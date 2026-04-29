@@ -27,13 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck } from "lucide-react";
 import { seedProducts } from "@/data/products";
 import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
@@ -49,7 +43,7 @@ import VerificationStep, { VerificationCheck, overallStatus } from "./Verificati
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+
 
 const PAYMENT_MODES: PaymentMode[] = [
   "Pay all years upfront",
@@ -59,46 +53,36 @@ const PAYMENT_MODES: PaymentMode[] = [
 
 const RELATIONSHIPS = ["Spouse", "Child", "Parent", "Sibling", "Partner", "Bank", "Other"];
 
-const StepHeader = ({ step }: { step: Step }) => {
-  const items = [
-    { n: 1, label: "Product", icon: Package },
-    { n: 2, label: "People", icon: Users },
-    { n: 3, label: "Policy Dates", icon: Calendar },
-    { n: 4, label: "Premium", icon: Calculator },
-    { n: 5, label: "Verification", icon: ShieldCheck },
-  ] as const;
-  return (
-    <div className="flex items-center gap-2 mb-6">
-      {items.map((it, idx) => {
-        const active = step === it.n;
-        const done = step > it.n;
-        const Icon = it.icon;
+const SECTIONS = [
+  { id: "product", label: "Product", icon: Package },
+  { id: "people", label: "People", icon: Users },
+  { id: "dates", label: "Dates", icon: Calendar },
+  { id: "premium", label: "Premium", icon: Calculator },
+  { id: "verification", label: "Verification", icon: ShieldCheck },
+] as const;
+
+const SectionNav = () => (
+  <div className="sticky top-16 z-20 -mx-2 mb-6 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto">
+      {SECTIONS.map((s) => {
+        const Icon = s.icon;
         return (
-          <div key={it.n} className="flex items-center gap-2">
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm ${
-                active
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : done
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                  : "bg-muted text-muted-foreground border-transparent"
-              }`}
-            >
-              {done ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
-              <span className="font-medium">Step {it.n}</span>
-              <span className="hidden sm:inline">· {it.label}</span>
-            </div>
-            {idx < items.length - 1 && <div className="h-px w-6 bg-border" />}
-          </div>
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {s.label}
+          </a>
         );
       })}
     </div>
-  );
-};
+  </div>
+);
 
 const CreateOffer = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>(1);
 
   // Step 1
   const [productId, setProductId] = useState("");
@@ -184,29 +168,14 @@ const CreateOffer = () => {
     setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
   };
 
-  // Step validation
-  const canNextStep1 = !!(productId && versionId && templateId && currency);
-  const canNextStep2 = !!(policyHolderId && payerId && insuredId)
+  // Validation
+  const productOk = !!(productId && versionId && templateId && currency);
+  const peopleOk = !!(policyHolderId && payerId && insuredId)
     && (beneficiaries.length === 0 || (beneficiariesValid && beneficiaries.every((b) => b.customerId && b.percentage > 0)));
-
-  const handleNext = () => {
-    if (step === 1 && !canNextStep1) {
-      toast.error("Complete product, version, template and currency");
-      return;
-    }
-    if (step === 2) {
-      if (!canNextStep2) {
-        toast.error("Select all parties and ensure beneficiaries total 100%");
-        return;
-      }
-    }
-    setStep((s) => (s === 5 ? s : ((s + 1) as Step)));
-  };
-
-  const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
+  const canSave = productOk && peopleOk;
 
   const handleSave = (intent: "Draft" | "Submit" | "Approve") => {
-    if (!canNextStep1 || !canNextStep2) {
+    if (!canSave) {
       toast.error("Complete required fields before saving");
       return;
     }
@@ -265,15 +234,14 @@ const CreateOffer = () => {
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">Create Offer</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Build a draft policy in three guided steps.
+          Fill in the details below — all sections are on one page.
         </p>
       </div>
 
-      <StepHeader step={step} />
+      <SectionNav />
 
-      <Tabs value={String(step)} className="w-full">
-        {/* STEP 1 */}
-        <TabsContent value="1" className="m-0">
+      <div className="space-y-4">
+        <section id="product" className="scroll-mt-32">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Product Selection</CardTitle>
@@ -344,10 +312,9 @@ const CreateOffer = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </section>
 
-        {/* STEP 2 */}
-        <TabsContent value="2" className="m-0">
+        <section id="people" className="scroll-mt-32">
           <Card className="mb-4">
             <CardHeader>
               <CardTitle className="text-base">People</CardTitle>
@@ -489,10 +456,9 @@ const CreateOffer = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </section>
 
-        {/* STEP 3 */}
-        <TabsContent value="3" className="m-0">
+        <section id="dates" className="scroll-mt-32">
           <Card className="mb-4">
             <CardHeader>
               <CardTitle className="text-base">Policy Dates & Payment</CardTitle>
@@ -570,10 +536,9 @@ const CreateOffer = () => {
               </CardContent>
             )}
           </Card>
-        </TabsContent>
+        </section>
 
-        {/* STEP 4 */}
-        <TabsContent value="4" className="m-0">
+        <section id="premium" className="scroll-mt-32">
           <PremiumCalculation
             productId={productId}
             versionId={versionId}
@@ -596,10 +561,9 @@ const CreateOffer = () => {
             }
             onResultChange={setPremiumResult}
           />
-        </TabsContent>
+        </section>
 
-        {/* STEP 5 */}
-        <TabsContent value="5" className="m-0">
+        <section id="verification" className="scroll-mt-32">
           <VerificationStep
             productId={productId}
             versionId={versionId}
@@ -611,30 +575,22 @@ const CreateOffer = () => {
             loanOutstanding={hasLoan ? Number(outstandingBalance) || 0 : undefined}
             onChecksComputed={setVerificationChecks}
           />
-        </TabsContent>
-      </Tabs>
+        </section>
+      </div>
 
-      {/* Footer nav */}
-      <div className="flex items-center justify-between mt-6">
-        <Button variant="outline" onClick={handleBack} disabled={step === 1} className="gap-2">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Button>
+      {/* Footer actions */}
+      <div className="flex items-center justify-between mt-6 sticky bottom-0 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-3 -mx-2 px-2">
+        <div className="text-xs text-muted-foreground">
+          {canSave ? "Ready to save." : "Complete product, parties and beneficiaries to enable submission."}
+        </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
-          {step < 5 ? (
-            <Button onClick={handleNext} className="gap-2">
-              Continue <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => handleSave("Approve")} className="gap-2">
-                Approve & Save
-              </Button>
-              <Button onClick={() => handleSave("Submit")} className="gap-2">
-                <Check className="h-4 w-4" /> Submit Offer
-              </Button>
-            </>
-          )}
+          <Button variant="outline" onClick={() => handleSave("Approve")} disabled={!canSave}>
+            Approve & Save
+          </Button>
+          <Button onClick={() => handleSave("Submit")} disabled={!canSave} className="gap-2">
+            <Check className="h-4 w-4" /> Submit Offer
+          </Button>
         </div>
       </div>
     </AppShell>
