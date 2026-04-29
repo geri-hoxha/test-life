@@ -288,7 +288,7 @@ const PremiumCalculation = ({
   }
 
   // Notify parent
-  useMemo(() => {
+  useEffect(() => {
     onResultChange?.({
       netPremium,
       commission,
