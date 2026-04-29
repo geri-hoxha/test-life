@@ -1,6 +1,6 @@
 import type { Beneficiary, PaymentMode } from "./offers";
 
-export type PolicyStatus = "Active" | "Lapsed" | "Cancelled" | "Matured";
+export type PolicyStatus = "Active" | "Pending Payment" | "Cancelled" | "Expired" | "Lapsed";
 
 export type Policy = {
   id: string;
@@ -59,7 +59,8 @@ export const newPolicyId = () => {
 
 export const policyStatusColor: Record<PolicyStatus, string> = {
   "Active": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "Pending Payment": "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   "Lapsed": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "Cancelled": "bg-destructive/15 text-destructive",
-  "Matured": "bg-muted text-muted-foreground",
+  "Expired": "bg-muted text-muted-foreground",
 };
