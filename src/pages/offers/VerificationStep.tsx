@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -259,10 +259,23 @@ export const overallStatus = (checks: VerificationCheck[]): "Pending Review" | "
 };
 
 const VerificationStep = (props: Props) => {
-  const checks = useMemo(() => computeVerification(props), [props]);
+  const checks = useMemo(
+    () => computeVerification(props),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      props.productId,
+      props.versionId,
+      props.templateId,
+      props.currency,
+      props.policyHolderId,
+      props.insuredId,
+      props.premium,
+      props.loanOutstanding,
+    ]
+  );
 
-  // Notify parent
-  useMemo(() => {
+  // Notify parent (effect, not memo, to avoid setState-during-render loops)
+  useEffect(() => {
     props.onChecksComputed?.(checks);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checks]);
