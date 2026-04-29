@@ -312,10 +312,9 @@ const CreateOffer = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </section>
 
-        {/* STEP 2 */}
-        <TabsContent value="2" className="m-0">
+        <section id="people" className="scroll-mt-32">
           <Card className="mb-4">
             <CardHeader>
               <CardTitle className="text-base">People</CardTitle>
@@ -457,10 +456,9 @@ const CreateOffer = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </section>
 
-        {/* STEP 3 */}
-        <TabsContent value="3" className="m-0">
+        <section id="dates" className="scroll-mt-32">
           <Card className="mb-4">
             <CardHeader>
               <CardTitle className="text-base">Policy Dates & Payment</CardTitle>
@@ -538,10 +536,9 @@ const CreateOffer = () => {
               </CardContent>
             )}
           </Card>
-        </TabsContent>
+        </section>
 
-        {/* STEP 4 */}
-        <TabsContent value="4" className="m-0">
+        <section id="premium" className="scroll-mt-32">
           <PremiumCalculation
             productId={productId}
             versionId={versionId}
@@ -564,10 +561,9 @@ const CreateOffer = () => {
             }
             onResultChange={setPremiumResult}
           />
-        </TabsContent>
+        </section>
 
-        {/* STEP 5 */}
-        <TabsContent value="5" className="m-0">
+        <section id="verification" className="scroll-mt-32">
           <VerificationStep
             productId={productId}
             versionId={versionId}
@@ -579,30 +575,22 @@ const CreateOffer = () => {
             loanOutstanding={hasLoan ? Number(outstandingBalance) || 0 : undefined}
             onChecksComputed={setVerificationChecks}
           />
-        </TabsContent>
-      </Tabs>
+        </section>
+      </div>
 
-      {/* Footer nav */}
-      <div className="flex items-center justify-between mt-6">
-        <Button variant="outline" onClick={handleBack} disabled={step === 1} className="gap-2">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Button>
+      {/* Footer actions */}
+      <div className="flex items-center justify-between mt-6 sticky bottom-0 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-3 -mx-2 px-2">
+        <div className="text-xs text-muted-foreground">
+          {canSave ? "Ready to save." : "Complete product, parties and beneficiaries to enable submission."}
+        </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
-          {step < 5 ? (
-            <Button onClick={handleNext} className="gap-2">
-              Continue <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => handleSave("Approve")} className="gap-2">
-                Approve & Save
-              </Button>
-              <Button onClick={() => handleSave("Submit")} className="gap-2">
-                <Check className="h-4 w-4" /> Submit Offer
-              </Button>
-            </>
-          )}
+          <Button variant="outline" onClick={() => handleSave("Approve")} disabled={!canSave}>
+            Approve & Save
+          </Button>
+          <Button onClick={() => handleSave("Submit")} disabled={!canSave} className="gap-2">
+            <Check className="h-4 w-4" /> Submit Offer
+          </Button>
         </div>
       </div>
     </AppShell>
