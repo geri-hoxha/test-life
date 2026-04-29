@@ -597,6 +597,21 @@ const CreateOffer = () => {
             onResultChange={setPremiumResult}
           />
         </TabsContent>
+
+        {/* STEP 5 */}
+        <TabsContent value="5" className="m-0">
+          <VerificationStep
+            productId={productId}
+            versionId={versionId}
+            templateId={templateId}
+            currency={currency}
+            policyHolderId={policyHolderId}
+            insuredId={insuredId}
+            premium={premiumResult}
+            loanOutstanding={hasLoan ? Number(outstandingBalance) || 0 : undefined}
+            onChecksComputed={setVerificationChecks}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Footer nav */}
@@ -606,14 +621,19 @@ const CreateOffer = () => {
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
-          {step < 4 ? (
+          {step < 5 ? (
             <Button onClick={handleNext} className="gap-2">
               Continue <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={() => handleSave("Quoted")} className="gap-2">
-              <Check className="h-4 w-4" /> Save & Quote
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => handleSave("Approve")} className="gap-2">
+                Approve & Save
+              </Button>
+              <Button onClick={() => handleSave("Submit")} className="gap-2">
+                <Check className="h-4 w-4" /> Submit Offer
+              </Button>
+            </>
           )}
         </div>
       </div>
