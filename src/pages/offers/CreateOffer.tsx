@@ -205,11 +205,20 @@ const CreateOffer = () => {
 
   const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
 
-  const handleSave = (status: "Draft" | "Quoted") => {
+  const handleSave = (intent: "Draft" | "Submit" | "Approve") => {
     if (!canNextStep1 || !canNextStep2) {
       toast.error("Complete required fields before saving");
       return;
     }
+    let status: "Draft" | "Quoted" | "Pending Review" | "Approved" = "Draft";
+    if (intent === "Draft") {
+      status = "Draft";
+    } else {
+      const computed = overallStatus(verificationChecks);
+      if (computed === "Pending Review") status = "Pending Review";
+      else status = intent === "Approve" ? "Approved" : "Quoted";
+    }
+
     const { id, number } = newOfferId();
     upsertOffer({
       id,
