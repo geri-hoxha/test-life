@@ -8,6 +8,9 @@ import NotFound from "./pages/NotFound.tsx";
 import ProductsList from "./pages/products/ProductsList.tsx";
 import CreateProduct from "./pages/products/CreateProduct.tsx";
 import ProductDetail from "./pages/products/ProductDetail.tsx";
+import CustomersList from "./pages/customers/CustomersList.tsx";
+import CustomerForm from "./pages/customers/CustomerForm.tsx";
+import CustomerDetail from "./pages/customers/CustomerDetail.tsx";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +25,10 @@ const App = () => (
           <Route path="/products" element={<ProductsList />} />
           <Route path="/products/new" element={<CreateProduct />} />
           <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/customers" element={<CustomersList />} />
+          <Route path="/customers/new" element={<CustomerForm />} />
+          <Route path="/customers/:id" element={<CustomerDetail />} />
+          <Route path="/customers/:id/edit" element={<CustomerForm />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
