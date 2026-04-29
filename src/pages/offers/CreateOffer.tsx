@@ -127,6 +127,9 @@ const CreateOffer = () => {
   // Step 4 result
   const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
 
+  // Step 5 result
+  const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
+
   // Derived
   const product = seedProducts.find((p) => p.id === productId);
   const versions = productId ? getActiveVersions(productId) : [];
@@ -197,7 +200,7 @@ const CreateOffer = () => {
         return;
       }
     }
-    setStep((s) => (s === 4 ? s : ((s + 1) as Step)));
+    setStep((s) => (s === 5 ? s : ((s + 1) as Step)));
   };
 
   const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
