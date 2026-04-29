@@ -58,6 +58,7 @@ import { seedProducts } from "@/data/products";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates, overrideSummary } from "@/data/templates";
 import { getCustomer, fullName, ageFromDob } from "@/data/customers";
+import PremiumBreakdownPanel from "@/components/premium/PremiumBreakdownPanel";
 import { listCoverages } from "@/data/coverages";
 import { listDocuments } from "@/data/documents";
 import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
@@ -348,6 +349,24 @@ const OfferDetail = () => {
               />
             </CardContent>
           </Card>
+
+          <PremiumBreakdownPanel
+            data={{
+              productName: product?.name ?? offer.productId,
+              templateName: template?.name,
+              currency: offer.currency,
+              insuredAge,
+              termYears: offer.termYears,
+              paymentMode: offer.paymentMode,
+              netPremium: premiumResult?.netPremium,
+              commission: premiumResult?.commission,
+              grossPremium: premiumResult?.grossPremium ?? offer.premium,
+              loanAdjustment: offer.loan ? 0 : undefined,
+              fxRate: premiumResult?.fxRate,
+              fxSource: premiumResult?.fxSource,
+              reportingCurrency: "EUR",
+            }}
+          />
         </TabsContent>
 
         {/* PREMIUM */}
