@@ -12,19 +12,21 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import QuickActions from "./QuickActions";
+import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
-  { label: "Dashboard", active: true },
-  { label: "Products" },
-  { label: "Customers" },
-  { label: "Offers" },
-  { label: "Policies" },
-  { label: "Payments" },
-  { label: "Reports" },
-  { label: "Administration" },
+  { label: "Dashboard", to: "/" },
+  { label: "Products", to: "/products" },
+  { label: "Customers", to: "/customers" },
+  { label: "Offers", to: "/offers" },
+  { label: "Policies", to: "/policies" },
+  { label: "Payments", to: "/payments" },
+  { label: "Reports", to: "/reports" },
+  { label: "Administration", to: "/administration" },
 ];
 
 const TopBar = () => {
+  const location = useLocation();
   return (
     <header className="bg-gradient-topbar text-topbar-foreground border-b border-topbar-border sticky top-0 z-40 shadow-elevated">
       {/* Upper row: brand · search · quick actions · user */}
@@ -95,22 +97,28 @@ const TopBar = () => {
       {/* Lower row: main nav */}
       <nav className="border-t border-topbar-border/60">
         <div className="container flex items-center gap-1 h-11 overflow-x-auto">
-          {navItems.map((item) => (
-            <a
-              key={item.label}
-              href="#"
-              className={`relative px-3.5 py-2 text-[13px] font-medium rounded-md transition-colors whitespace-nowrap ${
-                item.active
-                  ? "text-topbar-foreground bg-topbar-hover"
-                  : "text-topbar-muted hover:text-topbar-foreground hover:bg-topbar-hover/60"
-              }`}
-            >
-              {item.label}
-              {item.active && (
-                <span className="absolute -bottom-[10px] left-3 right-3 h-0.5 rounded-full bg-accent" />
-              )}
-            </a>
-          ))}
+          {navItems.map((item) => {
+            const active =
+              item.to === "/"
+                ? location.pathname === "/"
+                : location.pathname.startsWith(item.to);
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                className={`relative px-3.5 py-2 text-[13px] font-medium rounded-md transition-colors whitespace-nowrap ${
+                  active
+                    ? "text-topbar-foreground bg-topbar-hover"
+                    : "text-topbar-muted hover:text-topbar-foreground hover:bg-topbar-hover/60"
+                }`}
+              >
+                {item.label}
+                {active && (
+                  <span className="absolute -bottom-[10px] left-3 right-3 h-0.5 rounded-full bg-accent" />
+                )}
+              </Link>
+            );
+          })}
           <div className="ml-auto hidden lg:flex items-center gap-2 text-[11px] text-topbar-muted">
             <Badge variant="outline" className="border-topbar-border text-topbar-muted bg-topbar-hover/40 font-normal">
               FX rate: EUR/USD 1.0842

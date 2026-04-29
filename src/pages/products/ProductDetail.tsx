@@ -1,0 +1,279 @@
+import { Link, useParams } from "react-router-dom";
+import AppShell from "@/components/layout/AppShell";
+import PageHeader from "@/components/layout/PageHeader";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { getProduct, ProductStatus } from "@/data/products";
+import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator } from "lucide-react";
+
+const statusClass: Record<ProductStatus, string> = {
+  Active: "bg-success/15 text-success",
+  Draft: "bg-muted text-muted-foreground",
+  Inactive: "bg-destructive/10 text-destructive",
+};
+
+const SectionEmpty = ({ icon: Icon, title, hint, cta }: { icon: any; title: string; hint: string; cta: string }) => (
+  <Card className="p-12 shadow-card border-border border-dashed flex flex-col items-center text-center">
+    <div className="h-12 w-12 rounded-md bg-accent-soft text-accent flex items-center justify-center mb-3">
+      <Icon className="h-6 w-6" />
+    </div>
+    <div className="text-sm font-semibold text-foreground">{title}</div>
+    <p className="text-xs text-muted-foreground mt-1 max-w-md">{hint}</p>
+    <Button size="sm" className="mt-4 gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+      <Plus className="h-4 w-4" />{cta}
+    </Button>
+  </Card>
+);
+
+const ProductDetail = () => {
+  const { id } = useParams();
+  const product = id ? getProduct(id) : undefined;
+
+  if (!product) {
+    return (
+      <AppShell>
+        <PageHeader
+          breadcrumbs={[{ label: "Products", to: "/products" }, { label: "Not found" }]}
+          title="Product not found"
+        />
+        <Card className="p-10 text-center">
+          <p className="text-muted-foreground text-sm">This product no longer exists.</p>
+          <Button asChild className="mt-4"><Link to="/products">Back to products</Link></Button>
+        </Card>
+      </AppShell>
+    );
+  }
+
+  const flagList = [
+    { key: "pep", label: "PEP check required", on: product.flags.pep },
+    { key: "highInsuredAmount", label: "High insured amount requires review", on: product.flags.highInsuredAmount },
+    { key: "totalExposure", label: "Total customer exposure requires review", on: product.flags.totalExposure },
+    { key: "manualUnderwriting", label: "Manual underwriting required", on: product.flags.manualUnderwriting },
+    { key: "compliance", label: "Compliance review required", on: product.flags.compliance },
+  ];
+
+  return (
+    <AppShell>
+      <PageHeader
+        breadcrumbs={[{ label: "Products", to: "/products" }, { label: product.name }]}
+        title={product.name}
+        description={product.description}
+        actions={
+          <>
+            <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4" /> Edit</Button>
+            <Button className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Settings2 className="h-4 w-4" /> Configure
+            </Button>
+          </>
+        }
+      />
+
+      {/* Summary strip */}
+      <Card className="p-5 mb-6 shadow-card border-border">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Code</div>
+            <div className="font-mono text-sm text-accent mt-0.5">{product.code}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</div>
+            <Badge className={`mt-0.5 font-medium border-0 ${statusClass[product.status]}`}>{product.status}</Badge>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Type</div>
+            <div className="text-sm mt-0.5">{product.type}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Active Version</div>
+            <div className="font-mono text-sm mt-0.5">{product.activeVersion}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Currencies</div>
+            <div className="flex gap-1 mt-0.5">
+              {product.currencies.map((c) => (
+                <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Created</div>
+            <div className="text-sm mt-0.5">{product.createdDate}</div>
+          </div>
+        </div>
+      </Card>
+
+      <Tabs defaultValue="overview" className="space-y-5">
+        <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="versions">Versions</TabsTrigger>
+          <TabsTrigger value="coverages">Coverages</TabsTrigger>
+          <TabsTrigger value="templates">Templates / Packages</TabsTrigger>
+          <TabsTrigger value="premium">Premium Rules</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="verification">Verification Rules</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-5 shadow-card border-border md:col-span-2">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Description</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {product.description || "No description provided."}
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground">Required documents</div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {product.requiredDocuments.map((d) => (
+                      <Badge key={d} className="bg-accent-soft text-accent-soft-foreground border-0">{d}</Badge>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Currencies</div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {product.currencies.map((c) => (
+                      <Badge key={c} variant="outline" className="font-mono">{c}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-5 shadow-card border-border">
+              <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-warning" /> Verification flags
+              </h3>
+              <ul className="space-y-2.5">
+                {flagList.map((f) => (
+                  <li key={f.key} className="flex items-start gap-2 text-sm">
+                    <span className={`mt-0.5 h-4 w-4 rounded-sm flex items-center justify-center ${f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
+                      {f.on && <Check className="h-3 w-3" />}
+                    </span>
+                    <span className={f.on ? "text-foreground" : "text-muted-foreground"}>{f.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="versions">
+          <Card className="shadow-card border-border overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Versions</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Track configuration changes over time.</p>
+              </div>
+              <Button size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Plus className="h-4 w-4" /> New Version
+              </Button>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead>Version</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Effective From</TableHead>
+                  <TableHead>Author</TableHead>
+                  <TableHead>Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-mono text-accent">{product.activeVersion}</TableCell>
+                  <TableCell><Badge className="bg-success/15 text-success border-0">Active</Badge></TableCell>
+                  <TableCell>Jan 15, 2026</TableCell>
+                  <TableCell>Anna Kovač</TableCell>
+                  <TableCell className="text-muted-foreground">Updated premium tables</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-mono">v3.1</TableCell>
+                  <TableCell><Badge variant="outline">Archived</Badge></TableCell>
+                  <TableCell>Sep 02, 2025</TableCell>
+                  <TableCell>M. Hoxha</TableCell>
+                  <TableCell className="text-muted-foreground">Initial 2025 release</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="coverages">
+          <SectionEmpty icon={Shield} title="No coverages configured" hint="Define core and rider coverages, sums insured and exclusions for this product." cta="Add Coverage" />
+        </TabsContent>
+
+        <TabsContent value="templates">
+          <SectionEmpty icon={Layers} title="No packages defined" hint="Bundle coverages into ready-to-sell packages such as Standard, Plus, Premium." cta="Create Package" />
+        </TabsContent>
+
+        <TabsContent value="premium">
+          <SectionEmpty icon={Calculator} title="No premium rules yet" hint="Configure rating tables, age bands, loadings and discounts." cta="Add Premium Rule" />
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <Card className="shadow-card border-border overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Required documents</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Documents customers must submit when applying.</p>
+              </div>
+              <Button size="sm" variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Add</Button>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead>Document</TableHead>
+                  <TableHead>Mandatory</TableHead>
+                  <TableHead>Stage</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {product.requiredDocuments.map((d) => (
+                  <TableRow key={d}>
+                    <TableCell className="font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-accent" />{d}</TableCell>
+                    <TableCell><Badge className="bg-success/15 text-success border-0">Yes</Badge></TableCell>
+                    <TableCell className="text-muted-foreground">Application</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="verification">
+          <Card className="shadow-card border-border overflow-hidden">
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <ScrollText className="h-4 w-4 text-accent" /> Verification rules
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Conditions that route an application to manual review.</p>
+            </div>
+            <div className="divide-y divide-border">
+              {flagList.map((f) => (
+                <div key={f.key} className="flex items-center justify-between px-5 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <span className={`h-7 w-7 rounded-md flex items-center justify-center ${f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
+                      <Check className="h-4 w-4" />
+                    </span>
+                    <span className="text-sm font-medium">{f.label}</span>
+                  </div>
+                  <Badge className={f.on ? "bg-success/15 text-success border-0" : "bg-muted text-muted-foreground border-0"}>
+                    {f.on ? "Enabled" : "Disabled"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </AppShell>
+  );
+};
+
+export default ProductDetail;
