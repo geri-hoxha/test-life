@@ -175,7 +175,7 @@ const CreateOffer = () => {
   const canSave = productOk && peopleOk;
 
   const handleSave = (intent: "Draft" | "Submit" | "Approve") => {
-    if (!canNextStep1 || !canNextStep2) {
+    if (!canSave) {
       toast.error("Complete required fields before saving");
       return;
     }
