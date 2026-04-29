@@ -122,6 +122,9 @@ const CreateOffer = () => {
   const [remainingYears, setRemainingYears] = useState("");
   const [outstandingBalance, setOutstandingBalance] = useState("");
 
+  // Step 4 result
+  const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
+
   // Derived
   const product = seedProducts.find((p) => p.id === productId);
   const versions = productId ? getActiveVersions(productId) : [];
@@ -130,6 +133,10 @@ const CreateOffer = () => {
   const templates = productId && versionId ? listTemplates(productId, versionId).filter((t) => t.isActive) : [];
   const template = templates.find((t) => t.id === templateId);
   const allowedCurrencies = template?.allowedCurrencies ?? [];
+
+  const insured = insuredId ? getCustomer(insuredId) : undefined;
+  const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
+  const insuredGender: RuleGender = insured?.gender === "Female" ? "Female" : insured?.gender === "Male" ? "Male" : "Any";
 
   const endDate = useMemo(() => {
     if (!startDate) return "";
