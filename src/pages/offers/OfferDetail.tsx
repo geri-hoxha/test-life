@@ -361,7 +361,7 @@ const OfferDetail = () => {
               netPremium: premiumResult?.netPremium,
               commission: premiumResult?.commission,
               grossPremium: premiumResult?.grossPremium ?? offer.premium,
-              loanAdjustment: offer.loan ? offer.loan.outstandingBalance * 0 : undefined,
+              loanAdjustment: offer.loan ? 0 : undefined,
               fxRate: premiumResult?.fxRate,
               fxSource: premiumResult?.fxSource,
               reportingCurrency: "EUR",
