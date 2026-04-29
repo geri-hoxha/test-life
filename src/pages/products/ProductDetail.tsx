@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { getProduct, ProductStatus } from "@/data/products";
 import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator } from "lucide-react";
+import VersionsTab from "./VersionsTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -164,44 +165,7 @@ const ProductDetail = () => {
         </TabsContent>
 
         <TabsContent value="versions">
-          <Card className="shadow-card border-border overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Versions</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Track configuration changes over time.</p>
-              </div>
-              <Button size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Plus className="h-4 w-4" /> New Version
-              </Button>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead>Version</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Effective From</TableHead>
-                  <TableHead>Author</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-mono text-accent">{product.activeVersion}</TableCell>
-                  <TableCell><Badge className="bg-success/15 text-success border-0">Active</Badge></TableCell>
-                  <TableCell>Jan 15, 2026</TableCell>
-                  <TableCell>Anna Kovač</TableCell>
-                  <TableCell className="text-muted-foreground">Updated premium tables</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-mono">v3.1</TableCell>
-                  <TableCell><Badge variant="outline">Archived</Badge></TableCell>
-                  <TableCell>Sep 02, 2025</TableCell>
-                  <TableCell>M. Hoxha</TableCell>
-                  <TableCell className="text-muted-foreground">Initial 2025 release</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </Card>
+          <VersionsTab productId={product.id} />
         </TabsContent>
 
         <TabsContent value="coverages">
