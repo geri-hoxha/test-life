@@ -202,7 +202,7 @@ const OfferDetail = () => {
           </Button>
           <Button
             size="sm" className="gap-2"
-            onClick={() => updateStatus("Issued", `${offer.number} issued as policy`)}
+            onClick={() => navigate(`/offers/${offer.id}/issue`)}
             disabled={!canIssue}
           >
             <Send className="h-4 w-4" /> Issue Policy

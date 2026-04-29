@@ -1,0 +1,65 @@
+import type { Beneficiary, PaymentMode } from "./offers";
+
+export type PolicyStatus = "Active" | "Lapsed" | "Cancelled" | "Matured";
+
+export type Policy = {
+  id: string;
+  number: string;
+  offerId: string;
+  productId: string;
+  versionId: string;
+  templateId: string;
+  currency: string;
+  policyHolderId: string;
+  payerId: string;
+  insuredId: string;
+  beneficiaries: Beneficiary[];
+  startDate: string;
+  endDate: string;
+  termYears: number;
+  paymentMode: PaymentMode;
+  premium: number;
+  status: PolicyStatus;
+  issueDate: string;
+  issuedBy: string;
+};
+
+const seed: Policy[] = [
+  {
+    id: "POL-0001", number: "POL-2026-0001", offerId: "OFR-0004",
+    productId: "PRD-001", versionId: "VRS-1001", templateId: "TPL-3001", currency: "EUR",
+    policyHolderId: "CUS-0003", payerId: "CUS-0003", insuredId: "CUS-0003",
+    beneficiaries: [{ id: "b1", customerId: "CUS-0001", relationship: "Friend", percentage: 100 }],
+    startDate: "2026-03-15", endDate: "2046-03-15", termYears: 20,
+    paymentMode: "Pay first year only",
+    premium: 410, status: "Active",
+    issueDate: "2026-03-12", issuedBy: "Anna Kovač",
+  },
+];
+
+let policies: Policy[] = [...seed];
+
+export const listPolicies = () => [...policies].sort((a, b) => (a.issueDate < b.issueDate ? 1 : -1));
+export const getPolicy = (id: string) => policies.find((p) => p.id === id);
+export const getPolicyByOffer = (offerId: string) => policies.find((p) => p.offerId === offerId);
+
+export const upsertPolicy = (p: Policy) => {
+  const i = policies.findIndex((x) => x.id === p.id);
+  if (i >= 0) policies[i] = p;
+  else policies = [p, ...policies];
+};
+
+export const newPolicyId = () => {
+  const n = policies.length + 1;
+  return {
+    id: `POL-${String(n).padStart(4, "0")}`,
+    number: `POL-2026-${String(n).padStart(4, "0")}`,
+  };
+};
+
+export const policyStatusColor: Record<PolicyStatus, string> = {
+  "Active": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "Lapsed": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  "Cancelled": "bg-destructive/15 text-destructive",
+  "Matured": "bg-muted text-muted-foreground",
+};
