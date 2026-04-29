@@ -17,7 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, ShieldCheck, FileText } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, ShieldCheck, FileText, CreditCard, Calendar, Users, History, Files } from "lucide-react";
 import { getPolicy, policyStatusColor } from "@/data/policies";
 import { seedProducts } from "@/data/products";
 import { listVersions } from "@/data/productVersions";
@@ -57,6 +58,43 @@ const PolicyDetail = () => {
   const insured = getCustomer(policy.insuredId);
   const payer = getCustomer(policy.payerId);
 
+  // Premium schedule
+  const startYear = new Date(policy.startDate).getFullYear();
+  const schedule = Array.from({ length: policy.termYears }, (_, i) => {
+    const y = startYear + i;
+    const due = policy.paymentMode === "Pay all years upfront"
+      ? (i === 0 ? policy.premium * policy.termYears : 0)
+      : policy.paymentMode === "Pay first year only"
+        ? (i === 0 ? policy.premium : 0)
+        : policy.premium;
+    return {
+      year: i + 1,
+      startDate: `${y}-${policy.startDate.slice(5)}`,
+      endDate: `${y + 1}-${policy.startDate.slice(5)}`,
+      premium: due,
+      status: i === 0 && policy.status === "Active" ? "Paid" : "Not Due",
+    };
+  });
+
+  // Mock payments — first year recorded if Active
+  const payments = policy.status === "Active" ? [
+    { id: "PAY-001", date: policy.issueDate, amount: policy.premium, method: "Bank transfer", status: "Settled", reference: `INV-${policy.number}-1` },
+  ] : [];
+
+  // Mock documents from product config
+  const docs = [
+    { name: "Application Form", status: "Uploaded", uploadedBy: policy.issuedBy, uploadedAt: policy.issueDate },
+    { name: "ID Verification", status: "Uploaded", uploadedBy: policy.issuedBy, uploadedAt: policy.issueDate },
+    { name: "Medical Declaration", status: policy.status === "Pending Payment" ? "Pending" : "Uploaded", uploadedBy: policy.issuedBy, uploadedAt: policy.issueDate },
+  ];
+
+  // Mock audit trail
+  const audit = [
+    { ts: policy.issueDate + " 09:14", user: policy.issuedBy, action: "Policy issued", details: `From offer ${policy.offerId}` },
+    { ts: policy.issueDate + " 09:14", user: policy.issuedBy, action: "Status set", details: `→ ${policy.status}` },
+    { ts: policy.issueDate + " 09:13", user: policy.issuedBy, action: "Premium confirmed", details: fmtMoney(policy.premium, policy.currency) },
+  ];
+
   return (
     <AppShell>
       <div className="flex items-center justify-between mb-4">
@@ -80,7 +118,7 @@ const PolicyDetail = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <Card><CardHeader className="pb-1.5"><CardDescription>Premium</CardDescription></CardHeader>
+        <Card><CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold text-primary">{fmtMoney(policy.premium, policy.currency)}</div></CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Currency</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{policy.currency}</div></CardContent></Card>
@@ -92,64 +130,219 @@ const PolicyDetail = () => {
           <CardContent><div className="text-sm font-semibold flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> {policy.status}</div></CardContent></Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" /> Policy Details</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Field label="Product" value={product?.name} />
-            <Field label="Version" value={`${version?.name} (${version?.number})`} />
-            <Field label="Template" value={template?.name} />
-            <Field label="Currency" value={<Badge variant="outline">{policy.currency}</Badge>} />
-            <Field label="Start Date" value={<span className="font-mono text-xs">{policy.startDate}</span>} />
-            <Field label="End Date" value={<span className="font-mono text-xs">{policy.endDate}</span>} />
-            <Field label="Issue Date" value={<span className="font-mono text-xs">{policy.issueDate}</span>} />
-            <Field label="Issued By" value={policy.issuedBy} />
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="summary" className="w-full">
+        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
+          <TabsTrigger value="summary"><FileText className="h-3.5 w-3.5 mr-1.5" />Summary</TabsTrigger>
+          <TabsTrigger value="schedule"><Calendar className="h-3.5 w-3.5 mr-1.5" />Schedule</TabsTrigger>
+          <TabsTrigger value="payments"><CreditCard className="h-3.5 w-3.5 mr-1.5" />Payments</TabsTrigger>
+          <TabsTrigger value="documents"><Files className="h-3.5 w-3.5 mr-1.5" />Documents</TabsTrigger>
+          <TabsTrigger value="beneficiaries"><Users className="h-3.5 w-3.5 mr-1.5" />Beneficiaries</TabsTrigger>
+          <TabsTrigger value="audit"><History className="h-3.5 w-3.5 mr-1.5" />Audit Trail</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Parties</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <Field label="Policy Holder" value={holder ? <Link to={`/customers/${holder.id}`} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"} />
-            <Field label="Insured Person" value={insured ? <Link to={`/customers/${insured.id}`} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"} />
-            <Field label="Payer" value={payer ? <Link to={`/customers/${payer.id}`} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"} />
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="summary" className="mt-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle className="text-base">Policy Details</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                <Field label="Product" value={product?.name} />
+                <Field label="Version" value={`${version?.name} (${version?.number})`} />
+                <Field label="Template" value={template?.name} />
+                <Field label="Currency" value={<Badge variant="outline">{policy.currency}</Badge>} />
+                <Field label="Start Date" value={<span className="font-mono text-xs">{policy.startDate}</span>} />
+                <Field label="End Date" value={<span className="font-mono text-xs">{policy.endDate}</span>} />
+                <Field label="Issue Date" value={<span className="font-mono text-xs">{policy.issueDate}</span>} />
+                <Field label="Issued By" value={policy.issuedBy} />
+              </CardContent>
+            </Card>
 
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle className="text-base">Beneficiaries</CardTitle>
-          <CardDescription>{policy.beneficiaries.length} beneficiaries</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Relationship</TableHead>
-                  <TableHead className="text-right">Percentage</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {policy.beneficiaries.length === 0 ? (
-                  <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No beneficiaries</TableCell></TableRow>
-                ) : policy.beneficiaries.map((b) => {
-                  const c = getCustomer(b.customerId);
-                  return (
-                    <TableRow key={b.id}>
-                      <TableCell>{c ? <Link to={`/customers/${c.id}`} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}</TableCell>
-                      <TableCell>{b.relationship}</TableCell>
-                      <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Parties</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <Field label="Policy Holder" value={holder ? <Link to={`/customers/${holder.id}`} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"} />
+                <Field label="Insured Person" value={insured ? <Link to={`/customers/${insured.id}`} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"} />
+                <Field label="Payer" value={payer ? <Link to={`/customers/${payer.id}`} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"} />
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="schedule" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Premium Schedule</CardTitle>
+              <CardDescription>Projected premium installments over the policy term.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Year</TableHead>
+                      <TableHead>Period Start</TableHead>
+                      <TableHead>Period End</TableHead>
+                      <TableHead className="text-right">Premium Due</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {schedule.map((r) => (
+                      <TableRow key={r.year}>
+                        <TableCell className="font-mono text-xs">{r.year}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{r.startDate}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{r.endDate}</TableCell>
+                        <TableCell className="text-right font-mono">{fmtMoney(r.premium, policy.currency)}</TableCell>
+                        <TableCell><Badge variant="outline">{r.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payments" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Payments</CardTitle>
+              <CardDescription>Recorded premium payments and settlements.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">No payments recorded.</TableCell></TableRow>
+                    ) : payments.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{p.date}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.reference}</TableCell>
+                        <TableCell className="text-sm">{p.method}</TableCell>
+                        <TableCell className="text-right font-mono">{fmtMoney(p.amount, policy.currency)}</TableCell>
+                        <TableCell><Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">{p.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Documents</CardTitle>
+              <CardDescription>Underwriting and policy documents on file.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Document</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Uploaded By</TableHead>
+                      <TableHead>Uploaded At</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {docs.map((d, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-sm">{d.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={d.status === "Uploaded" ? "outline" : "secondary"}>{d.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{d.uploadedBy}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{d.uploadedAt}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="beneficiaries" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Beneficiaries</CardTitle>
+              <CardDescription>{policy.beneficiaries.length} beneficiaries · total {policy.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Relationship</TableHead>
+                      <TableHead className="text-right">Percentage</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {policy.beneficiaries.length === 0 ? (
+                      <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No beneficiaries</TableCell></TableRow>
+                    ) : policy.beneficiaries.map((b) => {
+                      const c = getCustomer(b.customerId);
+                      return (
+                        <TableRow key={b.id}>
+                          <TableCell>{c ? <Link to={`/customers/${c.id}`} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}</TableCell>
+                          <TableCell>{b.relationship}</TableCell>
+                          <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="audit" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Audit Trail</CardTitle>
+              <CardDescription>Chronological history of policy events.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Timestamp</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {audit.map((a, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{a.ts}</TableCell>
+                        <TableCell className="text-sm">{a.user}</TableCell>
+                        <TableCell className="text-sm font-medium">{a.action}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{a.details}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </AppShell>
   );
 };
