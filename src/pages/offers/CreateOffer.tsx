@@ -557,6 +557,32 @@ const CreateOffer = () => {
             )}
           </Card>
         </TabsContent>
+
+        {/* STEP 4 */}
+        <TabsContent value="4" className="m-0">
+          <PremiumCalculation
+            productId={productId}
+            versionId={versionId}
+            templateId={templateId}
+            currency={currency}
+            insuredAge={insuredAge}
+            insuredGender={insuredGender}
+            startDate={startDate}
+            termYears={termYears}
+            loan={
+              hasLoan
+                ? {
+                    amount: Number(loanAmount) || 0,
+                    interestRate: Number(interestRate) || 0,
+                    loanTermYears: Number(loanTermYears) || 0,
+                    remainingYears: Number(remainingYears) || 0,
+                    outstandingBalance: Number(outstandingBalance) || 0,
+                  }
+                : undefined
+            }
+            onResultChange={setPremiumResult}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Footer nav */}
@@ -566,7 +592,7 @@ const CreateOffer = () => {
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
-          {step < 3 ? (
+          {step < 4 ? (
             <Button onClick={handleNext} className="gap-2">
               Continue <ArrowRight className="h-4 w-4" />
             </Button>
