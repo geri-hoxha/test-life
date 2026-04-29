@@ -33,7 +33,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar, Calculator } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck } from "lucide-react";
 import { seedProducts } from "@/data/products";
 import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
@@ -45,10 +45,11 @@ import {
   upsertOffer,
 } from "@/data/offers";
 import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
+import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 const PAYMENT_MODES: PaymentMode[] = [
   "Pay all years upfront",
@@ -64,6 +65,7 @@ const StepHeader = ({ step }: { step: Step }) => {
     { n: 2, label: "People", icon: Users },
     { n: 3, label: "Policy Dates", icon: Calendar },
     { n: 4, label: "Premium", icon: Calculator },
+    { n: 5, label: "Verification", icon: ShieldCheck },
   ] as const;
   return (
     <div className="flex items-center gap-2 mb-6">
