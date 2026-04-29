@@ -33,20 +33,22 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar, Calculator } from "lucide-react";
 import { seedProducts } from "@/data/products";
 import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
-import { listCustomers, fullName } from "@/data/customers";
+import { listCustomers, fullName, ageFromDob, getCustomer } from "@/data/customers";
 import {
   Beneficiary,
   newOfferId,
   PaymentMode,
   upsertOffer,
 } from "@/data/offers";
+import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
+import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 const PAYMENT_MODES: PaymentMode[] = [
   "Pay all years upfront",
@@ -61,6 +63,7 @@ const StepHeader = ({ step }: { step: Step }) => {
     { n: 1, label: "Product", icon: Package },
     { n: 2, label: "People", icon: Users },
     { n: 3, label: "Policy Dates", icon: Calendar },
+    { n: 4, label: "Premium", icon: Calculator },
   ] as const;
   return (
     <div className="flex items-center gap-2 mb-6">
@@ -119,6 +122,9 @@ const CreateOffer = () => {
   const [remainingYears, setRemainingYears] = useState("");
   const [outstandingBalance, setOutstandingBalance] = useState("");
 
+  // Step 4 result
+  const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
+
   // Derived
   const product = seedProducts.find((p) => p.id === productId);
   const versions = productId ? getActiveVersions(productId) : [];
@@ -127,6 +133,10 @@ const CreateOffer = () => {
   const templates = productId && versionId ? listTemplates(productId, versionId).filter((t) => t.isActive) : [];
   const template = templates.find((t) => t.id === templateId);
   const allowedCurrencies = template?.allowedCurrencies ?? [];
+
+  const insured = insuredId ? getCustomer(insuredId) : undefined;
+  const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
+  const insuredGender: RuleGender = insured?.gender === "Female" ? "Female" : insured?.gender === "Male" ? "Male" : "Any";
 
   const endDate = useMemo(() => {
     if (!startDate) return "";
@@ -185,7 +195,7 @@ const CreateOffer = () => {
         return;
       }
     }
-    setStep((s) => (s === 3 ? s : ((s + 1) as Step)));
+    setStep((s) => (s === 4 ? s : ((s + 1) as Step)));
   };
 
   const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
@@ -220,7 +230,7 @@ const CreateOffer = () => {
             outstandingBalance: Number(outstandingBalance) || 0,
           }
         : undefined,
-      premium: 0,
+      premium: premiumResult?.grossPremium ?? 0,
       status,
       createdDate: new Date().toISOString().slice(0, 10),
     });
@@ -547,6 +557,32 @@ const CreateOffer = () => {
             )}
           </Card>
         </TabsContent>
+
+        {/* STEP 4 */}
+        <TabsContent value="4" className="m-0">
+          <PremiumCalculation
+            productId={productId}
+            versionId={versionId}
+            templateId={templateId}
+            currency={currency}
+            insuredAge={insuredAge}
+            insuredGender={insuredGender}
+            startDate={startDate}
+            termYears={termYears}
+            loan={
+              hasLoan
+                ? {
+                    amount: Number(loanAmount) || 0,
+                    interestRate: Number(interestRate) || 0,
+                    loanTermYears: Number(loanTermYears) || 0,
+                    remainingYears: Number(remainingYears) || 0,
+                    outstandingBalance: Number(outstandingBalance) || 0,
+                  }
+                : undefined
+            }
+            onResultChange={setPremiumResult}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Footer nav */}
@@ -556,7 +592,7 @@ const CreateOffer = () => {
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
-          {step < 3 ? (
+          {step < 4 ? (
             <Button onClick={handleNext} className="gap-2">
               Continue <ArrowRight className="h-4 w-4" />
             </Button>
