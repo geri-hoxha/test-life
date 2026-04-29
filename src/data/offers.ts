@@ -114,6 +114,11 @@ export const upsertOffer = (o: Offer) => {
   else offers = [o, ...offers];
 };
 
+export const setOfferStatus = (id: string, status: OfferStatus) => {
+  const o = offers.find((x) => x.id === id);
+  if (o) o.status = status;
+};
+
 export const newOfferId = () => {
   const n = offers.length + 1;
   const id = `OFR-${String(n).padStart(4, "0")}`;

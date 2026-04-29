@@ -189,7 +189,7 @@ const OffersList = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => toast.info(`View ${o.number}`)}>
+                              <DropdownMenuItem onClick={() => navigate(`/offers/${o.id}`)}>
                                 <Eye className="h-4 w-4 mr-2" />View
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => toast.info(`Edit ${o.number}`)}>

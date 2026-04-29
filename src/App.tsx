@@ -14,6 +14,7 @@ import CustomerDetail from "./pages/customers/CustomerDetail.tsx";
 import CurrencyExchange from "./pages/administration/CurrencyExchange.tsx";
 import OffersList from "./pages/offers/OffersList.tsx";
 import CreateOffer from "./pages/offers/CreateOffer.tsx";
+import OfferDetail from "./pages/offers/OfferDetail.tsx";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/customers/:id/edit" element={<CustomerForm />} />
           <Route path="/offers" element={<OffersList />} />
           <Route path="/offers/new" element={<CreateOffer />} />
+          <Route path="/offers/:id" element={<OfferDetail />} />
           <Route path="/administration" element={<CurrencyExchange />} />
           <Route path="/administration/currency-exchange" element={<CurrencyExchange />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
