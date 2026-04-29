@@ -11,6 +11,7 @@ import ProductDetail from "./pages/products/ProductDetail.tsx";
 import CustomersList from "./pages/customers/CustomersList.tsx";
 import CustomerForm from "./pages/customers/CustomerForm.tsx";
 import CustomerDetail from "./pages/customers/CustomerDetail.tsx";
+import CurrencyExchange from "./pages/administration/CurrencyExchange.tsx";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,8 @@ const App = () => (
           <Route path="/customers/new" element={<CustomerForm />} />
           <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/customers/:id/edit" element={<CustomerForm />} />
+          <Route path="/administration" element={<CurrencyExchange />} />
+          <Route path="/administration/currency-exchange" element={<CurrencyExchange />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
