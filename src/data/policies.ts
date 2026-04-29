@@ -28,12 +28,12 @@ const seed: Policy[] = [
   {
     id: "POL-0001", number: "POL-2026-0001", offerId: "OFR-0004",
     productId: "PRD-001", versionId: "VRS-1001", templateId: "TPL-3001", currency: "EUR",
-    policyHolderId: "CUS-0003", payerId: "CUS-0003", insuredId: "CUS-0003",
-    beneficiaries: [{ id: "b1", customerId: "CUS-0001", relationship: "Friend", percentage: 100 }],
-    startDate: "2026-03-15", endDate: "2046-03-15", termYears: 20,
-    paymentMode: "Pay first year only",
-    premium: 410, status: "Active",
-    issueDate: "2026-03-12", issuedBy: "Anna Kovač",
+    policyHolderId: "CUS-0001", payerId: "CUS-0001", insuredId: "CUS-0001",
+    beneficiaries: [{ id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 100 }],
+    startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
+    paymentMode: "Annual payment schedule",
+    premium: 615, status: "Active",
+    issueDate: "2026-04-01", issuedBy: "Anna Kovač",
   },
 ];
 

@@ -43,63 +43,55 @@ export type Offer = {
 };
 
 const seed: Offer[] = [
+  // 1) Draft — Premium Life Plus, USD, Mira Leka exploring options
   {
     id: "OFR-0001", number: "OFR-2026-0001",
-    productId: "PRD-001", versionId: "VRS-1001", templateId: "TPL-3002", currency: "EUR",
-    policyHolderId: "CUS-0001", payerId: "CUS-0001", insuredId: "CUS-0001",
+    productId: "PRD-003", versionId: "VRS-1020", templateId: "TPL-3003", currency: "USD",
+    policyHolderId: "CUS-0004", payerId: "CUS-0004", insuredId: "CUS-0004",
     beneficiaries: [
-      { id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 60 },
-      { id: "b2", customerId: "CUS-0004", relationship: "Child", percentage: 40 },
+      { id: "b1", customerId: "CUS-0001", relationship: "Father", percentage: 100 },
     ],
-    startDate: "2026-05-01", endDate: "2046-05-01", termYears: 20,
+    startDate: "2026-06-01", endDate: "2056-06-01", termYears: 30,
     paymentMode: "Annual payment schedule",
-    premium: 642, status: "Quoted", createdDate: "2026-04-22",
+    premium: 1180, status: "Draft", createdDate: "2026-04-26",
   },
+  // 2) Pending Review — PEP-flagged client (Elira Dervishi)
   {
     id: "OFR-0002", number: "OFR-2026-0002",
     productId: "PRD-002", versionId: "VRS-1010", templateId: "TPL-3010", currency: "EUR",
-    policyHolderId: "CUS-0004", payerId: "CUS-0004", insuredId: "CUS-0004",
-    beneficiaries: [{ id: "b1", customerId: "CUS-0005", relationship: "Bank", percentage: 100 }],
-    startDate: "2026-04-15", endDate: "2036-04-15", termYears: 10,
-    paymentMode: "Pay all years upfront",
-    loan: { amount: 180000, interestRate: 4.2, loanTermYears: 10, remainingYears: 10, outstandingBalance: 180000 },
-    premium: 4820, status: "Pending Review", createdDate: "2026-04-20",
+    policyHolderId: "CUS-0002", payerId: "CUS-0002", insuredId: "CUS-0002",
+    beneficiaries: [
+      { id: "b1", customerId: "CUS-0004", relationship: "Sister", percentage: 100 },
+    ],
+    startDate: "2026-05-01", endDate: "2036-05-01", termYears: 10,
+    paymentMode: "Annual payment schedule",
+    premium: 720, status: "Pending Review", createdDate: "2026-04-22",
   },
+  // 3) Approved — Standard Life Insurance for Dritan Kola, ALL currency
   {
     id: "OFR-0003", number: "OFR-2026-0003",
-    productId: "PRD-003", versionId: "VRS-1020", templateId: "TPL-3003", currency: "USD",
-    policyHolderId: "CUS-0002", payerId: "CUS-0002", insuredId: "CUS-0002",
-    beneficiaries: [{ id: "b1", customerId: "CUS-0006", relationship: "Sibling", percentage: 100 }],
-    startDate: "2026-06-01", endDate: "2056-06-01", termYears: 30,
+    productId: "PRD-002", versionId: "VRS-1010", templateId: "TPL-3010", currency: "ALL",
+    policyHolderId: "CUS-0003", payerId: "CUS-0003", insuredId: "CUS-0003",
+    beneficiaries: [
+      { id: "b1", customerId: "CUS-0004", relationship: "Daughter", percentage: 60 },
+      { id: "b2", customerId: "CUS-0001", relationship: "Brother", percentage: 40 },
+    ],
+    startDate: "2026-05-15", endDate: "2036-05-15", termYears: 10,
     paymentMode: "Annual payment schedule",
-    premium: 1280, status: "Draft", createdDate: "2026-04-25",
+    premium: 84000, status: "Approved", createdDate: "2026-04-18",
   },
+  // 4) Issued — Bank Loan Life Protection for Arben Hoxha (linked to policy below)
   {
     id: "OFR-0004", number: "OFR-2026-0004",
     productId: "PRD-001", versionId: "VRS-1001", templateId: "TPL-3001", currency: "EUR",
-    policyHolderId: "CUS-0003", payerId: "CUS-0003", insuredId: "CUS-0003",
-    beneficiaries: [{ id: "b1", customerId: "CUS-0001", relationship: "Friend", percentage: 100 }],
-    startDate: "2026-03-15", endDate: "2046-03-15", termYears: 20,
-    paymentMode: "Pay first year only",
-    premium: 410, status: "Issued", createdDate: "2026-03-10",
-  },
-  {
-    id: "OFR-0005", number: "OFR-2026-0005",
-    productId: "PRD-001", versionId: "VRS-1001", templateId: "TPL-3003", currency: "EUR",
-    policyHolderId: "CUS-0005", payerId: "CUS-0005", insuredId: "CUS-0005",
-    beneficiaries: [{ id: "b1", customerId: "CUS-0006", relationship: "Daughter", percentage: 100 }],
-    startDate: "2026-05-15", endDate: "2041-05-15", termYears: 15,
+    policyHolderId: "CUS-0001", payerId: "CUS-0001", insuredId: "CUS-0001",
+    beneficiaries: [
+      { id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 100 },
+    ],
+    startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
     paymentMode: "Annual payment schedule",
-    premium: 980, status: "Approved", createdDate: "2026-04-18",
-  },
-  {
-    id: "OFR-0006", number: "OFR-2026-0006",
-    productId: "PRD-002", versionId: "VRS-1010", templateId: "TPL-3010", currency: "EUR",
-    policyHolderId: "CUS-0006", payerId: "CUS-0006", insuredId: "CUS-0006",
-    beneficiaries: [],
-    startDate: "2026-04-10", endDate: "2031-04-10", termYears: 5,
-    paymentMode: "Annual payment schedule",
-    premium: 0, status: "Rejected", createdDate: "2026-04-08",
+    loan: { amount: 145000, interestRate: 4.5, loanTermYears: 20, remainingYears: 20, outstandingBalance: 145000 },
+    premium: 615, status: "Issued", createdDate: "2026-03-22",
   },
 ];
 
