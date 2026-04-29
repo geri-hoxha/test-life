@@ -168,26 +168,11 @@ const CreateOffer = () => {
     setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
   };
 
-  // Step validation
-  const canNextStep1 = !!(productId && versionId && templateId && currency);
-  const canNextStep2 = !!(policyHolderId && payerId && insuredId)
+  // Validation
+  const productOk = !!(productId && versionId && templateId && currency);
+  const peopleOk = !!(policyHolderId && payerId && insuredId)
     && (beneficiaries.length === 0 || (beneficiariesValid && beneficiaries.every((b) => b.customerId && b.percentage > 0)));
-
-  const handleNext = () => {
-    if (step === 1 && !canNextStep1) {
-      toast.error("Complete product, version, template and currency");
-      return;
-    }
-    if (step === 2) {
-      if (!canNextStep2) {
-        toast.error("Select all parties and ensure beneficiaries total 100%");
-        return;
-      }
-    }
-    setStep((s) => (s === 5 ? s : ((s + 1) as Step)));
-  };
-
-  const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
+  const canSave = productOk && peopleOk;
 
   const handleSave = (intent: "Draft" | "Submit" | "Approve") => {
     if (!canNextStep1 || !canNextStep2) {
