@@ -14,6 +14,7 @@ import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
 import PremiumRulesTab from "./PremiumRulesTab";
 import TemplatesTab from "./TemplatesTab";
+import DocumentsTab from "./DocumentsTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -184,33 +185,7 @@ const ProductDetail = () => {
         </TabsContent>
 
         <TabsContent value="documents">
-          <Card className="shadow-card border-border overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Required documents</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Documents customers must submit when applying.</p>
-              </div>
-              <Button size="sm" variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Add</Button>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead>Document</TableHead>
-                  <TableHead>Mandatory</TableHead>
-                  <TableHead>Stage</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {product.requiredDocuments.map((d) => (
-                  <TableRow key={d}>
-                    <TableCell className="font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-accent" />{d}</TableCell>
-                    <TableCell><Badge className="bg-success/15 text-success border-0">Yes</Badge></TableCell>
-                    <TableCell className="text-muted-foreground">Application</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+          <DocumentsTab productId={product.id} />
         </TabsContent>
 
         <TabsContent value="verification">
