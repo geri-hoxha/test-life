@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { getProduct, ProductStatus } from "@/data/products";
 import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator } from "lucide-react";
+import VersionsTab from "./VersionsTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
