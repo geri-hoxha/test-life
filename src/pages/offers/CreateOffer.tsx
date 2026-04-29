@@ -43,7 +43,7 @@ import VerificationStep, { VerificationCheck, overallStatus } from "./Verificati
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+
 
 const PAYMENT_MODES: PaymentMode[] = [
   "Pay all years upfront",
