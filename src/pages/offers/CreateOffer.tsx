@@ -234,15 +234,14 @@ const CreateOffer = () => {
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">Create Offer</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Build a draft policy in three guided steps.
+          Fill in the details below — all sections are on one page.
         </p>
       </div>
 
-      <StepHeader step={step} />
+      <SectionNav />
 
-      <Tabs value={String(step)} className="w-full">
-        {/* STEP 1 */}
-        <TabsContent value="1" className="m-0">
+      <div className="space-y-4">
+        <section id="product" className="scroll-mt-32">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Product Selection</CardTitle>
