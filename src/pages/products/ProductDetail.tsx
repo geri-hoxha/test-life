@@ -13,6 +13,7 @@ import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, 
 import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
 import PremiumRulesTab from "./PremiumRulesTab";
+import TemplatesTab from "./TemplatesTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -175,7 +176,7 @@ const ProductDetail = () => {
         </TabsContent>
 
         <TabsContent value="templates">
-          <SectionEmpty icon={Layers} title="No packages defined" hint="Bundle coverages into ready-to-sell packages such as Standard, Plus, Premium." cta="Create Package" />
+          <TemplatesTab productId={product.id} />
         </TabsContent>
 
         <TabsContent value="premium">
