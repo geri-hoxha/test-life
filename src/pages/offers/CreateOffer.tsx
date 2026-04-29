@@ -195,7 +195,7 @@ const CreateOffer = () => {
         return;
       }
     }
-    setStep((s) => (s === 3 ? s : ((s + 1) as Step)));
+    setStep((s) => (s === 4 ? s : ((s + 1) as Step)));
   };
 
   const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
@@ -230,7 +230,7 @@ const CreateOffer = () => {
             outstandingBalance: Number(outstandingBalance) || 0,
           }
         : undefined,
-      premium: 0,
+      premium: premiumResult?.grossPremium ?? 0,
       status,
       createdDate: new Date().toISOString().slice(0, 10),
     });
