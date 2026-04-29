@@ -23,7 +23,8 @@ import { getPolicy, policyStatusColor } from "@/data/policies";
 import { seedProducts } from "@/data/products";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
-import { getCustomer, fullName } from "@/data/customers";
+import { getCustomer, fullName, ageFromDob } from "@/data/customers";
+import PremiumBreakdownPanel from "@/components/premium/PremiumBreakdownPanel";
 
 const fmtMoney = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(v);
@@ -164,6 +165,21 @@ const PolicyDetail = () => {
                 <Field label="Payer" value={payer ? <Link to={`/customers/${payer.id}`} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"} />
               </CardContent>
             </Card>
+          </div>
+
+          <div className="mt-4">
+            <PremiumBreakdownPanel
+              data={{
+                productName: product?.name ?? policy.productId,
+                templateName: template?.name,
+                currency: policy.currency,
+                insuredAge: insured ? ageFromDob(insured.dateOfBirth) : undefined,
+                termYears: policy.termYears,
+                paymentMode: policy.paymentMode,
+                grossPremium: policy.premium,
+                reportingCurrency: "EUR",
+              }}
+            />
           </div>
         </TabsContent>
 
