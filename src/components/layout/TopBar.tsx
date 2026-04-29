@@ -12,16 +12,17 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import QuickActions from "./QuickActions";
+import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
-  { label: "Dashboard", active: true },
-  { label: "Products" },
-  { label: "Customers" },
-  { label: "Offers" },
-  { label: "Policies" },
-  { label: "Payments" },
-  { label: "Reports" },
-  { label: "Administration" },
+  { label: "Dashboard", to: "/" },
+  { label: "Products", to: "/products" },
+  { label: "Customers", to: "/customers" },
+  { label: "Offers", to: "/offers" },
+  { label: "Policies", to: "/policies" },
+  { label: "Payments", to: "/payments" },
+  { label: "Reports", to: "/reports" },
+  { label: "Administration", to: "/administration" },
 ];
 
 const TopBar = () => {
