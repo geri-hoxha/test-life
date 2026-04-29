@@ -33,7 +33,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar, Calculator } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck } from "lucide-react";
 import { seedProducts } from "@/data/products";
 import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
@@ -45,10 +45,11 @@ import {
   upsertOffer,
 } from "@/data/offers";
 import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
+import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 const PAYMENT_MODES: PaymentMode[] = [
   "Pay all years upfront",
@@ -64,6 +65,7 @@ const StepHeader = ({ step }: { step: Step }) => {
     { n: 2, label: "People", icon: Users },
     { n: 3, label: "Policy Dates", icon: Calendar },
     { n: 4, label: "Premium", icon: Calculator },
+    { n: 5, label: "Verification", icon: ShieldCheck },
   ] as const;
   return (
     <div className="flex items-center gap-2 mb-6">
@@ -124,6 +126,9 @@ const CreateOffer = () => {
 
   // Step 4 result
   const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
+
+  // Step 5 result
+  const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
 
   // Derived
   const product = seedProducts.find((p) => p.id === productId);
@@ -195,16 +200,25 @@ const CreateOffer = () => {
         return;
       }
     }
-    setStep((s) => (s === 4 ? s : ((s + 1) as Step)));
+    setStep((s) => (s === 5 ? s : ((s + 1) as Step)));
   };
 
   const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
 
-  const handleSave = (status: "Draft" | "Quoted") => {
+  const handleSave = (intent: "Draft" | "Submit" | "Approve") => {
     if (!canNextStep1 || !canNextStep2) {
       toast.error("Complete required fields before saving");
       return;
     }
+    let status: "Draft" | "Quoted" | "Pending Review" | "Approved" = "Draft";
+    if (intent === "Draft") {
+      status = "Draft";
+    } else {
+      const computed = overallStatus(verificationChecks);
+      if (computed === "Pending Review") status = "Pending Review";
+      else status = intent === "Approve" ? "Approved" : "Quoted";
+    }
+
     const { id, number } = newOfferId();
     upsertOffer({
       id,
@@ -583,6 +597,21 @@ const CreateOffer = () => {
             onResultChange={setPremiumResult}
           />
         </TabsContent>
+
+        {/* STEP 5 */}
+        <TabsContent value="5" className="m-0">
+          <VerificationStep
+            productId={productId}
+            versionId={versionId}
+            templateId={templateId}
+            currency={currency}
+            policyHolderId={policyHolderId}
+            insuredId={insuredId}
+            premium={premiumResult}
+            loanOutstanding={hasLoan ? Number(outstandingBalance) || 0 : undefined}
+            onChecksComputed={setVerificationChecks}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Footer nav */}
@@ -592,14 +621,19 @@ const CreateOffer = () => {
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
-          {step < 4 ? (
+          {step < 5 ? (
             <Button onClick={handleNext} className="gap-2">
               Continue <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={() => handleSave("Quoted")} className="gap-2">
-              <Check className="h-4 w-4" /> Save & Quote
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => handleSave("Approve")} className="gap-2">
+                Approve & Save
+              </Button>
+              <Button onClick={() => handleSave("Submit")} className="gap-2">
+                <Check className="h-4 w-4" /> Submit Offer
+              </Button>
+            </>
           )}
         </div>
       </div>
