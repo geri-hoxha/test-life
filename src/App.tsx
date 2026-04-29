@@ -18,6 +18,8 @@ import OfferDetail from "./pages/offers/OfferDetail.tsx";
 import IssuePolicy from "./pages/offers/IssuePolicy.tsx";
 import PoliciesList from "./pages/policies/PoliciesList.tsx";
 import PolicyDetail from "./pages/policies/PolicyDetail.tsx";
+import PaymentsList from "./pages/payments/PaymentsList.tsx";
+import RecordPayment from "./pages/payments/RecordPayment.tsx";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,8 @@ const App = () => (
           <Route path="/offers/:offerId/issue" element={<IssuePolicy />} />
           <Route path="/policies" element={<PoliciesList />} />
           <Route path="/policies/:id" element={<PolicyDetail />} />
+          <Route path="/payments" element={<PaymentsList />} />
+          <Route path="/payments/new" element={<RecordPayment />} />
           <Route path="/administration" element={<CurrencyExchange />} />
           <Route path="/administration/currency-exchange" element={<CurrencyExchange />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
