@@ -26,12 +26,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, ShieldCheck } from "lucide-react";
+import { Eye, Search, ShieldCheck } from "lucide-react";
 import { listPolicies, policyStatusColor, PolicyStatus } from "@/data/policies";
 import { seedProducts } from "@/data/products";
 import { getCustomer, fullName } from "@/data/customers";
 
-const STATUSES: PolicyStatus[] = ["Active", "Lapsed", "Cancelled", "Matured"];
+const STATUSES: PolicyStatus[] = ["Active", "Pending Payment", "Cancelled", "Expired", "Lapsed"];
 
 const PoliciesList = () => {
   const navigate = useNavigate();
@@ -65,7 +65,7 @@ const PoliciesList = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {STATUSES.map((s) => (
           <Card key={s}>
             <CardHeader className="pb-1.5"><CardDescription className="text-[11px] uppercase tracking-wider">{s}</CardDescription></CardHeader>
@@ -104,16 +104,17 @@ const PoliciesList = () => {
                   <TableHead>Policy #</TableHead>
                   <TableHead>Policy Holder</TableHead>
                   <TableHead>Product</TableHead>
-                  <TableHead>Currency</TableHead>
-                  <TableHead className="text-right">Premium</TableHead>
-                  <TableHead>Period</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>End Date</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Issue Date</TableHead>
+                  <TableHead className="text-right">Gross Premium</TableHead>
+                  <TableHead>Currency</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-10 text-sm text-muted-foreground">No policies match the current filters.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">No policies match the current filters.</TableCell></TableRow>
                 ) : filtered.map((p) => {
                   const ph = getCustomer(p.policyHolderId);
                   const product = productMap[p.productId];
@@ -124,15 +125,20 @@ const PoliciesList = () => {
                       </TableCell>
                       <TableCell>{ph ? fullName(ph) : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="text-sm">{product?.name ?? p.productId}</TableCell>
-                      <TableCell><Badge variant="outline">{p.currency}</Badge></TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {new Intl.NumberFormat("en-US", { style: "currency", currency: p.currency }).format(p.premium)}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{p.startDate} → {p.endDate}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{p.startDate}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{p.endDate}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${policyStatusColor[p.status]}`}>{p.status}</span>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono">{p.issueDate}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {new Intl.NumberFormat("en-US", { style: "currency", currency: p.currency }).format(p.premium)}
+                      </TableCell>
+                      <TableCell><Badge variant="outline">{p.currency}</Badge></TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => navigate(`/policies/${p.id}`)}>
+                          <Eye className="h-3.5 w-3.5" /> View
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
