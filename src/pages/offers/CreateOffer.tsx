@@ -1,0 +1,574 @@
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import AppShell from "@/components/layout/AppShell";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar } from "lucide-react";
+import { seedProducts } from "@/data/products";
+import { listVersions, getActiveVersions } from "@/data/productVersions";
+import { listTemplates } from "@/data/templates";
+import { listCustomers, fullName } from "@/data/customers";
+import {
+  Beneficiary,
+  newOfferId,
+  PaymentMode,
+  upsertOffer,
+} from "@/data/offers";
+import { toast } from "sonner";
+
+type Step = 1 | 2 | 3;
+
+const PAYMENT_MODES: PaymentMode[] = [
+  "Pay all years upfront",
+  "Pay first year only",
+  "Annual payment schedule",
+];
+
+const RELATIONSHIPS = ["Spouse", "Child", "Parent", "Sibling", "Partner", "Bank", "Other"];
+
+const StepHeader = ({ step }: { step: Step }) => {
+  const items = [
+    { n: 1, label: "Product", icon: Package },
+    { n: 2, label: "People", icon: Users },
+    { n: 3, label: "Policy Dates", icon: Calendar },
+  ] as const;
+  return (
+    <div className="flex items-center gap-2 mb-6">
+      {items.map((it, idx) => {
+        const active = step === it.n;
+        const done = step > it.n;
+        const Icon = it.icon;
+        return (
+          <div key={it.n} className="flex items-center gap-2">
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm ${
+                active
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : done
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                  : "bg-muted text-muted-foreground border-transparent"
+              }`}
+            >
+              {done ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
+              <span className="font-medium">Step {it.n}</span>
+              <span className="hidden sm:inline">· {it.label}</span>
+            </div>
+            {idx < items.length - 1 && <div className="h-px w-6 bg-border" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const CreateOffer = () => {
+  const navigate = useNavigate();
+  const [step, setStep] = useState<Step>(1);
+
+  // Step 1
+  const [productId, setProductId] = useState("");
+  const [versionId, setVersionId] = useState("");
+  const [templateId, setTemplateId] = useState("");
+  const [currency, setCurrency] = useState("");
+
+  // Step 2
+  const customers = useMemo(() => listCustomers(), []);
+  const [policyHolderId, setPolicyHolderId] = useState("");
+  const [payerId, setPayerId] = useState("");
+  const [insuredId, setInsuredId] = useState("");
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+
+  // Step 3
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [termYears, setTermYears] = useState(20);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("Annual payment schedule");
+  const [hasLoan, setHasLoan] = useState(false);
+  const [loanAmount, setLoanAmount] = useState("");
+  const [interestRate, setInterestRate] = useState("");
+  const [loanTermYears, setLoanTermYears] = useState("");
+  const [remainingYears, setRemainingYears] = useState("");
+  const [outstandingBalance, setOutstandingBalance] = useState("");
+
+  // Derived
+  const product = seedProducts.find((p) => p.id === productId);
+  const versions = productId ? getActiveVersions(productId) : [];
+  const allVersions = productId ? listVersions(productId) : [];
+  const version = allVersions.find((v) => v.id === versionId);
+  const templates = productId && versionId ? listTemplates(productId, versionId).filter((t) => t.isActive) : [];
+  const template = templates.find((t) => t.id === templateId);
+  const allowedCurrencies = template?.allowedCurrencies ?? [];
+
+  const endDate = useMemo(() => {
+    if (!startDate) return "";
+    const d = new Date(startDate);
+    d.setFullYear(d.getFullYear() + termYears);
+    return d.toISOString().slice(0, 10);
+  }, [startDate, termYears]);
+
+  const beneficiaryTotal = beneficiaries.reduce((s, b) => s + (Number(b.percentage) || 0), 0);
+  const beneficiariesValid = beneficiaries.length === 0 || beneficiaryTotal === 100;
+
+  // Handlers
+  const onProductChange = (id: string) => {
+    setProductId(id);
+    setVersionId("");
+    setTemplateId("");
+    setCurrency("");
+  };
+  const onVersionChange = (id: string) => {
+    setVersionId(id);
+    setTemplateId("");
+    setCurrency("");
+  };
+  const onTemplateChange = (id: string) => {
+    setTemplateId(id);
+    const t = listTemplates(productId, versionId).find((x) => x.id === id);
+    setCurrency(t?.defaultCurrency ?? "");
+  };
+
+  const addBeneficiary = () => {
+    setBeneficiaries((prev) => [
+      ...prev,
+      { id: `b-${Date.now()}`, customerId: "", relationship: "Spouse", percentage: 0 },
+    ]);
+  };
+  const updateBeneficiary = (id: string, patch: Partial<Beneficiary>) => {
+    setBeneficiaries((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  };
+  const removeBeneficiary = (id: string) => {
+    setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  // Step validation
+  const canNextStep1 = !!(productId && versionId && templateId && currency);
+  const canNextStep2 = !!(policyHolderId && payerId && insuredId)
+    && (beneficiaries.length === 0 || (beneficiariesValid && beneficiaries.every((b) => b.customerId && b.percentage > 0)));
+
+  const handleNext = () => {
+    if (step === 1 && !canNextStep1) {
+      toast.error("Complete product, version, template and currency");
+      return;
+    }
+    if (step === 2) {
+      if (!canNextStep2) {
+        toast.error("Select all parties and ensure beneficiaries total 100%");
+        return;
+      }
+    }
+    setStep((s) => (s === 3 ? s : ((s + 1) as Step)));
+  };
+
+  const handleBack = () => setStep((s) => (s === 1 ? s : ((s - 1) as Step)));
+
+  const handleSave = (status: "Draft" | "Quoted") => {
+    if (!canNextStep1 || !canNextStep2) {
+      toast.error("Complete required fields before saving");
+      return;
+    }
+    const { id, number } = newOfferId();
+    upsertOffer({
+      id,
+      number,
+      productId,
+      versionId,
+      templateId,
+      currency,
+      policyHolderId,
+      payerId,
+      insuredId,
+      beneficiaries,
+      startDate,
+      endDate,
+      termYears,
+      paymentMode,
+      loan: hasLoan
+        ? {
+            amount: Number(loanAmount) || 0,
+            interestRate: Number(interestRate) || 0,
+            loanTermYears: Number(loanTermYears) || 0,
+            remainingYears: Number(remainingYears) || 0,
+            outstandingBalance: Number(outstandingBalance) || 0,
+          }
+        : undefined,
+      premium: 0,
+      status,
+      createdDate: new Date().toISOString().slice(0, 10),
+    });
+    toast.success(`Offer ${number} saved as ${status}`);
+    navigate("/offers");
+  };
+
+  return (
+    <AppShell>
+      <div className="flex items-center justify-between mb-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/offers")} className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Back to Offers
+        </Button>
+      </div>
+      <div className="mb-6">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+          New Offer
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Create Offer</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Build a draft policy in three guided steps.
+        </p>
+      </div>
+
+      <StepHeader step={step} />
+
+      <Tabs value={String(step)} className="w-full">
+        {/* STEP 1 */}
+        <TabsContent value="1" className="m-0">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Product Selection</CardTitle>
+              <CardDescription>Pick a product, an active version, and the package to base the offer on.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label>Product</Label>
+                <Select value={productId} onValueChange={onProductChange}>
+                  <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                  <SelectContent>
+                    {seedProducts.filter((p) => p.status === "Active").map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Product Version (Active only)</Label>
+                <Select value={versionId} onValueChange={onVersionChange} disabled={!productId}>
+                  <SelectTrigger><SelectValue placeholder={productId ? "Select version" : "Pick product first"} /></SelectTrigger>
+                  <SelectContent>
+                    {versions.length === 0 ? (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No active versions for this product.</div>
+                    ) : versions.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>{v.name} · {v.number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Template / Package</Label>
+                <Select value={templateId} onValueChange={onTemplateChange} disabled={!versionId}>
+                  <SelectTrigger><SelectValue placeholder={versionId ? "Select package" : "Pick version first"} /></SelectTrigger>
+                  <SelectContent>
+                    {templates.length === 0 ? (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No active packages for this version.</div>
+                    ) : templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Currency</Label>
+                <Select value={currency} onValueChange={setCurrency} disabled={!templateId}>
+                  <SelectTrigger><SelectValue placeholder={templateId ? "Select currency" : "Pick package first"} /></SelectTrigger>
+                  <SelectContent>
+                    {allowedCurrencies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {template && (
+                  <div className="text-[11px] text-muted-foreground mt-1.5">
+                    Available: {allowedCurrencies.map((c) => (
+                      <Badge key={c} variant="outline" className="mr-1 font-normal">{c}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {template && (
+                <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 text-sm">
+                  <div className="font-medium">{product?.name} · {version?.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{template.description}</div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* STEP 2 */}
+        <TabsContent value="2" className="m-0">
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-base">People</CardTitle>
+              <CardDescription>Define who holds the policy, who pays, who is insured, and beneficiaries.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+              <div>
+                <Label>Policy Holder</Label>
+                <Select value={policyHolderId} onValueChange={setPolicyHolderId}>
+                  <SelectTrigger><SelectValue placeholder="Select holder" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="px-0 h-7 text-xs"
+                  onClick={() => navigate("/customers/new")}
+                >
+                  + Create new customer
+                </Button>
+              </div>
+              <div>
+                <Label>Invoice Recipient / Payer</Label>
+                <Select value={payerId} onValueChange={setPayerId}>
+                  <SelectTrigger><SelectValue placeholder="Select payer" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {policyHolderId && (
+                  <Button
+                    variant="link" size="sm" className="px-0 h-7 text-xs"
+                    onClick={() => setPayerId(policyHolderId)}
+                  >
+                    Same as policy holder
+                  </Button>
+                )}
+              </div>
+              <div>
+                <Label>Insured Person</Label>
+                <Select value={insuredId} onValueChange={setInsuredId}>
+                  <SelectTrigger><SelectValue placeholder="Select insured" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {policyHolderId && (
+                  <Button
+                    variant="link" size="sm" className="px-0 h-7 text-xs"
+                    onClick={() => setInsuredId(policyHolderId)}
+                  >
+                    Same as policy holder
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Beneficiaries</CardTitle>
+                  <CardDescription>Total percentage must equal 100% when one or more beneficiaries are added.</CardDescription>
+                </div>
+                <Button size="sm" variant="outline" className="gap-2" onClick={addBeneficiary}>
+                  <Plus className="h-4 w-4" /> Add Beneficiary
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="w-[180px]">Relationship</TableHead>
+                      <TableHead className="w-[140px]">Percentage</TableHead>
+                      <TableHead className="w-[60px]" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {beneficiaries.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
+                          No beneficiaries added yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : beneficiaries.map((b) => (
+                      <TableRow key={b.id}>
+                        <TableCell>
+                          <Select value={b.customerId} onValueChange={(v) => updateBeneficiary(b.id, { customerId: v })}>
+                            <SelectTrigger className="h-9"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                            <SelectContent>
+                              {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select value={b.relationship} onValueChange={(v) => updateBeneficiary(b.id, { relationship: v })}>
+                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {RELATIONSHIPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={b.percentage}
+                              onChange={(e) => updateBeneficiary(b.id, { percentage: Number(e.target.value) })}
+                              className="h-9 pr-7"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeBeneficiary(b.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {beneficiaries.length > 0 && (
+                <div className={`mt-3 text-sm flex items-center justify-between rounded-md px-3 py-2 ${
+                  beneficiariesValid ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-destructive/10 text-destructive"
+                }`}>
+                  <span>{beneficiariesValid ? "Beneficiary split is valid." : "Beneficiaries must total exactly 100%."}</span>
+                  <span className="font-mono font-semibold">{beneficiaryTotal}%</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* STEP 3 */}
+        <TabsContent value="3" className="m-0">
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-base">Policy Dates & Payment</CardTitle>
+              <CardDescription>Set the cover period and payment schedule.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-4">
+              <div>
+                <Label>Start Date</Label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>Term (Years)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={termYears}
+                  onChange={(e) => setTermYears(Number(e.target.value) || 1)}
+                />
+              </div>
+              <div>
+                <Label>End Date</Label>
+                <Input value={endDate} readOnly className="bg-muted/40" />
+              </div>
+              <div>
+                <Label>Payment Mode</Label>
+                <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_MODES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Mortgage / Loan</CardTitle>
+                  <CardDescription>Optional — only required for loan-protection policies.</CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  variant={hasLoan ? "secondary" : "outline"}
+                  onClick={() => setHasLoan((v) => !v)}
+                >
+                  {hasLoan ? "Remove loan details" : "Add loan details"}
+                </Button>
+              </div>
+            </CardHeader>
+            {hasLoan && (
+              <CardContent className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label>Loan Amount ({currency || "—"})</Label>
+                  <Input type="number" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Mortgage Interest Rate (%)</Label>
+                  <Input type="number" step="0.01" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Loan Term (Years)</Label>
+                  <Input type="number" value={loanTermYears} onChange={(e) => setLoanTermYears(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Remaining Loan Years</Label>
+                  <Input type="number" value={remainingYears} onChange={(e) => setRemainingYears(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Outstanding Balance ({currency || "—"})</Label>
+                  <Input type="number" value={outstandingBalance} onChange={(e) => setOutstandingBalance(e.target.value)} />
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Footer nav */}
+      <div className="flex items-center justify-between mt-6">
+        <Button variant="outline" onClick={handleBack} disabled={step === 1} className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
+          {step < 3 ? (
+            <Button onClick={handleNext} className="gap-2">
+              Continue <ArrowRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button onClick={() => handleSave("Quoted")} className="gap-2">
+              <Check className="h-4 w-4" /> Save & Quote
+            </Button>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+};
+
+export default CreateOffer;
