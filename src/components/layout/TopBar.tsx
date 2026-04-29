@@ -26,6 +26,7 @@ const navItems = [
 ];
 
 const TopBar = () => {
+  const location = useLocation();
   return (
     <header className="bg-gradient-topbar text-topbar-foreground border-b border-topbar-border sticky top-0 z-40 shadow-elevated">
       {/* Upper row: brand · search · quick actions · user */}
@@ -97,7 +98,6 @@ const TopBar = () => {
       <nav className="border-t border-topbar-border/60">
         <div className="container flex items-center gap-1 h-11 overflow-x-auto">
           {navItems.map((item) => {
-            const location = useLocation();
             const active =
               item.to === "/"
                 ? location.pathname === "/"
