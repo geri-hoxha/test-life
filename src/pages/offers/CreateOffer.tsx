@@ -27,13 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck } from "lucide-react";
 import { seedProducts } from "@/data/products";
 import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
@@ -59,46 +53,36 @@ const PAYMENT_MODES: PaymentMode[] = [
 
 const RELATIONSHIPS = ["Spouse", "Child", "Parent", "Sibling", "Partner", "Bank", "Other"];
 
-const StepHeader = ({ step }: { step: Step }) => {
-  const items = [
-    { n: 1, label: "Product", icon: Package },
-    { n: 2, label: "People", icon: Users },
-    { n: 3, label: "Policy Dates", icon: Calendar },
-    { n: 4, label: "Premium", icon: Calculator },
-    { n: 5, label: "Verification", icon: ShieldCheck },
-  ] as const;
-  return (
-    <div className="flex items-center gap-2 mb-6">
-      {items.map((it, idx) => {
-        const active = step === it.n;
-        const done = step > it.n;
-        const Icon = it.icon;
+const SECTIONS = [
+  { id: "product", label: "Product", icon: Package },
+  { id: "people", label: "People", icon: Users },
+  { id: "dates", label: "Dates", icon: Calendar },
+  { id: "premium", label: "Premium", icon: Calculator },
+  { id: "verification", label: "Verification", icon: ShieldCheck },
+] as const;
+
+const SectionNav = () => (
+  <div className="sticky top-16 z-20 -mx-2 mb-6 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto">
+      {SECTIONS.map((s) => {
+        const Icon = s.icon;
         return (
-          <div key={it.n} className="flex items-center gap-2">
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm ${
-                active
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : done
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                  : "bg-muted text-muted-foreground border-transparent"
-              }`}
-            >
-              {done ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
-              <span className="font-medium">Step {it.n}</span>
-              <span className="hidden sm:inline">· {it.label}</span>
-            </div>
-            {idx < items.length - 1 && <div className="h-px w-6 bg-border" />}
-          </div>
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {s.label}
+          </a>
         );
       })}
     </div>
-  );
-};
+  </div>
+);
 
 const CreateOffer = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>(1);
 
   // Step 1
   const [productId, setProductId] = useState("");
