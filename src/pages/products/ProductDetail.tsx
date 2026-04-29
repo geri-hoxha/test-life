@@ -11,6 +11,7 @@ import {
 import { getProduct, ProductStatus } from "@/data/products";
 import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator } from "lucide-react";
 import VersionsTab from "./VersionsTab";
+import CoveragesTab from "./CoveragesTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -169,7 +170,7 @@ const ProductDetail = () => {
         </TabsContent>
 
         <TabsContent value="coverages">
-          <SectionEmpty icon={Shield} title="No coverages configured" hint="Define core and rider coverages, sums insured and exclusions for this product." cta="Add Coverage" />
+          <CoveragesTab productId={product.id} />
         </TabsContent>
 
         <TabsContent value="templates">
