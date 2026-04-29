@@ -14,6 +14,7 @@ import CustomerDetail from "./pages/customers/CustomerDetail.tsx";
 import CurrencyExchange from "./pages/administration/CurrencyExchange.tsx";
 import OffersList from "./pages/offers/OffersList.tsx";
 import CreateOffer from "./pages/offers/CreateOffer.tsx";
+import OfferDetail from "./pages/offers/OfferDetail.tsx";
 
 const queryClient = new QueryClient();
 
