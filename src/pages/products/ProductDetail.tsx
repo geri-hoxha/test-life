@@ -12,6 +12,7 @@ import { getProduct, ProductStatus } from "@/data/products";
 import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator } from "lucide-react";
 import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
+import PremiumRulesTab from "./PremiumRulesTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -178,7 +179,7 @@ const ProductDetail = () => {
         </TabsContent>
 
         <TabsContent value="premium">
-          <SectionEmpty icon={Calculator} title="No premium rules yet" hint="Configure rating tables, age bands, loadings and discounts." cta="Add Premium Rule" />
+          <PremiumRulesTab productId={product.id} />
         </TabsContent>
 
         <TabsContent value="documents">
