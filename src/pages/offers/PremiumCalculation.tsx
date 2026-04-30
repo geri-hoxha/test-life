@@ -416,25 +416,42 @@ const PremiumCalculation = ({
               <div className="font-mono text-sm font-semibold">{fmt(netPremium, currency)}</div>
             </div>
             <div className="flex items-center justify-between px-3 py-2.5">
-              <div className="text-sm">Commission ({effectiveCommissionPct.toFixed(1)}%)</div>
-              <div className="font-mono text-sm">+ {fmt(commission, currency)}</div>
+              <div>
+                <div className="text-sm">Insurance tax (10%)</div>
+                <div className="text-[11px] text-muted-foreground">Statutory tax applied on top of the net premium.</div>
+              </div>
+              <div className="font-mono text-sm">+ {fmt(tax, currency)}</div>
             </div>
             <div className="flex items-center justify-between px-3 py-3 bg-primary/5">
               <div className="text-sm font-semibold">Gross Premium</div>
               <div className="font-mono text-base font-bold">{fmt(grossPremium, currency)}</div>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2.5 bg-amber-500/5">
+              <div>
+                <div className="text-sm">Agent commission ({effectiveCommissionPct.toFixed(1)}% of net)</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Paid to the distributing agent. Not charged to the customer — does not affect Gross.
+                </div>
+              </div>
+              <div className="font-mono text-sm">{fmt(commission, currency)}</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Result cards + FX */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card><CardHeader className="pb-1.5"><CardDescription>Net Premium</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{fmt(netPremium, currency)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-1.5"><CardDescription>Commission</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{fmt(commission, currency)}</div></CardContent></Card>
+        <Card><CardHeader className="pb-1.5"><CardDescription>Tax (10%)</CardDescription></CardHeader>
+          <CardContent><div className="text-lg font-semibold">{fmt(tax, currency)}</div></CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold text-primary">{fmt(grossPremium, currency)}</div></CardContent></Card>
+        <Card><CardHeader className="pb-1.5"><CardDescription>Agent Commission</CardDescription></CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">{fmt(commission, currency)}</div>
+            <div className="text-[10px] text-muted-foreground">{effectiveCommissionPct.toFixed(1)}% of net</div>
+          </CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Currency</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{currency}</div></CardContent></Card>
         <Card>
