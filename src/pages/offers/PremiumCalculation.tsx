@@ -391,7 +391,7 @@ const PremiumCalculation = ({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Calculation Breakdown</CardTitle>
-          <CardDescription>Step-by-step composition of the net premium.</CardDescription>
+          <CardDescription>Step-by-step composition of the net and gross premium. Agent commission is shown separately.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border divide-y">
