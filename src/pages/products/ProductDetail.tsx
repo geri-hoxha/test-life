@@ -71,14 +71,6 @@ const ProductDetail = () => {
         breadcrumbs={[{ label: "Products", to: "/products" }, { label: product.name }]}
         title={product.name}
         description={product.description}
-        actions={
-          <>
-            <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4" /> Edit</Button>
-            <Button className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Settings2 className="h-4 w-4" /> Configure
-            </Button>
-          </>
-        }
       />
 
       {/* Summary strip */}
