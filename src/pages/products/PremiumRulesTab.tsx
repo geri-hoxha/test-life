@@ -98,11 +98,13 @@ const PremiumRulesTab = ({ productId }: Props) => {
     termYears: 10,
   });
 
-  // Per-year premiums across the term (customer ages each year)
+  // Per-year premiums across the term. If repriceOnAttainedAge is OFF,
+  // every year uses the inception age (level premium).
   const yearly = useMemo(() => {
     const years = Math.max(1, Math.floor(preview.termYears || 1));
+    const reprice = rule.repriceOnAttainedAge ?? false;
     return Array.from({ length: years }, (_, i) => {
-      const ageAtYear = preview.age + i;
+      const ageAtYear = reprice ? preview.age + i : preview.age;
       return calculatePremium(rule, {
         age: ageAtYear,
         gender: preview.gender,
