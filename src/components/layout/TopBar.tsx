@@ -37,7 +37,7 @@ const TopBar = () => {
             <Shield className="h-5 w-5 text-accent-foreground" strokeWidth={2.5} />
           </div>
           <div className="leading-tight">
-            <div className="font-semibold text-[15px] tracking-tight">LifeERP</div>
+            <div className="font-semibold text-[15px] tracking-tight">ESIG Life</div>
             <div className="text-[10px] uppercase tracking-[0.14em] text-topbar-muted">Demo</div>
           </div>
         </a>
@@ -79,7 +79,7 @@ const TopBar = () => {
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span>Erin Hoxha</span>
-                  <span className="text-xs text-muted-foreground font-normal">anna.k@lifeerp.demo</span>
+                  <span className="text-xs text-muted-foreground font-normal">erin.h@esiglife.demo</span>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

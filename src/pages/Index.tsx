@@ -20,7 +20,7 @@ const Index = () => {
             Dashboard
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Good morning, Erin. Here's what's happening across LifeERP today.
+            Good morning, Erin. Here's what's happening across ESIG Life today.
           </p>
         </div>
         <div className="flex items-center gap-2">
