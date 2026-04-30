@@ -287,6 +287,7 @@ const PremiumCalculation = ({
       endDate: ye.toISOString().slice(0, 10),
       estimatedLoanBalance: estLoanBal,
       premium: netPremium,
+      tax,
       commission,
       gross: grossPremium,
       status: y === 1 ? "Current Year" : "Not Due",
@@ -297,6 +298,8 @@ const PremiumCalculation = ({
   useEffect(() => {
     onResultChange?.({
       netPremium,
+      taxRate: TAX_RATE,
+      tax,
       commission,
       grossPremium,
       fxRate: fxConv.rate,
@@ -305,7 +308,7 @@ const PremiumCalculation = ({
       schedule,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [netPremium, commission, grossPremium, fxConv.rate, manualOverride, manualAmount, manualReason]);
+  }, [netPremium, tax, commission, grossPremium, fxConv.rate, manualOverride, manualAmount, manualReason]);
 
   const toggleRider = (id: string) => {
     setSelectedRiders((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
