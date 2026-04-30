@@ -554,9 +554,10 @@ const PremiumCalculation = ({
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
                   {loan && <TableHead className="text-right">Est. Loan Balance</TableHead>}
-                  <TableHead className="text-right">Premium</TableHead>
-                  <TableHead className="text-right">Commission</TableHead>
+                  <TableHead className="text-right">Net Premium</TableHead>
+                  <TableHead className="text-right">Tax (10%)</TableHead>
                   <TableHead className="text-right">Gross Premium</TableHead>
+                  <TableHead className="text-right">Agent Commission</TableHead>
                   <TableHead>Payment Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -572,8 +573,9 @@ const PremiumCalculation = ({
                       </TableCell>
                     )}
                     <TableCell className="text-right font-mono text-sm">{fmt(s.premium, currency)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmt(s.commission, currency)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmt(s.tax, currency)}</TableCell>
                     <TableCell className="text-right font-mono text-sm font-semibold">{fmt(s.gross, currency)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmt(s.commission, currency)}</TableCell>
                     <TableCell>
                       <Badge variant={s.status === "Current Year" ? "default" : "secondary"}>{s.status}</Badge>
                     </TableCell>
