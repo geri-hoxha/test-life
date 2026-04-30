@@ -550,19 +550,49 @@ const CreateOffer = () => {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-base">Mortgage / Loan</CardTitle>
-                  <CardDescription>Optional — only required for loan-protection policies.</CardDescription>
+                  <CardDescription>
+                    Optional — only required for loan-protection policies. You can also import details from an Excel file.
+                  </CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  variant={hasLoan ? "secondary" : "outline"}
-                  onClick={() => setHasLoan((v) => !v)}
-                >
-                  {hasLoan ? "Remove loan details" : "Add loan details"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={loanFileRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleLoanExcelUpload(f);
+                      if (loanFileRef.current) loanFileRef.current.value = "";
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => loanFileRef.current?.click()}
+                    className="gap-2"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Upload from Excel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={hasLoan ? "secondary" : "outline"}
+                    onClick={() => setHasLoan((v) => !v)}
+                  >
+                    {hasLoan ? "Remove loan details" : "Add loan details"}
+                  </Button>
+                </div>
               </div>
+              {loanFileName && (
+                <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Imported from <span className="font-medium text-foreground">{loanFileName}</span>
+                </div>
+              )}
             </CardHeader>
             {hasLoan && (
               <CardContent className="grid gap-4 md:grid-cols-3">
