@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getProduct, ProductStatus } from "@/data/products";
-import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator } from "lucide-react";
+import { getProduct, updateProductFlags, ProductStatus, Product } from "@/data/products";
+import { Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator, Save } from "lucide-react";
+import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
 import PremiumRulesTab from "./PremiumRulesTab";
