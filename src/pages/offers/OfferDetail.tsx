@@ -336,12 +336,16 @@ const OfferDetail = () => {
 
           <Card>
             <CardHeader><CardTitle className="text-base">Premium Summary</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <Field label="Net Premium" value={fmtMoney(premiumResult?.netPremium ?? offer.premium, offer.currency)} />
-              <Field label="Commission" value={fmtMoney(premiumResult?.commission ?? 0, offer.currency)} />
+              <Field label="Tax (10%)" value={fmtMoney(premiumResult?.tax ?? 0, offer.currency)} />
               <Field
                 label="Gross Premium"
                 value={<span className="text-primary">{fmtMoney(premiumResult?.grossPremium ?? offer.premium, offer.currency)}</span>}
+              />
+              <Field
+                label="Agent Commission"
+                value={<span>{fmtMoney(premiumResult?.commission ?? 0, offer.currency)} <span className="text-[11px] text-muted-foreground">(on net)</span></span>}
               />
               <Field
                 label="FX Rate"
@@ -359,6 +363,8 @@ const OfferDetail = () => {
               termYears: offer.termYears,
               paymentMode: offer.paymentMode,
               netPremium: premiumResult?.netPremium,
+              tax: premiumResult?.tax,
+              taxRate: premiumResult?.taxRate,
               commission: premiumResult?.commission,
               grossPremium: premiumResult?.grossPremium ?? offer.premium,
               loanAdjustment: offer.loan ? 0 : undefined,
