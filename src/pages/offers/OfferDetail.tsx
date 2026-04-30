@@ -414,9 +414,10 @@ const OfferDetail = () => {
                         <TableHead>Start</TableHead>
                         <TableHead>End</TableHead>
                         {offer.loan && <TableHead className="text-right">Est. Loan Balance</TableHead>}
-                        <TableHead className="text-right">Premium</TableHead>
-                        <TableHead className="text-right">Commission</TableHead>
+                        <TableHead className="text-right">Net Premium</TableHead>
+                        <TableHead className="text-right">Tax (10%)</TableHead>
                         <TableHead className="text-right">Gross</TableHead>
+                        <TableHead className="text-right">Agent Commission</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -432,8 +433,9 @@ const OfferDetail = () => {
                             </TableCell>
                           )}
                           <TableCell className="text-right font-mono text-sm">{fmtMoney(s.premium, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(s.commission, offer.currency)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtMoney(s.tax, offer.currency)}</TableCell>
                           <TableCell className="text-right font-mono text-sm font-semibold">{fmtMoney(s.gross, offer.currency)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(s.commission, offer.currency)}</TableCell>
                           <TableCell>
                             <Badge variant={s.status === "Current Year" ? "default" : "secondary"}>{s.status}</Badge>
                           </TableCell>
