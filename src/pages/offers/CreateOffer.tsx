@@ -108,6 +108,58 @@ const CreateOffer = () => {
   const [loanTermYears, setLoanTermYears] = useState("");
   const [remainingYears, setRemainingYears] = useState("");
   const [outstandingBalance, setOutstandingBalance] = useState("");
+  const loanFileRef = useRef<HTMLInputElement>(null);
+  const [loanFileName, setLoanFileName] = useState<string | null>(null);
+
+  const handleLoanExcelUpload = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, blankrows: false });
+
+      // Build a key→value map from two-column rows: [Field, Value]
+      const map = new Map<string, string>();
+      for (const r of rows) {
+        if (!Array.isArray(r) || r.length < 2) continue;
+        const k = String(r[0] ?? "").trim().toLowerCase();
+        const v = r[1];
+        if (k && v !== undefined && v !== null && v !== "") map.set(k, String(v));
+      }
+
+      const pick = (...keys: string[]) => {
+        for (const k of keys) {
+          const v = map.get(k.toLowerCase());
+          if (v !== undefined) return v.replace(/[^0-9.\-]/g, "");
+        }
+        return "";
+      };
+
+      const amt = pick("loan amount", "amount", "principal");
+      const ir = pick("interest rate", "mortgage interest rate", "rate");
+      const term = pick("loan term", "loan term (years)", "term", "term years");
+      const rem = pick("remaining years", "remaining loan years", "remaining");
+      const out = pick("outstanding balance", "outstanding", "balance");
+
+      if (amt) setLoanAmount(amt);
+      if (ir) setInterestRate(ir);
+      if (term) setLoanTermYears(term);
+      if (rem) setRemainingYears(rem);
+      if (out) setOutstandingBalance(out);
+      if (!hasLoan) setHasLoan(true);
+      setLoanFileName(file.name);
+
+      const filled = [amt, ir, term, rem, out].filter(Boolean).length;
+      if (filled === 0) {
+        toast.error("No loan fields recognized in the file. Use a two-column sheet: Field | Value.");
+      } else {
+        toast.success(`Imported ${filled} loan field${filled === 1 ? "" : "s"} from ${file.name}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not read Excel file");
+    }
+  };
 
   // Step 4 result
   const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
