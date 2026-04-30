@@ -43,6 +43,8 @@ import { getRatesForPair, convert } from "@/data/fxRates";
 
 export type PremiumResult = {
   netPremium: number;
+  taxRate: number;
+  tax: number;
   commission: number;
   grossPremium: number;
   fxRate: number;
@@ -57,6 +59,7 @@ export type ScheduleRow = {
   endDate: string;
   estimatedLoanBalance?: number;
   premium: number;
+  tax: number;
   commission: number;
   gross: number;
   status: "Not Due" | "Current Year";
@@ -245,13 +248,16 @@ const PremiumCalculation = ({
     });
   }
 
-  // 6. Commission
+  // 6. Tax (10% on net) — gross is net + tax
+  const TAX_RATE = 0.10;
+  const tax = netPremium * TAX_RATE;
+  const grossPremium = netPremium + tax;
+
+  // 7. Commission — paid to the agent, calculated on the NET premium.
+  //    Not added to gross; it's a cost to the insurer, not a charge to the customer.
   const effectiveCommissionPct =
     template?.commissionOverridePct ?? (subtotal > 0 ? (weightedCommission / subtotal) * 100 : 0);
   const commission = (netPremium * effectiveCommissionPct) / 100;
-
-  // 7. Gross
-  const grossPremium = netPremium + commission;
 
   // ---- Multi-year schedule ----
   const schedule: ScheduleRow[] = [];
@@ -281,6 +287,7 @@ const PremiumCalculation = ({
       endDate: ye.toISOString().slice(0, 10),
       estimatedLoanBalance: estLoanBal,
       premium: netPremium,
+      tax,
       commission,
       gross: grossPremium,
       status: y === 1 ? "Current Year" : "Not Due",
@@ -291,6 +298,8 @@ const PremiumCalculation = ({
   useEffect(() => {
     onResultChange?.({
       netPremium,
+      taxRate: TAX_RATE,
+      tax,
       commission,
       grossPremium,
       fxRate: fxConv.rate,
@@ -299,7 +308,7 @@ const PremiumCalculation = ({
       schedule,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [netPremium, commission, grossPremium, fxConv.rate, manualOverride, manualAmount, manualReason]);
+  }, [netPremium, tax, commission, grossPremium, fxConv.rate, manualOverride, manualAmount, manualReason]);
 
   const toggleRider = (id: string) => {
     setSelectedRiders((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -382,7 +391,7 @@ const PremiumCalculation = ({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Calculation Breakdown</CardTitle>
-          <CardDescription>Step-by-step composition of the net premium.</CardDescription>
+          <CardDescription>Step-by-step composition of the net and gross premium. Agent commission is shown separately.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border divide-y">
@@ -407,25 +416,42 @@ const PremiumCalculation = ({
               <div className="font-mono text-sm font-semibold">{fmt(netPremium, currency)}</div>
             </div>
             <div className="flex items-center justify-between px-3 py-2.5">
-              <div className="text-sm">Commission ({effectiveCommissionPct.toFixed(1)}%)</div>
-              <div className="font-mono text-sm">+ {fmt(commission, currency)}</div>
+              <div>
+                <div className="text-sm">Insurance tax (10%)</div>
+                <div className="text-[11px] text-muted-foreground">Statutory tax applied on top of the net premium.</div>
+              </div>
+              <div className="font-mono text-sm">+ {fmt(tax, currency)}</div>
             </div>
             <div className="flex items-center justify-between px-3 py-3 bg-primary/5">
               <div className="text-sm font-semibold">Gross Premium</div>
               <div className="font-mono text-base font-bold">{fmt(grossPremium, currency)}</div>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2.5 bg-amber-500/5">
+              <div>
+                <div className="text-sm">Agent commission ({effectiveCommissionPct.toFixed(1)}% of net)</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Paid to the distributing agent. Not charged to the customer — does not affect Gross.
+                </div>
+              </div>
+              <div className="font-mono text-sm">{fmt(commission, currency)}</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Result cards + FX */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card><CardHeader className="pb-1.5"><CardDescription>Net Premium</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{fmt(netPremium, currency)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-1.5"><CardDescription>Commission</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{fmt(commission, currency)}</div></CardContent></Card>
+        <Card><CardHeader className="pb-1.5"><CardDescription>Tax (10%)</CardDescription></CardHeader>
+          <CardContent><div className="text-lg font-semibold">{fmt(tax, currency)}</div></CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold text-primary">{fmt(grossPremium, currency)}</div></CardContent></Card>
+        <Card><CardHeader className="pb-1.5"><CardDescription>Agent Commission</CardDescription></CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">{fmt(commission, currency)}</div>
+            <div className="text-[10px] text-muted-foreground">{effectiveCommissionPct.toFixed(1)}% of net</div>
+          </CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Currency</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{currency}</div></CardContent></Card>
         <Card>
@@ -528,9 +554,10 @@ const PremiumCalculation = ({
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
                   {loan && <TableHead className="text-right">Est. Loan Balance</TableHead>}
-                  <TableHead className="text-right">Premium</TableHead>
-                  <TableHead className="text-right">Commission</TableHead>
+                  <TableHead className="text-right">Net Premium</TableHead>
+                  <TableHead className="text-right">Tax (10%)</TableHead>
                   <TableHead className="text-right">Gross Premium</TableHead>
+                  <TableHead className="text-right">Agent Commission</TableHead>
                   <TableHead>Payment Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -546,8 +573,9 @@ const PremiumCalculation = ({
                       </TableCell>
                     )}
                     <TableCell className="text-right font-mono text-sm">{fmt(s.premium, currency)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmt(s.commission, currency)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmt(s.tax, currency)}</TableCell>
                     <TableCell className="text-right font-mono text-sm font-semibold">{fmt(s.gross, currency)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmt(s.commission, currency)}</TableCell>
                     <TableCell>
                       <Badge variant={s.status === "Current Year" ? "default" : "secondary"}>{s.status}</Badge>
                     </TableCell>

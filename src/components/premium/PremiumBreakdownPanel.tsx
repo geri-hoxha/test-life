@@ -12,6 +12,8 @@ export type PremiumBreakdownInput = {
   termYears: number;
   paymentMode: PaymentMode;
   netPremium?: number;
+  tax?: number;
+  taxRate?: number;
   commission?: number;
   grossPremium: number;
   basePremium?: number;
@@ -143,12 +145,23 @@ const PremiumBreakdownPanel = ({ data }: { data: PremiumBreakdownInput }) => {
               />
             )}
             {data.netPremium !== undefined && (
-              <Row label="Net premium" value={fmt(data.netPremium, data.currency)} hint="Premium before commission." />
+              <Row label="Net premium" value={fmt(data.netPremium, data.currency)} hint="Premium for the coverage, before tax." />
             )}
-            {data.commission !== undefined && data.commission > 0 && (
-              <Row label="+ Commission" value={fmt(data.commission, data.currency)} hint="Distribution and broker fees." />
+            {data.tax !== undefined && data.tax > 0 && (
+              <Row
+                label={`+ Insurance tax (${((data.taxRate ?? 0.10) * 100).toFixed(0)}%)`}
+                value={fmt(data.tax, data.currency)}
+                hint="Statutory tax on top of the net premium."
+              />
             )}
             <Row label="Gross premium (annual)" value={fmt(data.grossPremium, data.currency)} accent />
+            {data.commission !== undefined && data.commission > 0 && (
+              <Row
+                label="Agent commission"
+                value={fmt(data.commission, data.currency)}
+                hint="Calculated on the net premium and paid to the distributing agent. Not charged to the customer."
+              />
+            )}
           </div>
         </section>
 
