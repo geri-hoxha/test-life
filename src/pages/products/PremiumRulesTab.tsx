@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,11 +98,13 @@ const PremiumRulesTab = ({ productId }: Props) => {
     termYears: 10,
   });
 
-  // Per-year premiums across the term (customer ages each year)
+  // Per-year premiums across the term. If repriceOnAttainedAge is OFF,
+  // every year uses the inception age (level premium).
   const yearly = useMemo(() => {
     const years = Math.max(1, Math.floor(preview.termYears || 1));
+    const reprice = rule.repriceOnAttainedAge ?? false;
     return Array.from({ length: years }, (_, i) => {
-      const ageAtYear = preview.age + i;
+      const ageAtYear = reprice ? preview.age + i : preview.age;
       return calculatePremium(rule, {
         age: ageAtYear,
         gender: preview.gender,
@@ -176,6 +179,25 @@ const PremiumRulesTab = ({ productId }: Props) => {
                 <span>{ruleHints[rule.ruleType]}</span>
               </div>
             </div>
+
+            {/* Attained-age toggle — only relevant when age affects pricing */}
+            {usesRateTable(rule.ruleType) && (
+              <div className="mt-5 flex items-start justify-between gap-4 rounded-md border border-border bg-muted/30 p-4">
+                <div className="space-y-1">
+                  <Label htmlFor="reprice-toggle" className="text-sm font-medium text-foreground cursor-pointer">
+                    Reprice each year on attained age
+                  </Label>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    When ON, the premium is recalculated every policy year using the customer's current age — so it grows as they get older. When OFF, the premium stays level at the inception age for the full term.
+                  </p>
+                </div>
+                <Switch
+                  id="reprice-toggle"
+                  checked={rule.repriceOnAttainedAge ?? false}
+                  onCheckedChange={(v) => setField("repriceOnAttainedAge", v)}
+                />
+              </div>
+            )}
 
             {/* Conditional fields */}
             {rule.ruleType === "Fixed premium" && (
