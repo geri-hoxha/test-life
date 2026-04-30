@@ -94,19 +94,29 @@ const PremiumRulesTab = ({ productId }: Props) => {
     sumInsured: 50000,
     currency: currencies[0] ?? "EUR",
     loanBalance: 50000,
+    termYears: 10,
   });
 
-  const result = useMemo(
-    () =>
-      calculatePremium(rule, {
-        age: preview.age,
+  // Per-year premiums across the term (customer ages each year)
+  const yearly = useMemo(() => {
+    const years = Math.max(1, Math.floor(preview.termYears || 1));
+    return Array.from({ length: years }, (_, i) => {
+      const ageAtYear = preview.age + i;
+      return calculatePremium(rule, {
+        age: ageAtYear,
         gender: preview.gender,
         sumInsured: preview.sumInsured,
         currency: preview.currency,
         loanBalance: preview.loanBalance,
-      }),
-    [rule, preview]
-  );
+      });
+    });
+  }, [rule, preview]);
+
+  // First-year result drives the headline & rate-row highlight
+  const result = yearly[0] ?? { amount: 0, explanation: "" };
+  const totalOverTerm = yearly.reduce((s, y) => s + y.amount, 0);
+  const avgAnnual = totalOverTerm / yearly.length;
+  const lastYear = yearly[yearly.length - 1];
 
   if (versions.length === 0) {
     return (
