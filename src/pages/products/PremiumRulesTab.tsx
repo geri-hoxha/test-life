@@ -327,10 +327,17 @@ const PremiumRulesTab = ({ productId }: Props) => {
                 </Select>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pv-sum">Sum Insured</Label>
-              <Input id="pv-sum" type="number" value={preview.sumInsured}
-                onChange={(e) => setPreview((p) => ({ ...p, sumInsured: +e.target.value }))} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="pv-sum">Sum Insured</Label>
+                <Input id="pv-sum" type="number" value={preview.sumInsured}
+                  onChange={(e) => setPreview((p) => ({ ...p, sumInsured: +e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pv-term">Term (years)</Label>
+                <Input id="pv-term" type="number" min={1} max={50} value={preview.termYears}
+                  onChange={(e) => setPreview((p) => ({ ...p, termYears: +e.target.value }))} />
+              </div>
             </div>
             {rule.ruleType === "Loan balance based premium" && (
               <div className="space-y-1.5">
