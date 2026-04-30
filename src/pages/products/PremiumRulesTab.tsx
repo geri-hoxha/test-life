@@ -178,6 +178,25 @@ const PremiumRulesTab = ({ productId }: Props) => {
               </div>
             </div>
 
+            {/* Attained-age toggle — only relevant when age affects pricing */}
+            {usesRateTable(rule.ruleType) && (
+              <div className="mt-5 flex items-start justify-between gap-4 rounded-md border border-border bg-muted/30 p-4">
+                <div className="space-y-1">
+                  <Label htmlFor="reprice-toggle" className="text-sm font-medium text-foreground cursor-pointer">
+                    Reprice each year on attained age
+                  </Label>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    When ON, the premium is recalculated every policy year using the customer's current age — so it grows as they get older. When OFF, the premium stays level at the inception age for the full term.
+                  </p>
+                </div>
+                <Switch
+                  id="reprice-toggle"
+                  checked={rule.repriceOnAttainedAge ?? false}
+                  onCheckedChange={(v) => setField("repriceOnAttainedAge", v)}
+                />
+              </div>
+            )}
+
             {/* Conditional fields */}
             {rule.ruleType === "Fixed premium" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
