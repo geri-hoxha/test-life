@@ -199,25 +199,50 @@ const ProductDetail = () => {
 
         <TabsContent value="verification">
           <Card className="shadow-card border-border overflow-hidden">
-            <div className="px-5 py-4 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <ScrollText className="h-4 w-4 text-accent" /> Verification rules
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Conditions that route an application to manual review.</p>
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <ScrollText className="h-4 w-4 text-accent" /> Verification rules
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Toggle the conditions that route an application to manual review.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={saveFlags}
+                disabled={!dirty}
+                className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                <Save className="h-4 w-4" /> Save changes
+              </Button>
             </div>
             <div className="divide-y divide-border">
               {flagList.map((f) => (
-                <div key={f.key} className="flex items-center justify-between px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className={`h-7 w-7 rounded-md flex items-center justify-center ${f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
+                <label
+                  key={f.key}
+                  htmlFor={`flag-${f.key}`}
+                  className="flex items-center justify-between px-5 py-4 gap-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span
+                      className={`mt-0.5 h-7 w-7 shrink-0 rounded-md flex items-center justify-center ${
+                        f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
                       <Check className="h-4 w-4" />
                     </span>
-                    <span className="text-sm font-medium">{f.label}</span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground">{f.label}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{f.hint}</div>
+                    </div>
                   </div>
-                  <Badge className={f.on ? "bg-success/15 text-success border-0" : "bg-muted text-muted-foreground border-0"}>
-                    {f.on ? "Enabled" : "Disabled"}
-                  </Badge>
-                </div>
+                  <Switch
+                    id={`flag-${f.key}`}
+                    checked={f.on}
+                    onCheckedChange={() => toggleFlag(f.key)}
+                  />
+                </label>
               ))}
             </div>
           </Card>
