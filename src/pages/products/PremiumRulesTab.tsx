@@ -94,19 +94,29 @@ const PremiumRulesTab = ({ productId }: Props) => {
     sumInsured: 50000,
     currency: currencies[0] ?? "EUR",
     loanBalance: 50000,
+    termYears: 10,
   });
 
-  const result = useMemo(
-    () =>
-      calculatePremium(rule, {
-        age: preview.age,
+  // Per-year premiums across the term (customer ages each year)
+  const yearly = useMemo(() => {
+    const years = Math.max(1, Math.floor(preview.termYears || 1));
+    return Array.from({ length: years }, (_, i) => {
+      const ageAtYear = preview.age + i;
+      return calculatePremium(rule, {
+        age: ageAtYear,
         gender: preview.gender,
         sumInsured: preview.sumInsured,
         currency: preview.currency,
         loanBalance: preview.loanBalance,
-      }),
-    [rule, preview]
-  );
+      });
+    });
+  }, [rule, preview]);
+
+  // First-year result drives the headline & rate-row highlight
+  const result = yearly[0] ?? { amount: 0, explanation: "" };
+  const totalOverTerm = yearly.reduce((s, y) => s + y.amount, 0);
+  const avgAnnual = totalOverTerm / yearly.length;
+  const lastYear = yearly[yearly.length - 1];
 
   if (versions.length === 0) {
     return (
@@ -317,10 +327,17 @@ const PremiumRulesTab = ({ productId }: Props) => {
                 </Select>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pv-sum">Sum Insured</Label>
-              <Input id="pv-sum" type="number" value={preview.sumInsured}
-                onChange={(e) => setPreview((p) => ({ ...p, sumInsured: +e.target.value }))} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="pv-sum">Sum Insured</Label>
+                <Input id="pv-sum" type="number" value={preview.sumInsured}
+                  onChange={(e) => setPreview((p) => ({ ...p, sumInsured: +e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pv-term">Term (years)</Label>
+                <Input id="pv-term" type="number" min={1} max={50} value={preview.termYears}
+                  onChange={(e) => setPreview((p) => ({ ...p, termYears: +e.target.value }))} />
+              </div>
             </div>
             {rule.ruleType === "Loan balance based premium" && (
               <div className="space-y-1.5">
@@ -356,12 +373,64 @@ const PremiumRulesTab = ({ productId }: Props) => {
               <Badge className="bg-accent text-accent-foreground border-0">/ year</Badge>
             </div>
             <div className="mt-1 text-xs text-topbar-muted">
-              ≈ {(result.amount / 12).toFixed(2)} {preview.currency} / month
+              ≈ {(result.amount / 12).toFixed(2)} {preview.currency} / month · year 1 (age {preview.age})
             </div>
             <p className="mt-3 text-xs text-topbar-muted leading-relaxed border-t border-topbar-border pt-3">
               {result.explanation}
             </p>
+
+            {preview.termYears > 1 && (
+              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-topbar-border pt-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-topbar-muted font-semibold">Total over {preview.termYears} yrs</div>
+                  <div className="text-base font-semibold mt-0.5">
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: preview.currency, maximumFractionDigits: 0 }).format(totalOverTerm)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-topbar-muted font-semibold">Avg / year</div>
+                  <div className="text-base font-semibold mt-0.5">
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: preview.currency, maximumFractionDigits: 0 }).format(avgAnnual)}
+                  </div>
+                </div>
+                <div className="col-span-2 text-xs text-topbar-muted">
+                  Year {preview.termYears} (age {preview.age + preview.termYears - 1}):{" "}
+                  <span className="text-topbar-foreground font-medium">
+                    {lastYear && lastYear.amount > 0
+                      ? new Intl.NumberFormat("en-US", { style: "currency", currency: preview.currency, maximumFractionDigits: 2 }).format(lastYear.amount)
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
+
+          {preview.termYears > 1 && (
+            <div className="mt-4 max-h-48 overflow-auto rounded-md border border-border">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40 sticky top-0">
+                  <tr className="text-muted-foreground">
+                    <th className="text-left font-semibold px-3 py-1.5">Year</th>
+                    <th className="text-left font-semibold px-3 py-1.5">Age</th>
+                    <th className="text-right font-semibold px-3 py-1.5">Premium</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {yearly.map((y, i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="px-3 py-1.5 font-mono">{i + 1}</td>
+                      <td className="px-3 py-1.5">{preview.age + i}</td>
+                      <td className="px-3 py-1.5 text-right font-mono">
+                        {y.amount > 0
+                          ? new Intl.NumberFormat("en-US", { style: "currency", currency: preview.currency, maximumFractionDigits: 2 }).format(y.amount)
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
       </div>
     </div>
