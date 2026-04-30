@@ -32,11 +32,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Eye, Edit, Send, MoreHorizontal, Plus, Search } from "lucide-react";
+import { Eye, Edit, Send, MoreHorizontal, Plus, Search, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
 import { listOffers, statusColor, OfferStatus } from "@/data/offers";
 import { getCustomer, fullName } from "@/data/customers";
 import { seedProducts } from "@/data/products";
 import { listTemplates } from "@/data/templates";
+import { computeVerification, overallStatus } from "./VerificationStep";
 import { toast } from "sonner";
 
 const STATUSES: OfferStatus[] = ["Draft", "Quoted", "Pending Review", "Approved", "Issued", "Rejected"];
@@ -144,14 +145,15 @@ const OffersList = () => {
                   <TableHead>Currency</TableHead>
                   <TableHead className="text-right">Premium</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Checks</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-[60px]" />
+                  <TableHead className="w-[140px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-10 text-sm text-muted-foreground">
                       No offers match the current filters.
                     </TableCell>
                   </TableRow>
@@ -159,6 +161,21 @@ const OffersList = () => {
                   filtered.map((o) => {
                     const ph = getCustomer(o.policyHolderId);
                     const product = productMap[o.productId];
+                    const checks = computeVerification({
+                      productId: o.productId,
+                      versionId: o.versionId,
+                      templateId: o.templateId,
+                      currency: o.currency,
+                      policyHolderId: o.policyHolderId,
+                      insuredId: o.insuredId,
+                      premium: null,
+                      loanOutstanding: o.loan?.outstandingBalance,
+                    });
+                    const review = checks.filter((c) => c.result === "Requires Review").length;
+                    const warn = checks.filter((c) => c.result === "Warning").length;
+                    const passed = checks.filter((c) => c.result === "Passed").length;
+                    const verifStatus = overallStatus(checks);
+                    const allPassed = review === 0 && warn === 0;
                     return (
                       <TableRow key={o.id}>
                         <TableCell>
@@ -180,29 +197,63 @@ const OffersList = () => {
                             {o.status}
                           </span>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-mono">{o.createdDate}</TableCell>
                         <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => navigate(`/offers/${o.id}`)}>
-                                <Eye className="h-4 w-4 mr-2" />View
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => toast.info(`Edit ${o.number}`)}>
-                                <Edit className="h-4 w-4 mr-2" />Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => toast.success(`${o.number} sent for issuance`)}
-                                disabled={o.status === "Issued" || o.status === "Rejected"}
-                              >
-                                <Send className="h-4 w-4 mr-2" />Issue
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                              allPassed
+                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                : verifStatus === "Pending Review"
+                                ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                            title={`${passed} passed · ${warn} warnings · ${review} require review`}
+                          >
+                            {allPassed ? (
+                              <ShieldCheck className="h-3 w-3" />
+                            ) : verifStatus === "Pending Review" ? (
+                              <ShieldAlert className="h-3 w-3" />
+                            ) : (
+                              <AlertTriangle className="h-3 w-3" />
+                            )}
+                            {allPassed
+                              ? `Passed (${passed}/${checks.length})`
+                              : `${review + warn} of ${checks.length} open`}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground font-mono">{o.createdDate}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5"
+                              onClick={() => navigate(`/offers/${o.id}`)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => navigate(`/offers/${o.id}`)}>
+                                  <Eye className="h-4 w-4 mr-2" />View
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => toast.info(`Edit ${o.number}`)}>
+                                  <Edit className="h-4 w-4 mr-2" />Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => toast.success(`${o.number} sent for issuance`)}
+                                  disabled={o.status === "Issued" || o.status === "Rejected"}
+                                >
+                                  <Send className="h-4 w-4 mr-2" />Issue
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
