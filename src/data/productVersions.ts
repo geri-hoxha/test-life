@@ -14,15 +14,15 @@ export type ProductVersion = {
 
 const seed: ProductVersion[] = [
   // PRD-001
-  { id: "VRS-1001", productId: "PRD-001", name: "2026 Standard Life", number: "v3.2", effectiveFrom: "2026-01-15", status: "Active", notes: "Updated premium tables and introduced critical illness rider.", author: "Anna Kovač" },
+  { id: "VRS-1001", productId: "PRD-001", name: "2026 Standard Life", number: "v3.2", effectiveFrom: "2026-01-15", status: "Active", notes: "Updated premium tables and introduced critical illness rider.", author: "Erin Hoxha" },
   { id: "VRS-1002", productId: "PRD-001", name: "2025 Autumn Refresh", number: "v3.1", effectiveFrom: "2025-09-02", effectiveTo: "2026-01-14", status: "Retired", notes: "Initial 2025 release.", author: "M. Hoxha" },
-  { id: "VRS-1003", productId: "PRD-001", name: "2026 Mid-Year Update", number: "v3.3", status: "Draft", notes: "Planned mid-year repricing — pending compliance review.", author: "Anna Kovač" },
+  { id: "VRS-1003", productId: "PRD-001", name: "2026 Mid-Year Update", number: "v3.3", status: "Draft", notes: "Planned mid-year repricing — pending compliance review.", author: "Erin Hoxha" },
   // PRD-002
   { id: "VRS-1010", productId: "PRD-002", name: "2025 Basic Refresh", number: "v2.0", effectiveFrom: "2025-03-04", status: "Active", author: "M. Hoxha" },
   // PRD-003
-  { id: "VRS-1020", productId: "PRD-003", name: "2025 WholeLife Premium", number: "v1.4", effectiveFrom: "2025-06-21", status: "Active", author: "Anna Kovač" },
+  { id: "VRS-1020", productId: "PRD-003", name: "2025 WholeLife Premium", number: "v1.4", effectiveFrom: "2025-06-21", status: "Active", author: "Erin Hoxha" },
   // PRD-004
-  { id: "VRS-1030", productId: "PRD-004", name: "2026 Endowment 15Y", number: "v0.9", status: "Draft", notes: "Awaiting actuary sign-off.", author: "Anna Kovač" },
+  { id: "VRS-1030", productId: "PRD-004", name: "2026 Endowment 15Y", number: "v0.9", status: "Draft", notes: "Awaiting actuary sign-off.", author: "Erin Hoxha" },
   // PRD-005
   { id: "VRS-1040", productId: "PRD-005", name: "2024 TermLife 30Y", number: "v2.1", effectiveFrom: "2024-09-14", effectiveTo: "2025-12-31", status: "Retired", author: "M. Hoxha" },
 ];

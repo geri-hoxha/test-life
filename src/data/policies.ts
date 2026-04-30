@@ -33,7 +33,7 @@ const seed: Policy[] = [
     startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
     paymentMode: "Annual payment schedule",
     premium: 615, status: "Active",
-    issueDate: "2026-04-01", issuedBy: "Anna Kovač",
+    issueDate: "2026-04-01", issuedBy: "Erin Hoxha",
   },
 ];
 

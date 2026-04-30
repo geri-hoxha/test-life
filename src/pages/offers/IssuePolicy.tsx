@@ -193,7 +193,7 @@ const IssuePolicy = () => {
       premium: offer.premium,
       status: "Active",
       issueDate,
-      issuedBy: "Anna Kovač",
+      issuedBy: "Erin Hoxha",
     });
     setOfferStatus(offer.id, "Issued");
     toast.success(`Policy ${generated.number} issued successfully`);

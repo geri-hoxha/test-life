@@ -49,7 +49,7 @@ const VersionDialog = ({ open, onOpenChange, productId, initial, onSave }: Props
       effectiveFrom: toISO(from),
       effectiveTo: toISO(to),
       notes,
-      author: initial?.author ?? "Anna Kovač",
+      author: initial?.author ?? "Erin Hoxha",
     });
     onOpenChange(false);
   };

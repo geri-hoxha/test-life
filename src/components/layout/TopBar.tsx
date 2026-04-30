@@ -69,7 +69,7 @@ const TopBar = () => {
                   <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">AK</AvatarFallback>
                 </Avatar>
                 <div className="hidden md:block text-left leading-tight">
-                  <div className="text-xs font-medium">Anna Kovač</div>
+                  <div className="text-xs font-medium">Erin Hoxha</div>
                   <div className="text-[10px] text-topbar-muted">Underwriter</div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-topbar-muted" />
@@ -78,7 +78,7 @@ const TopBar = () => {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span>Anna Kovač</span>
+                  <span>Erin Hoxha</span>
                   <span className="text-xs text-muted-foreground font-normal">anna.k@lifeerp.demo</span>
                 </div>
               </DropdownMenuLabel>

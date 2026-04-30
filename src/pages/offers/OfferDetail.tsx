@@ -86,7 +86,7 @@ const OfferDetail = () => {
   const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
   const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
   const [notes, setNotes] = useState(
-    "Initial draft prepared by Anna Kovač. Awaiting underwriter review.\n• Customer requested annual payment.\n• Beneficiary split confirmed via call on 2026-04-22."
+    "Initial draft prepared by Erin Hoxha. Awaiting underwriter review.\n• Customer requested annual payment.\n• Beneficiary split confirmed via call on 2026-04-22."
   );
 
   if (!offer) {
