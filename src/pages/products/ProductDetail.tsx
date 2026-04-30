@@ -38,11 +38,21 @@ const SectionEmpty = ({ icon: Icon, title, hint, cta }: { icon: any; title: stri
   </Card>
 );
 
+const FLAG_DEFS: { key: keyof Product["flags"]; label: string; hint: string }[] = [
+  { key: "pep", label: "PEP check required", hint: "Politically Exposed Persons trigger enhanced due-diligence." },
+  { key: "highInsuredAmount", label: "High insured amount requires review", hint: "Sum insured above the product threshold goes to manual review." },
+  { key: "totalExposure", label: "Total customer exposure requires review", hint: "If the customer's combined exposure across policies exceeds the limit." },
+  { key: "manualUnderwriting", label: "Manual underwriting required", hint: "Every application is routed to an underwriter regardless of other rules." },
+  { key: "compliance", label: "Compliance review required", hint: "An additional compliance officer sign-off is mandatory before issuance." },
+];
+
 const ProductDetail = () => {
   const { id } = useParams();
   const product = id ? getProduct(id) : undefined;
 
-  if (!product) {
+  const [flags, setFlags] = useState<Product["flags"] | null>(product?.flags ?? null);
+
+  if (!product || !flags) {
     return (
       <AppShell>
         <PageHeader
@@ -57,13 +67,17 @@ const ProductDetail = () => {
     );
   }
 
-  const flagList = [
-    { key: "pep", label: "PEP check required", on: product.flags.pep },
-    { key: "highInsuredAmount", label: "High insured amount requires review", on: product.flags.highInsuredAmount },
-    { key: "totalExposure", label: "Total customer exposure requires review", on: product.flags.totalExposure },
-    { key: "manualUnderwriting", label: "Manual underwriting required", on: product.flags.manualUnderwriting },
-    { key: "compliance", label: "Compliance review required", on: product.flags.compliance },
-  ];
+  const dirty = JSON.stringify(flags) !== JSON.stringify(product.flags);
+
+  const toggleFlag = (key: keyof Product["flags"]) =>
+    setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
+
+  const saveFlags = () => {
+    updateProductFlags(product.id, flags);
+    toast.success("Verification rules saved");
+  };
+
+  const flagList = FLAG_DEFS.map((f) => ({ ...f, on: flags[f.key] }));
 
   return (
     <AppShell>
