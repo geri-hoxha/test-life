@@ -10,7 +10,7 @@ const AppShell = ({ children }: { children: ReactNode }) => {
       </main>
       <footer className="border-t border-border bg-card">
         <div className="container py-4 flex items-center justify-between text-xs text-muted-foreground">
-          <span>© 2026 LifeERP Demo · Internal preview build</span>
+          <span>© 2026 ESIG Life Demo · Internal preview build</span>
           <span>v0.1.0 · Environment: Sandbox</span>
         </div>
       </footer>
