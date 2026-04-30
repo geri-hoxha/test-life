@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck, FileSpreadsheet } from "lucide-react";
 import { seedProducts } from "@/data/products";
 import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
