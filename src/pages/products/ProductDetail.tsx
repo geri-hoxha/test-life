@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getProduct, ProductStatus } from "@/data/products";
-import { Pencil, Settings2, Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator } from "lucide-react";
+import { getProduct, updateProductFlags, ProductStatus, Product } from "@/data/products";
+import { Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator, Save } from "lucide-react";
+import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
 import PremiumRulesTab from "./PremiumRulesTab";
@@ -35,11 +38,21 @@ const SectionEmpty = ({ icon: Icon, title, hint, cta }: { icon: any; title: stri
   </Card>
 );
 
+const FLAG_DEFS: { key: keyof Product["flags"]; label: string; hint: string }[] = [
+  { key: "pep", label: "PEP check required", hint: "Politically Exposed Persons trigger enhanced due-diligence." },
+  { key: "highInsuredAmount", label: "High insured amount requires review", hint: "Sum insured above the product threshold goes to manual review." },
+  { key: "totalExposure", label: "Total customer exposure requires review", hint: "If the customer's combined exposure across policies exceeds the limit." },
+  { key: "manualUnderwriting", label: "Manual underwriting required", hint: "Every application is routed to an underwriter regardless of other rules." },
+  { key: "compliance", label: "Compliance review required", hint: "An additional compliance officer sign-off is mandatory before issuance." },
+];
+
 const ProductDetail = () => {
   const { id } = useParams();
   const product = id ? getProduct(id) : undefined;
 
-  if (!product) {
+  const [flags, setFlags] = useState<Product["flags"] | null>(product?.flags ?? null);
+
+  if (!product || !flags) {
     return (
       <AppShell>
         <PageHeader
@@ -54,13 +67,17 @@ const ProductDetail = () => {
     );
   }
 
-  const flagList = [
-    { key: "pep", label: "PEP check required", on: product.flags.pep },
-    { key: "highInsuredAmount", label: "High insured amount requires review", on: product.flags.highInsuredAmount },
-    { key: "totalExposure", label: "Total customer exposure requires review", on: product.flags.totalExposure },
-    { key: "manualUnderwriting", label: "Manual underwriting required", on: product.flags.manualUnderwriting },
-    { key: "compliance", label: "Compliance review required", on: product.flags.compliance },
-  ];
+  const dirty = JSON.stringify(flags) !== JSON.stringify(product.flags);
+
+  const toggleFlag = (key: keyof Product["flags"]) =>
+    setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
+
+  const saveFlags = () => {
+    updateProductFlags(product.id, flags);
+    toast.success("Verification rules saved");
+  };
+
+  const flagList = FLAG_DEFS.map((f) => ({ ...f, on: flags[f.key] }));
 
   return (
     <AppShell>
@@ -68,14 +85,6 @@ const ProductDetail = () => {
         breadcrumbs={[{ label: "Products", to: "/products" }, { label: product.name }]}
         title={product.name}
         description={product.description}
-        actions={
-          <>
-            <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4" /> Edit</Button>
-            <Button className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Settings2 className="h-4 w-4" /> Configure
-            </Button>
-          </>
-        }
       />
 
       {/* Summary strip */}
@@ -190,25 +199,50 @@ const ProductDetail = () => {
 
         <TabsContent value="verification">
           <Card className="shadow-card border-border overflow-hidden">
-            <div className="px-5 py-4 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <ScrollText className="h-4 w-4 text-accent" /> Verification rules
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Conditions that route an application to manual review.</p>
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <ScrollText className="h-4 w-4 text-accent" /> Verification rules
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Toggle the conditions that route an application to manual review.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={saveFlags}
+                disabled={!dirty}
+                className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                <Save className="h-4 w-4" /> Save changes
+              </Button>
             </div>
             <div className="divide-y divide-border">
               {flagList.map((f) => (
-                <div key={f.key} className="flex items-center justify-between px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className={`h-7 w-7 rounded-md flex items-center justify-center ${f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
+                <label
+                  key={f.key}
+                  htmlFor={`flag-${f.key}`}
+                  className="flex items-center justify-between px-5 py-4 gap-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span
+                      className={`mt-0.5 h-7 w-7 shrink-0 rounded-md flex items-center justify-center ${
+                        f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
                       <Check className="h-4 w-4" />
                     </span>
-                    <span className="text-sm font-medium">{f.label}</span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground">{f.label}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{f.hint}</div>
+                    </div>
                   </div>
-                  <Badge className={f.on ? "bg-success/15 text-success border-0" : "bg-muted text-muted-foreground border-0"}>
-                    {f.on ? "Enabled" : "Disabled"}
-                  </Badge>
-                </div>
+                  <Switch
+                    id={`flag-${f.key}`}
+                    checked={f.on}
+                    onCheckedChange={() => toggleFlag(f.key)}
+                  />
+                </label>
               ))}
             </div>
           </Card>
