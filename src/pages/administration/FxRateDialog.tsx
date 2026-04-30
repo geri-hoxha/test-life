@@ -68,7 +68,7 @@ const FxRateDialog = ({ open, onOpenChange, onSaved }: Props) => {
       reason,
       notes,
       source: "Manual",
-      enteredBy: "Anna Kovač",
+      enteredBy: "Erin Hoxha",
     });
     toast.success(`Manual FX rate saved: 1 ${fromCurrency} = ${num} ${toCurrency}`);
     reset();

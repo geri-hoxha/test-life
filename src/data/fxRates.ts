@@ -29,7 +29,7 @@ let rates: FxRate[] = [
   { id: "fx-4", date: daysAgo(1), fromCurrency: "EUR", toCurrency: "USD", rate: 1.0821, source: "Automatic", enteredBy: "ECB Feed" },
   { id: "fx-5", date: daysAgo(1), fromCurrency: "EUR", toCurrency: "GBP", rate: 0.8551, source: "Automatic", enteredBy: "ECB Feed" },
   { id: "fx-6", date: daysAgo(2), fromCurrency: "EUR", toCurrency: "USD", rate: 1.0798, source: "Automatic", enteredBy: "ECB Feed" },
-  { id: "fx-7", date: daysAgo(3), fromCurrency: "EUR", toCurrency: "USD", rate: 1.0810, source: "Manual", enteredBy: "Anna Kovač", reason: "Corporate hedging rate", notes: "Used for Q2 corporate offers" },
+  { id: "fx-7", date: daysAgo(3), fromCurrency: "EUR", toCurrency: "USD", rate: 1.0810, source: "Manual", enteredBy: "Erin Hoxha", reason: "Corporate hedging rate", notes: "Used for Q2 corporate offers" },
   { id: "fx-8", date: daysAgo(2), fromCurrency: "EUR", toCurrency: "RSD", rate: 117.21, source: "Automatic", enteredBy: "NBS Feed" },
   { id: "fx-9", date: daysAgo(0), fromCurrency: "EUR", toCurrency: "RSD", rate: 117.18, source: "Automatic", enteredBy: "NBS Feed" },
   { id: "fx-10", date: daysAgo(5), fromCurrency: "USD", toCurrency: "EUR", rate: 0.9221, source: "Automatic", enteredBy: "ECB Feed" },
@@ -41,7 +41,7 @@ export const addFxRate = (r: Omit<FxRate, "id" | "source" | "enteredBy"> & { sou
   const next: FxRate = {
     id: `fx-${Date.now()}`,
     source: r.source ?? "Manual",
-    enteredBy: r.enteredBy ?? "Anna Kovač",
+    enteredBy: r.enteredBy ?? "Erin Hoxha",
     ...r,
   };
   rates = [next, ...rates];
