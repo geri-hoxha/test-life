@@ -40,6 +40,7 @@ const seed: PremiumRule[] = [
     productId: "PRD-001",
     versionId: "VRS-1001",
     ruleType: "Age + Gender rate table",
+    repriceOnAttainedAge: true,
     rateTable: [
       { id: "RR-1", ageFrom: 18, ageTo: 35, gender: "Male", rate: 1.2, rateType: "Per 1000 Sum Insured" },
       { id: "RR-2", ageFrom: 18, ageTo: 35, gender: "Female", rate: 1.0, rateType: "Per 1000 Sum Insured" },
