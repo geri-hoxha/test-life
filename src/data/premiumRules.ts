@@ -58,6 +58,7 @@ const blankRule = (productId: string, versionId: string): PremiumRule => ({
   productId,
   versionId,
   ruleType: "Age + Gender rate table",
+  repriceOnAttainedAge: true,
   rateTable: [],
 });
 
