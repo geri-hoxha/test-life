@@ -43,6 +43,8 @@ import { getRatesForPair, convert } from "@/data/fxRates";
 
 export type PremiumResult = {
   netPremium: number;
+  taxRate: number;
+  tax: number;
   commission: number;
   grossPremium: number;
   fxRate: number;
@@ -57,6 +59,7 @@ export type ScheduleRow = {
   endDate: string;
   estimatedLoanBalance?: number;
   premium: number;
+  tax: number;
   commission: number;
   gross: number;
   status: "Not Due" | "Current Year";
@@ -245,13 +248,16 @@ const PremiumCalculation = ({
     });
   }
 
-  // 6. Commission
+  // 6. Tax (10% on net) — gross is net + tax
+  const TAX_RATE = 0.10;
+  const tax = netPremium * TAX_RATE;
+  const grossPremium = netPremium + tax;
+
+  // 7. Commission — paid to the agent, calculated on the NET premium.
+  //    Not added to gross; it's a cost to the insurer, not a charge to the customer.
   const effectiveCommissionPct =
     template?.commissionOverridePct ?? (subtotal > 0 ? (weightedCommission / subtotal) * 100 : 0);
   const commission = (netPremium * effectiveCommissionPct) / 100;
-
-  // 7. Gross
-  const grossPremium = netPremium + commission;
 
   // ---- Multi-year schedule ----
   const schedule: ScheduleRow[] = [];
