@@ -27,6 +27,12 @@ export type PremiumRule = {
   percentage?: number;
   loanRatePer1000?: number;
   rateTable: RateRow[];
+  /**
+   * If true, the premium is recalculated each policy year using the customer's
+   * age at that year (attained-age pricing). If false, the premium is locked
+   * to the customer's age at policy inception (level-premium pricing).
+   */
+  reprice​OnAttainedAge?: boolean;
 };
 
 const seed: PremiumRule[] = [
