@@ -126,14 +126,6 @@ const ProductsList = () => {
               </div>
             </CardContent>
 
-            <CardFooter className="border-t border-border bg-muted/20 py-2.5 px-6 gap-1" onClick={(e) => e.stopPropagation()}>
-              <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs flex-1">
-                <Link to={`/products/${p.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Link>
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs flex-1">
-                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-              </Button>
-            </CardFooter>
           </Card>
         ))}
       </div>
