@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreHorizontal, Eye, Pencil, Settings2, Filter, Package, Calendar, GitBranch } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Settings2, Filter, Package, Calendar, GitBranch } from "lucide-react";
 import { listProducts, ProductStatus } from "@/data/products";
 
 const statusClass: Record<ProductStatus, string> = {
