@@ -30,24 +30,6 @@ const statusClass: Record<ProductStatus, string> = {
 
 const ALL_CURRENCIES = ["EUR", "ALL", "USD", "GBP", "CHF"];
 
-const statusClass: Record<ProductStatus, string> = {
-  Active: "bg-success/15 text-success",
-  Draft: "bg-muted text-muted-foreground",
-  Inactive: "bg-destructive/10 text-destructive",
-};
-
-const SectionEmpty = ({ icon: Icon, title, hint, cta }: { icon: any; title: string; hint: string; cta: string }) => (
-  <Card className="p-12 shadow-card border-border border-dashed flex flex-col items-center text-center">
-    <div className="h-12 w-12 rounded-md bg-accent-soft text-accent flex items-center justify-center mb-3">
-      <Icon className="h-6 w-6" />
-    </div>
-    <div className="text-sm font-semibold text-foreground">{title}</div>
-    <p className="text-xs text-muted-foreground mt-1 max-w-md">{hint}</p>
-    <Button size="sm" className="mt-4 gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-      <Plus className="h-4 w-4" />{cta}
-    </Button>
-  </Card>
-);
 
 const FLAG_DEFS: { key: keyof Product["flags"]; label: string; hint: string }[] = [
   { key: "pep", label: "PEP check required", hint: "Politically Exposed Persons trigger enhanced due-diligence." },
