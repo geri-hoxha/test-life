@@ -6,18 +6,29 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { getProduct, updateProductFlags, ProductStatus, Product } from "@/data/products";
-import { Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator, Save } from "lucide-react";
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getProduct, updateProductFlags, updateProduct, ProductStatus, Product } from "@/data/products";
+import { Check, AlertCircle, ScrollText, Save, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
 import PremiumRulesTab from "./PremiumRulesTab";
 import TemplatesTab from "./TemplatesTab";
 import DocumentsTab from "./DocumentsTab";
+
+const statusClass: Record<ProductStatus, string> = {
+  Active: "bg-success/15 text-success",
+  Draft: "bg-muted text-muted-foreground",
+  Inactive: "bg-destructive/10 text-destructive",
+};
+
+const ALL_CURRENCIES = ["EUR", "ALL", "USD", "GBP", "CHF"];
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
