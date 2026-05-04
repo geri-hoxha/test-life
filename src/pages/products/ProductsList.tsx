@@ -2,14 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreHorizontal, Eye, Pencil, Settings2, Filter, Package, Calendar, GitBranch } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Settings2, Filter, Package, Calendar, GitBranch } from "lucide-react";
 import { listProducts, ProductStatus } from "@/data/products";
 
 const statusClass: Record<ProductStatus, string> = {
@@ -126,14 +126,6 @@ const ProductsList = () => {
               </div>
             </CardContent>
 
-            <CardFooter className="border-t border-border bg-muted/20 py-2.5 px-6 gap-1" onClick={(e) => e.stopPropagation()}>
-              <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs flex-1">
-                <Link to={`/products/${p.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Link>
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs flex-1">
-                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-              </Button>
-            </CardFooter>
           </Card>
         ))}
       </div>

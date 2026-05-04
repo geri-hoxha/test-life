@@ -6,12 +6,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { getProduct, updateProductFlags, ProductStatus, Product } from "@/data/products";
-import { Check, AlertCircle, Plus, FileText, Shield, Layers, ScrollText, Calculator, Save } from "lucide-react";
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getProduct, updateProductFlags, updateProduct, ProductStatus, Product } from "@/data/products";
+import { Check, AlertCircle, ScrollText, Save, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
@@ -25,18 +28,8 @@ const statusClass: Record<ProductStatus, string> = {
   Inactive: "bg-destructive/10 text-destructive",
 };
 
-const SectionEmpty = ({ icon: Icon, title, hint, cta }: { icon: any; title: string; hint: string; cta: string }) => (
-  <Card className="p-12 shadow-card border-border border-dashed flex flex-col items-center text-center">
-    <div className="h-12 w-12 rounded-md bg-accent-soft text-accent flex items-center justify-center mb-3">
-      <Icon className="h-6 w-6" />
-    </div>
-    <div className="text-sm font-semibold text-foreground">{title}</div>
-    <p className="text-xs text-muted-foreground mt-1 max-w-md">{hint}</p>
-    <Button size="sm" className="mt-4 gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-      <Plus className="h-4 w-4" />{cta}
-    </Button>
-  </Card>
-);
+const ALL_CURRENCIES = ["EUR", "ALL", "USD", "GBP", "CHF"];
+
 
 const FLAG_DEFS: { key: keyof Product["flags"]; label: string; hint: string }[] = [
   { key: "pep", label: "PEP check required", hint: "Politically Exposed Persons trigger enhanced due-diligence." },
@@ -46,13 +39,37 @@ const FLAG_DEFS: { key: keyof Product["flags"]; label: string; hint: string }[] 
   { key: "compliance", label: "Compliance review required", hint: "An additional compliance officer sign-off is mandatory before issuance." },
 ];
 
+type EditableFields = {
+  name: string;
+  code: string;
+  status: ProductStatus;
+  type: string;
+  description: string;
+  currencies: string[];
+  requiredDocuments: string[];
+};
+
 const ProductDetail = () => {
   const { id } = useParams();
   const product = id ? getProduct(id) : undefined;
 
   const [flags, setFlags] = useState<Product["flags"] | null>(product?.flags ?? null);
+  const [fields, setFields] = useState<EditableFields | null>(
+    product
+      ? {
+          name: product.name,
+          code: product.code,
+          status: product.status,
+          type: product.type,
+          description: product.description,
+          currencies: [...product.currencies],
+          requiredDocuments: [...product.requiredDocuments],
+        }
+      : null
+  );
+  const [newDoc, setNewDoc] = useState("");
 
-  if (!product || !flags) {
+  if (!product || !flags || !fields) {
     return (
       <AppShell>
         <PageHeader
@@ -68,6 +85,14 @@ const ProductDetail = () => {
   }
 
   const dirty = JSON.stringify(flags) !== JSON.stringify(product.flags);
+  const fieldsDirty =
+    fields.name !== product.name ||
+    fields.code !== product.code ||
+    fields.status !== product.status ||
+    fields.type !== product.type ||
+    fields.description !== product.description ||
+    JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
+    JSON.stringify(fields.requiredDocuments) !== JSON.stringify(product.requiredDocuments);
 
   const toggleFlag = (key: keyof Product["flags"]) =>
     setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
@@ -76,6 +101,28 @@ const ProductDetail = () => {
     updateProductFlags(product.id, flags);
     toast.success("Verification rules saved");
   };
+
+  const saveFields = () => {
+    updateProduct(product.id, fields);
+    toast.success("Product details saved");
+  };
+
+  const toggleCurrency = (c: string) =>
+    setFields((f) =>
+      f
+        ? { ...f, currencies: f.currencies.includes(c) ? f.currencies.filter((x) => x !== c) : [...f.currencies, c] }
+        : f
+    );
+
+  const addDoc = () => {
+    const v = newDoc.trim();
+    if (!v) return;
+    setFields((f) => (f ? { ...f, requiredDocuments: [...f.requiredDocuments, v] } : f));
+    setNewDoc("");
+  };
+
+  const removeDoc = (d: string) =>
+    setFields((f) => (f ? { ...f, requiredDocuments: f.requiredDocuments.filter((x) => x !== d) } : f));
 
   const flagList = FLAG_DEFS.map((f) => ({ ...f, on: flags[f.key] }));
 
@@ -133,48 +180,134 @@ const ProductDetail = () => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="p-5 shadow-card border-border md:col-span-2">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Description</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {product.description || "No description provided."}
-              </p>
-              <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-xs text-muted-foreground">Required documents</div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {product.requiredDocuments.map((d) => (
-                      <Badge key={d} className="bg-accent-soft text-accent-soft-foreground border-0">{d}</Badge>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Currencies</div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {product.currencies.map((c) => (
-                      <Badge key={c} variant="outline" className="font-mono">{c}</Badge>
-                    ))}
-                  </div>
+          <Card className="shadow-card border-border overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Product details</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Edit the core attributes of this product.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={saveFields}
+                disabled={!fieldsDirty}
+                className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                <Save className="h-4 w-4" /> Save changes
+              </Button>
+            </div>
+
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <Label htmlFor="p-name">Name</Label>
+                <Input id="p-name" value={fields.name} onChange={(e) => setFields({ ...fields, name: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-code">Code</Label>
+                <Input id="p-code" value={fields.code} onChange={(e) => setFields({ ...fields, code: e.target.value })} className="font-mono" />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={fields.status} onValueChange={(v) => setFields({ ...fields, status: v as ProductStatus })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-type">Type</Label>
+                <Input id="p-type" value={fields.type} onChange={(e) => setFields({ ...fields, type: e.target.value })} />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="p-desc">Description</Label>
+                <Textarea
+                  id="p-desc"
+                  rows={4}
+                  value={fields.description}
+                  onChange={(e) => setFields({ ...fields, description: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Currencies</Label>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_CURRENCIES.map((c) => {
+                    const on = fields.currencies.includes(c);
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => toggleCurrency(c)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-mono border transition-colors ${
+                          on
+                            ? "bg-accent text-accent-foreground border-accent"
+                            : "bg-background text-muted-foreground border-border hover:border-accent/50"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </Card>
 
-            <Card className="p-5 shadow-card border-border">
-              <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-warning" /> Verification flags
-              </h3>
-              <ul className="space-y-2.5">
-                {flagList.map((f) => (
-                  <li key={f.key} className="flex items-start gap-2 text-sm">
-                    <span className={`mt-0.5 h-4 w-4 rounded-sm flex items-center justify-center ${f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
-                      {f.on && <Check className="h-3 w-3" />}
-                    </span>
-                    <span className={f.on ? "text-foreground" : "text-muted-foreground"}>{f.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Required documents</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {fields.requiredDocuments.map((d) => (
+                    <Badge key={d} className="bg-accent-soft text-accent-soft-foreground border-0 gap-1 pr-1">
+                      {d}
+                      <button
+                        type="button"
+                        onClick={() => removeDoc(d)}
+                        className="rounded-sm hover:bg-background/50 p-0.5"
+                        aria-label={`Remove ${d}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Input
+                    placeholder="Add required document…"
+                    value={newDoc}
+                    onChange={(e) => setNewDoc(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addDoc();
+                      }
+                    }}
+                    className="max-w-xs h-9"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={addDoc} className="gap-1">
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5 shadow-card border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-warning" /> Verification flags (summary)
+            </h3>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {flagList.map((f) => (
+                <li key={f.key} className="flex items-start gap-2 text-sm">
+                  <span className={`mt-0.5 h-4 w-4 rounded-sm flex items-center justify-center ${f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {f.on && <Check className="h-3 w-3" />}
+                  </span>
+                  <span className={f.on ? "text-foreground" : "text-muted-foreground"}>{f.label}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
         </TabsContent>
 
         <TabsContent value="versions">

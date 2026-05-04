@@ -97,6 +97,10 @@ export const updateProductFlags = (id: string, flags: Product["flags"]) => {
   products = products.map((p) => (p.id === id ? { ...p, flags } : p));
   return products.find((p) => p.id === id);
 };
+export const updateProduct = (id: string, patch: Partial<Omit<Product, "id">>) => {
+  products = products.map((p) => (p.id === id ? { ...p, ...patch } : p));
+  return products.find((p) => p.id === id);
+};
 export const addProduct = (p: Omit<Product, "id" | "activeVersion" | "createdDate">) => {
   const id = `PRD-${String(products.length + 1).padStart(3, "0")}`;
   const created: Product = {
