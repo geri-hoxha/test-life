@@ -128,9 +128,9 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{initial ? "Edit template" : "New template / package"}</DialogTitle>
+      <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader className="pb-2 border-b border-border">
+          <DialogTitle className="text-xl">{initial ? "Edit template" : "New template / package"}</DialogTitle>
           <DialogDescription>
             Bundle coverages and pricing rules into a sellable package.
           </DialogDescription>
