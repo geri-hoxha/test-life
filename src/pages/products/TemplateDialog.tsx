@@ -279,14 +279,14 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
           <section className="space-y-3 rounded-lg border border-border bg-card p-5">
             <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Classification & policy attributes</h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Type</Label>
                 <Select value={t.typeCode} onValueChange={(v) => set("typeCode", v as TemplateTypeCode)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{TYPE_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5 md:col-span-3">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Policy type (Tip Police)</Label>
                 <Select value={t.policyType} onValueChange={(v) => set("policyType", v as PolicyTypeCode)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
