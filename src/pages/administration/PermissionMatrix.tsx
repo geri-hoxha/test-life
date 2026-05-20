@@ -43,10 +43,7 @@ const PermissionMatrix = () => {
   const [fProduct, setFProduct] = useState<string>(ALL);
   const [fTemplate, setFTemplate] = useState<string>(ALL);
   const [fBank, setFBank] = useState<string>(ALL);
-  const [fBranches, setFBranches] = useState<string[]>([]);
-  const [fAgencies, setFAgencies] = useState<string[]>([]);
   const [fAgent, setFAgent] = useState<string>(ALL);
-  const [search, setSearch] = useState("");
 
   // Dialogs
   const [addOpen, setAddOpen] = useState(false);
@@ -54,46 +51,27 @@ const PermissionMatrix = () => {
 
   const rows = useMemo(() => {
     void version;
-    const q = search.trim().toLowerCase();
     return listGrantRows().filter((r) => {
       if (fProduct !== ALL && r.productId !== fProduct) return false;
       if (fTemplate !== ALL && r.templateId !== fTemplate) return false;
       if (fBank !== ALL && r.bankId !== fBank) return false;
-      if (fBranches.length > 0 && (!r.bankBranchId || !fBranches.includes(r.bankBranchId))) return false;
-      if (fAgencies.length > 0 && (!r.agencyId || !fAgencies.includes(r.agencyId))) return false;
       if (fAgent !== ALL && r.agentId !== fAgent) return false;
-      if (q) {
-        const hay = [
-          r.productName, r.templateName, r.bankName, r.bankBranchName, r.agencyName, r.agentName,
-        ].filter(Boolean).join(" ").toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
       return true;
     });
-  }, [version, fProduct, fTemplate, fBank, fBranches, fAgencies, fAgent, search]);
+  }, [version, fProduct, fTemplate, fBank, fAgent]);
 
   const templatesForFilter = useMemo(
     () => matrixTemplates.filter((t) => fProduct === ALL || t.productId === fProduct),
     [fProduct]
   );
-  const branchesForFilter = useMemo(
-    () => matrixBankBranches.filter((b) => fBank === ALL || b.bankId === fBank),
-    [fBank]
-  );
-  const agentsForFilter = useMemo(
-    () => matrixAgents.filter((a) => fAgencies.length === 0 || fAgencies.includes(a.agencyId)),
-    [fAgencies]
-  );
 
   const clearFilters = () => {
-    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFBranches([]);
-    setFAgencies([]); setFAgent(ALL); setSearch("");
+    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFAgent(ALL);
   };
 
   const activeFilters =
-    (fProduct !== ALL ? 1 : 0) + (fTemplate !== ALL ? 1 : 0) + (fBank !== ALL ? 1 : 0) +
-    (fBranches.length > 0 ? 1 : 0) + (fAgencies.length > 0 ? 1 : 0) + (fAgent !== ALL ? 1 : 0) +
-    (search ? 1 : 0);
+    (fProduct !== ALL ? 1 : 0) + (fTemplate !== ALL ? 1 : 0) +
+    (fBank !== ALL ? 1 : 0) + (fAgent !== ALL ? 1 : 0);
 
   const handleExport = () => {
     const data = rows.map((r) => ({
