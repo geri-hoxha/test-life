@@ -37,7 +37,7 @@ import { toast } from "sonner";
 type SubjectTab = "BANK" | "AGENT" | "BOTH";
 
 const PermissionMatrix = () => {
-  const [productId, setProductId] = useState<string>(matrixProducts[0].id);
+  const [productId, setProductId] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [subjectTab, setSubjectTab] = useState<SubjectTab>("BOTH");
@@ -67,12 +67,25 @@ const PermissionMatrix = () => {
     return () => clearTimeout(t);
   }, [search]);
 
+  const productById = useMemo(
+    () => new Map(matrixProducts.map((p) => [p.id, p])),
+    []
+  );
+
   const templates = useMemo(
     () =>
       matrixTemplates
-        .filter((t) => t.productId === productId)
-        .filter((t) => !debounced || t.name.toLowerCase().includes(debounced) || t.id.toLowerCase().includes(debounced)),
-    [productId, debounced]
+        .filter((t) => productId === "ALL" || t.productId === productId)
+        .filter((t) => {
+          if (!debounced) return true;
+          const productName = productById.get(t.productId)?.name.toLowerCase() ?? "";
+          return (
+            t.name.toLowerCase().includes(debounced) ||
+            t.id.toLowerCase().includes(debounced) ||
+            productName.includes(debounced)
+          );
+        }),
+    [productId, debounced, productById]
   );
 
   const banks = useMemo(
@@ -87,16 +100,12 @@ const PermissionMatrix = () => {
   // Index permissions for O(1) lookup
   const permIndex = useMemo(() => {
     void version;
-    const perms = listPermissions(productId, templates.map((t) => t.id));
+    const targetProduct = productId === "ALL" ? undefined : productId;
+    const perms = listPermissions(targetProduct, templates.map((t) => t.id));
     const map = new Map<string, Permission>();
     for (const p of perms) map.set(`${p.templateId}::${p.subjectType}::${p.subjectId}`, p);
     return map;
   }, [productId, templates, version]);
-
-  const stats = useMemo(() => {
-    void version;
-    return globalStats(productId);
-  }, [productId, version]);
 
   const regions = useMemo(() => Array.from(new Set(matrixBanks.map((b) => b.region))), []);
   const tiers = ["Junior", "Senior", "Lead"];
@@ -122,7 +131,12 @@ const PermissionMatrix = () => {
       ...(subjectTab !== "BANK" ? agents.map((a) => ({ k: `AGENT::${a.id}`, label: `${a.name} (Agent)` })) : []),
     ];
     const rows = templates.map((t) => {
-      const row: Record<string, string> = { Template: t.name, ID: t.id, Type: t.type };
+      const productName = productById.get(t.productId)?.name ?? "";
+      const row: Record<string, string> = {
+        Template: `${productName} - ${t.name}`,
+        ID: t.id,
+        Type: t.type,
+      };
       for (const s of subjects) {
         const [stype, sid] = s.k.split("::") as ["BANK" | "AGENT", string];
         const p = permIndex.get(`${t.id}::${stype}::${sid}`);
@@ -153,22 +167,13 @@ const PermissionMatrix = () => {
         }
       />
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-6">
-        <StatCard label="Templates" value={stats.templates} hint={`${stats.openTemplates} with grants`} icon={Layers} />
-        <StatCard label="Banks" value={stats.banks} hint="active distributors" icon={Building2} />
-        <StatCard label="Agents" value={stats.agents} hint={`across ${new Set(matrixAgents.map(a=>a.tier)).size} tiers`} icon={UserCircle2} />
-        <StatCard label="Total grants" value={stats.totalGrants} hint={`of ${stats.totalSlots} slots`} icon={ShieldCheck} accent />
-        <StatCard label="Coverage" value={`${(stats.coverage * 100).toFixed(0)}%`} hint="allowed cells" icon={Activity} progress={stats.coverage} />
-      </div>
-
       {/* Filters */}
-      <Card className="mt-4">
+      <Card className="mt-6">
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-center">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search template by name or ID…"
+              placeholder="Search by product or template…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-9"
@@ -177,6 +182,7 @@ const PermissionMatrix = () => {
           <Select value={productId} onValueChange={setProductId}>
             <SelectTrigger className="h-9 w-[260px]"><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="ALL">All products</SelectItem>
               {matrixProducts.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   <span className="font-mono text-xs mr-2 text-muted-foreground">{p.code}</span>{p.name}
@@ -400,6 +406,7 @@ const MatrixTable = ({
         <tbody>
           {templates.map((t) => {
             const s = templateStats(t.id);
+            const product = matrixProducts.find((p) => p.id === t.productId);
             return (
               <tr key={t.id} className="hover:bg-muted/30 transition-colors">
                 <td className="sticky left-0 z-20 bg-card hover:bg-muted/30 transition-colors p-3 border-b border-r border-border min-w-[280px]">
@@ -409,8 +416,12 @@ const MatrixTable = ({
                     className="text-left group w-full"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm group-hover:text-accent transition-colors truncate">{t.name}</span>
-                      <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0">{t.type}</Badge>
+                      <span className="font-semibold text-sm group-hover:text-accent transition-colors truncate">
+                        <span className="text-muted-foreground font-normal">{product?.name}</span>
+                        <span className="text-muted-foreground font-normal mx-1.5">-</span>
+                        {t.name}
+                      </span>
+                      <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0 shrink-0">{t.type}</Badge>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
                       <span className="font-mono">{t.id}</span>
