@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Shield, ShieldPlus, Calculator, FileText, AlertCircle, Check, Coins } from "lucide-react";
+import { Shield, ShieldPlus, Calculator, FileText, AlertCircle, Check, Coins, Settings2 } from "lucide-react";
 import { Template, overrideSummary } from "@/data/templates";
 import { listCoverages } from "@/data/coverages";
 import { getProduct } from "@/data/products";
