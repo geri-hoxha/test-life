@@ -135,7 +135,7 @@ const PremiumRulesTab = ({ productId }: Props) => {
     <div className="space-y-6">
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="hidden items-center gap-3">
           <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Version</span>
           <Select value={versionId} onValueChange={switchVersion}>
             <SelectTrigger className="w-[280px] h-9">
