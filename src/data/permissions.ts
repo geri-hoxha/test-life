@@ -13,6 +13,8 @@ export type Grant = {
   templateId: string;
   subjectType: GrantSubjectType;
   subjectId: string; // bankBranchId or agentId
+  canSell: boolean;
+  commissionPct: number; // 0–100
   createdAt: string;
   createdBy: string;
 };
