@@ -133,7 +133,7 @@ const CustomerDetail = () => {
               <h3 className="text-sm font-semibold text-foreground mb-3">Profile details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 divide-y md:divide-y-0 divide-border">
                 <Field icon={BadgeCheck} label="Personal ID" value={<span className="font-mono">{customer.personalId}</span>} />
-                <Field icon={Calendar} label="Date of Birth" value={`${format(parseISO(customer.dateOfBirth), "PPP")} (${age} y/o)`} />
+                <Field icon={Calendar} label="Date of Birth" value={customer.dateOfBirth ? `${format(parseISO(customer.dateOfBirth), "PPP")} (${age} y/o)` : "—"} />
                 <Field icon={Briefcase} label="Occupation" value={customer.occupation} />
                 <Field icon={MapPin} label="Address" value={[customer.address, customer.city, customer.country].filter(Boolean).join(", ")} />
                 <Field icon={Phone} label="Phone" value={customer.phone} />

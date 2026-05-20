@@ -106,7 +106,7 @@ const CustomersList = () => {
                   </div>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{c.personalId}</TableCell>
-                <TableCell className="text-muted-foreground">{format(parseISO(c.dateOfBirth), "MMM dd, yyyy")}</TableCell>
+                <TableCell className="text-muted-foreground">{c.dateOfBirth ? format(parseISO(c.dateOfBirth), "MMM dd, yyyy") : "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{c.gender}</TableCell>
                 <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground truncate max-w-[200px]">{c.email ?? "—"}</TableCell>
