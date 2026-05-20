@@ -288,14 +288,11 @@ const CustomerForm = () => {
                 <Label htmlFor="addr">Address</Label>
                 <Input id="addr" value={c.address ?? ""} maxLength={200} onChange={(e) => set("address", e.target.value)} />
               </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea id="notes" rows={4} maxLength={1000} value={c.notes ?? ""} onChange={(e) => set("notes", e.target.value)} placeholder="Internal notes — visible to operators only." />
+              </div>
             </div>
-          </Card>
-
-          {/* Notes */}
-          <Card className="p-6 shadow-card border-border">
-            <h3 className="text-sm font-semibold text-foreground mb-1">Notes</h3>
-            <p className="text-xs text-muted-foreground mb-4">Internal notes — visible to operators only.</p>
-            <Textarea rows={4} maxLength={1000} value={c.notes ?? ""} onChange={(e) => set("notes", e.target.value)} placeholder="Any internal context about the customer…" />
           </Card>
         </div>
 
