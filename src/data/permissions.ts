@@ -1,35 +1,26 @@
 // Permission matrix data layer (in-memory demo store)
 
-export type Bank = { id: string; name: string; code: string; region: string };
-export type Agent = { id: string; name: string; code: string; tier: "Junior" | "Senior" | "Lead" };
+export type Bank = { id: string; name: string; code: string };
+export type BankBranch = { id: string; bankId: string; name: string; region: string };
+export type Agency = { id: string; name: string; code: string; region: string };
+export type Agent = { id: string; agencyId: string; name: string; code: string; tier: "Junior" | "Senior" | "Lead" };
 
-export type PermissionSubjectType = "BANK" | "AGENT";
+export type GrantSubjectType = "BANK_BRANCH" | "AGENT";
 
-export type Permission = {
+export type Grant = {
   id: string;
   productId: string;
   templateId: string;
-  subjectType: PermissionSubjectType;
-  subjectId: string;
-  canAccess: boolean;
-  updatedAt: string; // ISO
-  updatedBy: string;
-};
-
-export type AuditEvent = {
-  id: string;
-  templateId: string;
-  productId: string;
-  action: string;
-  detail: string;
-  actor: string;
-  at: string; // ISO
+  subjectType: GrantSubjectType;
+  subjectId: string; // bankBranchId or agentId
+  createdAt: string;
+  createdBy: string;
 };
 
 export type MatrixProduct = { id: string; name: string; code: string };
 export type MatrixTemplate = { id: string; productId: string; name: string; type: string };
 
-// ---------- Seed: 5 products, 20 templates, 10 banks, 20 agents ----------
+// ---------- Seed: products & templates ----------
 export const matrixProducts: MatrixProduct[] = [
   { id: "PRD-001", name: "Sigurim i Jetes i Kombinuar", code: "05" },
   { id: "PRD-002", name: "Jete e Debitorit Regular",    code: "07" },
@@ -51,23 +42,57 @@ export const matrixTemplates: MatrixTemplate[] = (() => {
   let n = 3001;
   for (const p of matrixProducts) {
     for (const name of tplNamesByProduct[p.id]) {
-      out.push({ id: `TPL-${n++}`, productId: p.id, name, type: name.toLowerCase().includes("single") ? "SP" : name.toLowerCase().includes("kursim") ? "GP" : "RP" });
+      out.push({
+        id: `TPL-${n++}`,
+        productId: p.id,
+        name,
+        type: name.toLowerCase().includes("single") ? "SP" : name.toLowerCase().includes("kursim") ? "GP" : "RP",
+      });
     }
   }
   return out;
 })();
 
+// ---------- Banks & branches ----------
 export const matrixBanks: Bank[] = [
-  { id: "BNK-01", name: "BKT — Tirana HQ",          code: "BKT-TR", region: "Tirana" },
-  { id: "BNK-02", name: "BKT — Durres",             code: "BKT-DR", region: "Durres" },
-  { id: "BNK-03", name: "Raiffeisen — Tirana",      code: "RBA-TR", region: "Tirana" },
-  { id: "BNK-04", name: "Raiffeisen — Vlore",       code: "RBA-VL", region: "Vlore" },
-  { id: "BNK-05", name: "Credins — Tirana",         code: "CRD-TR", region: "Tirana" },
-  { id: "BNK-06", name: "Credins — Shkoder",        code: "CRD-SH", region: "Shkoder" },
-  { id: "BNK-07", name: "Intesa Sanpaolo Albania",  code: "ISP-AL", region: "Tirana" },
-  { id: "BNK-08", name: "OTP Bank — Tirana",        code: "OTP-TR", region: "Tirana" },
-  { id: "BNK-09", name: "ABI Bank — Elbasan",       code: "ABI-EL", region: "Elbasan" },
-  { id: "BNK-10", name: "Union Bank — Korce",       code: "UNI-KO", region: "Korce" },
+  { id: "BNK-BKT", name: "BKT",           code: "BKT" },
+  { id: "BNK-RBA", name: "Raiffeisen",    code: "RBA" },
+  { id: "BNK-CRD", name: "Credins",       code: "CRD" },
+  { id: "BNK-ISP", name: "Intesa Sanpaolo", code: "ISP" },
+  { id: "BNK-OTP", name: "OTP Bank",      code: "OTP" },
+  { id: "BNK-ABI", name: "ABI Bank",      code: "ABI" },
+  { id: "BNK-UNI", name: "Union Bank",    code: "UNI" },
+];
+
+const branchesByBank: Record<string, { name: string; region: string }[]> = {
+  "BNK-BKT": [{ name: "Tirana HQ", region: "Tirana" }, { name: "Durres", region: "Durres" }, { name: "Vlore", region: "Vlore" }],
+  "BNK-RBA": [{ name: "Tirana Center", region: "Tirana" }, { name: "Vlore", region: "Vlore" }, { name: "Shkoder", region: "Shkoder" }],
+  "BNK-CRD": [{ name: "Tirana", region: "Tirana" }, { name: "Shkoder", region: "Shkoder" }],
+  "BNK-ISP": [{ name: "Tirana", region: "Tirana" }, { name: "Korce", region: "Korce" }],
+  "BNK-OTP": [{ name: "Tirana", region: "Tirana" }, { name: "Elbasan", region: "Elbasan" }],
+  "BNK-ABI": [{ name: "Elbasan", region: "Elbasan" }, { name: "Fier", region: "Fier" }],
+  "BNK-UNI": [{ name: "Korce", region: "Korce" }, { name: "Tirana", region: "Tirana" }],
+};
+
+export const matrixBankBranches: BankBranch[] = (() => {
+  const out: BankBranch[] = [];
+  let n = 1;
+  for (const b of matrixBanks) {
+    for (const br of branchesByBank[b.id] ?? []) {
+      out.push({ id: `BRC-${String(n++).padStart(3, "0")}`, bankId: b.id, name: br.name, region: br.region });
+    }
+  }
+  return out;
+})();
+
+// ---------- Agencies & agents ----------
+export const matrixAgencies: Agency[] = [
+  { id: "AGY-01", name: "Sigal Tirana",   code: "SIG-TR", region: "Tirana" },
+  { id: "AGY-02", name: "Sigal Durres",   code: "SIG-DR", region: "Durres" },
+  { id: "AGY-03", name: "Insig Tirana",   code: "INS-TR", region: "Tirana" },
+  { id: "AGY-04", name: "Insig Vlore",    code: "INS-VL", region: "Vlore" },
+  { id: "AGY-05", name: "Albsig Shkoder", code: "ALB-SH", region: "Shkoder" },
+  { id: "AGY-06", name: "Albsig Korce",   code: "ALB-KO", region: "Korce" },
 ];
 
 const agentFirst = ["Arben","Erida","Besnik","Mirela","Genti","Anila","Florian","Klodian","Suela","Dritan","Edona","Erion","Vjollca","Ardian","Ledjon","Iva","Olta","Renato","Sokol","Xhuljana"];
@@ -76,177 +101,135 @@ const tiers: Agent["tier"][] = ["Junior", "Senior", "Lead"];
 
 export const matrixAgents: Agent[] = agentFirst.map((f, i) => ({
   id: `AGT-${String(i + 1).padStart(2, "0")}`,
+  agencyId: matrixAgencies[i % matrixAgencies.length].id,
   name: `${f} ${agentLast[i]}`,
   code: `AG-${f.slice(0, 2).toUpperCase()}-${String(i + 1).padStart(3, "0")}`,
   tier: tiers[i % 3],
 }));
 
-// ---------- Random permission seed (deterministic) ----------
+// ---------- Random grant seed (deterministic) ----------
 let seedN = 1;
 const rand = () => {
-  // Mulberry32-ish deterministic
   seedN = (seedN * 1664525 + 1013904223) >>> 0;
   return (seedN & 0xffffffff) / 0x100000000;
 };
 
 const todayIso = "2026-05-18T10:24:00Z";
-let permissions: Permission[] = (() => {
-  const out: Permission[] = [];
+let grants: Grant[] = (() => {
+  const out: Grant[] = [];
   let pid = 1;
   for (const t of matrixTemplates) {
-    for (const b of matrixBanks) {
-      out.push({
-        id: `PRM-${pid++}`,
-        productId: t.productId,
-        templateId: t.id,
-        subjectType: "BANK",
-        subjectId: b.id,
-        canAccess: rand() > 0.45,
-        updatedAt: todayIso,
-        updatedBy: "system.seed",
-      });
+    for (const br of matrixBankBranches) {
+      if (rand() > 0.78) {
+        out.push({
+          id: `GRT-${pid++}`,
+          productId: t.productId,
+          templateId: t.id,
+          subjectType: "BANK_BRANCH",
+          subjectId: br.id,
+          createdAt: todayIso,
+          createdBy: "system.seed",
+        });
+      }
     }
     for (const a of matrixAgents) {
-      out.push({
-        id: `PRM-${pid++}`,
-        productId: t.productId,
-        templateId: t.id,
-        subjectType: "AGENT",
-        subjectId: a.id,
-        canAccess: rand() > 0.55,
-        updatedAt: todayIso,
-        updatedBy: "system.seed",
-      });
+      if (rand() > 0.85) {
+        out.push({
+          id: `GRT-${pid++}`,
+          productId: t.productId,
+          templateId: t.id,
+          subjectType: "AGENT",
+          subjectId: a.id,
+          createdAt: todayIso,
+          createdBy: "system.seed",
+        });
+      }
     }
   }
   return out;
 })();
 
-let auditLog: AuditEvent[] = matrixTemplates.slice(0, 8).map((t, i) => ({
-  id: `AUD-${i + 1}`,
-  templateId: t.id,
-  productId: t.productId,
-  action: i % 3 === 0 ? "Bulk allow" : i % 3 === 1 ? "Permission toggled" : "Cloned permissions",
-  detail: i % 3 === 0 ? "Granted access to all banks" : i % 3 === 1 ? `Updated 1 subject access` : `Cloned from ${matrixTemplates[(i + 1) % matrixTemplates.length].name}`,
-  actor: ["Erin Hoxha", "Admin", "Aida M."][i % 3],
-  at: new Date(Date.now() - i * 86400_000 * 2).toISOString(),
-}));
-
 // ---------- Public API ----------
-export const listPermissions = (productId?: string, templateIds?: string[]) =>
-  permissions.filter(
-    (p) =>
-      (!productId || p.productId === productId) &&
-      (!templateIds || templateIds.includes(p.templateId))
+export type GrantRow = {
+  id: string;
+  productId: string;
+  productName: string;
+  templateId: string;
+  templateName: string;
+  templateType: string;
+  bankId?: string;
+  bankName?: string;
+  bankBranchId?: string;
+  bankBranchName?: string;
+  agencyId?: string;
+  agencyName?: string;
+  agentId?: string;
+  agentName?: string;
+  createdAt: string;
+};
+
+const productMap = new Map(matrixProducts.map((p) => [p.id, p]));
+const templateMap = new Map(matrixTemplates.map((t) => [t.id, t]));
+const bankMap = new Map(matrixBanks.map((b) => [b.id, b]));
+const branchMap = new Map(matrixBankBranches.map((b) => [b.id, b]));
+const agencyMap = new Map(matrixAgencies.map((a) => [a.id, a]));
+const agentMap = new Map(matrixAgents.map((a) => [a.id, a]));
+
+export const listGrantRows = (): GrantRow[] =>
+  grants.map((g) => {
+    const product = productMap.get(g.productId);
+    const tpl = templateMap.get(g.templateId);
+    const base = {
+      id: g.id,
+      productId: g.productId,
+      productName: product?.name ?? "",
+      templateId: g.templateId,
+      templateName: tpl?.name ?? "",
+      templateType: tpl?.type ?? "",
+      createdAt: g.createdAt,
+    };
+    if (g.subjectType === "BANK_BRANCH") {
+      const br = branchMap.get(g.subjectId);
+      const bk = br ? bankMap.get(br.bankId) : undefined;
+      return {
+        ...base,
+        bankId: bk?.id,
+        bankName: bk?.name,
+        bankBranchId: br?.id,
+        bankBranchName: br ? `${br.name} (${br.region})` : undefined,
+      };
+    }
+    const ag = agentMap.get(g.subjectId);
+    const agy = ag ? agencyMap.get(ag.agencyId) : undefined;
+    return {
+      ...base,
+      agencyId: agy?.id,
+      agencyName: agy?.name,
+      agentId: ag?.id,
+      agentName: ag?.name,
+    };
+  });
+
+export const addGrant = (input: Omit<Grant, "id" | "createdAt" | "createdBy">) => {
+  // dedupe
+  const exists = grants.find(
+    (g) =>
+      g.productId === input.productId &&
+      g.templateId === input.templateId &&
+      g.subjectType === input.subjectType &&
+      g.subjectId === input.subjectId
   );
-
-export const getPermission = (templateId: string, subjectType: PermissionSubjectType, subjectId: string) =>
-  permissions.find(
-    (p) => p.templateId === templateId && p.subjectType === subjectType && p.subjectId === subjectId
-  );
-
-export const setAccess = (
-  templateId: string,
-  subjectType: PermissionSubjectType,
-  subjectId: string,
-  canAccess: boolean,
-  actor = "Erin Hoxha"
-) => {
-  const tpl = matrixTemplates.find((t) => t.id === templateId);
-  if (!tpl) return;
-  const idx = permissions.findIndex(
-    (p) => p.templateId === templateId && p.subjectType === subjectType && p.subjectId === subjectId
-  );
-  const now = new Date().toISOString();
-  if (idx >= 0) {
-    permissions[idx] = { ...permissions[idx], canAccess, updatedAt: now, updatedBy: actor };
-  } else {
-    permissions = [
-      ...permissions,
-      {
-        id: `PRM-${permissions.length + 1}`,
-        productId: tpl.productId,
-        templateId,
-        subjectType,
-        subjectId,
-        canAccess,
-        updatedAt: now,
-        updatedBy: actor,
-      },
-    ];
-  }
-};
-
-export const bulkSetForTemplate = (
-  templateId: string,
-  subjectType: PermissionSubjectType,
-  canAccess: boolean,
-  actor = "Erin Hoxha"
-) => {
-  const subjects = subjectType === "BANK" ? matrixBanks : matrixAgents;
-  for (const s of subjects) setAccess(templateId, subjectType, s.id, canAccess, actor);
-  pushAudit(templateId, canAccess ? "Bulk allow" : "Bulk deny", `${canAccess ? "Granted" : "Revoked"} access for all ${subjectType === "BANK" ? "banks" : "agents"}`, actor);
-};
-
-export const clonePermissions = (fromTemplateId: string, toTemplateId: string, actor = "Erin Hoxha") => {
-  const src = permissions.filter((p) => p.templateId === fromTemplateId);
-  for (const p of src) setAccess(toTemplateId, p.subjectType, p.subjectId, p.canAccess, actor);
-  const fromName = matrixTemplates.find((t) => t.id === fromTemplateId)?.name ?? fromTemplateId;
-  pushAudit(toTemplateId, "Cloned permissions", `Cloned permissions from ${fromName}`, actor);
-};
-
-const pushAudit = (templateId: string, action: string, detail: string, actor: string) => {
-  const tpl = matrixTemplates.find((t) => t.id === templateId);
-  if (!tpl) return;
-  auditLog = [
-    {
-      id: `AUD-${auditLog.length + 1}`,
-      templateId,
-      productId: tpl.productId,
-      action,
-      detail,
-      actor,
-      at: new Date().toISOString(),
-    },
-    ...auditLog,
-  ];
-};
-
-export const recordAudit = pushAudit;
-
-export const listAudit = (templateId?: string) =>
-  auditLog.filter((a) => !templateId || a.templateId === templateId);
-
-export const templateStats = (templateId: string) => {
-  const perms = permissions.filter((p) => p.templateId === templateId);
-  const banks = perms.filter((p) => p.subjectType === "BANK");
-  const agents = perms.filter((p) => p.subjectType === "AGENT");
-  return {
-    banksAllowed: banks.filter((p) => p.canAccess).length,
-    banksTotal: matrixBanks.length,
-    agentsAllowed: agents.filter((p) => p.canAccess).length,
-    agentsTotal: matrixAgents.length,
-    lastUpdated: perms.reduce((m, p) => (p.updatedAt > m ? p.updatedAt : m), ""),
+  if (exists) return exists;
+  const g: Grant = {
+    ...input,
+    id: `GRT-${grants.length + 1}-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    createdBy: "Erin Hoxha",
   };
+  grants = [g, ...grants];
+  return g;
 };
 
-export const globalStats = (productId?: string) => {
-  const perms = productId ? permissions.filter((p) => p.productId === productId) : permissions;
-  const totalGrants = perms.filter((p) => p.canAccess).length;
-  const totalSlots = perms.length;
-  const templates = productId
-    ? matrixTemplates.filter((t) => t.productId === productId)
-    : matrixTemplates;
-  const openTemplates = templates.filter((t) =>
-    perms.some((p) => p.templateId === t.id && p.canAccess)
-  ).length;
-  return {
-    totalGrants,
-    totalSlots,
-    coverage: totalSlots ? totalGrants / totalSlots : 0,
-    templates: templates.length,
-    openTemplates,
-    banks: matrixBanks.length,
-    agents: matrixAgents.length,
-  };
+export const removeGrant = (id: string) => {
+  grants = grants.filter((g) => g.id !== id);
 };
