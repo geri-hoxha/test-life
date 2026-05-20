@@ -76,10 +76,13 @@ const TemplatesTab = ({ productId }: Props) => {
   }
 
   const overrideBadge = (t: Template) => {
-    if (t.premiumOverrideType === "No override") return <Badge variant="outline">Standard pricing</Badge>;
+    if (t.premiumOverrideType === "No override")
+      return <span className="px-2 py-0.5 bg-muted text-muted-foreground text-[10px] font-semibold rounded-full">Standard pricing</span>;
     if (t.premiumOverrideType === "Management approved manual premium")
-      return <Badge className="bg-warning/20 text-warning-foreground border-0">Manual</Badge>;
-    return <Badge className="bg-accent-soft text-accent-soft-foreground border-0">{t.premiumOverrideType}</Badge>;
+      return <span className="px-2 py-0.5 bg-warning/15 text-warning-foreground text-[10px] font-semibold rounded-full">Manual</span>;
+    if (t.premiumOverrideType === "Fixed discount" || t.premiumOverrideType === "Fixed premium")
+      return <span className="px-2 py-0.5 bg-accent-soft text-accent-soft-foreground text-[10px] font-semibold rounded-full">{t.premiumOverrideType}</span>;
+    return <span className="px-2 py-0.5 bg-accent/10 text-accent text-[10px] font-semibold rounded-full">{t.premiumOverrideType}</span>;
   };
 
   return (
@@ -117,106 +120,146 @@ const TemplatesTab = ({ productId }: Props) => {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {templates.map((t) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {templates.map((t, idx) => {
             const includedCount = t.includedCoverageIds.length;
             const ridersCount = t.optionalRiderIds.length;
             const includedNames = coverages
               .filter((c) => t.includedCoverageIds.includes(c.id))
               .map((c) => c.code);
+            const featured = idx === 1; // soft highlight on middle card
             return (
-              <Card key={t.id} className="shadow-card border-border overflow-hidden flex flex-col hover:shadow-elevated transition-shadow">
-                <div className="p-5 border-b border-border bg-gradient-to-br from-accent-soft/40 to-transparent">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-semibold text-foreground">{t.name}</h3>
-                        {t.isActive ? (
-                          <Badge className="bg-success/15 text-success border-0 text-[10px]">Active</Badge>
-                        ) : (
-                          <Badge className="bg-muted text-muted-foreground border-0 text-[10px]">Inactive</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 min-h-[2rem]">
-                        {t.description || "—"}
-                      </p>
+              <Card
+                key={t.id}
+                className={`bg-card border-border shadow-sm hover:shadow-md transition-shadow flex flex-col overflow-hidden ${
+                  featured ? "ring-2 ring-accent/15" : ""
+                }`}
+              >
+                <div className="p-6 flex-1">
+                  <div className="flex justify-between items-start mb-2 gap-2">
+                    <h3 className="text-lg font-bold text-foreground">{t.name}</h3>
+                    <div className="flex items-center gap-1">
+                      {t.isActive ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-success/10 text-success border border-success/20 uppercase tracking-wider">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground border border-border uppercase tracking-wider">
+                          Inactive
+                        </span>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 -mr-2 text-muted-foreground">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setDetail(t)}>
+                            <Eye className="h-4 w-4 mr-2" /> View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEdit(t)}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              upsertTemplate({ ...t, isActive: !t.isActive });
+                              refresh();
+                              toast.success(t.isActive ? "Deactivated" : "Activated");
+                            }}
+                          >
+                            {t.isActive ? "Deactivate" : "Activate"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setDeleteId(t.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-1">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setDetail(t)}><Eye className="h-4 w-4 mr-2" /> View</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openEdit(t)}><Pencil className="h-4 w-4 mr-2" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => { upsertTemplate({ ...t, isActive: !t.isActive }); refresh(); toast.success(t.isActive ? "Deactivated" : "Activated"); }}
-                        >
-                          {t.isActive ? "Deactivate" : "Activate"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setDeleteId(t.id)} className="text-destructive focus:text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
-                </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-6 line-clamp-2 min-h-[2.5rem]">
+                    {t.description || "—"}
+                  </p>
 
-                <div className="p-5 space-y-3 flex-1">
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="rounded-md bg-muted/40 p-2.5">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Shield className="h-3 w-3" /> Included
-                      </div>
-                      <div className="text-lg font-semibold mt-0.5">{includedCount}</div>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="p-3 bg-muted/40 rounded-lg">
+                      <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                        Included
+                      </span>
+                      <span className="text-2xl font-bold text-foreground">{includedCount}</span>
                     </div>
-                    <div className="rounded-md bg-muted/40 p-2.5">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <ShieldPlus className="h-3 w-3" /> Riders
-                      </div>
-                      <div className="text-lg font-semibold mt-0.5">{ridersCount}</div>
+                    <div className="p-3 bg-muted/40 rounded-lg">
+                      <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                        Riders
+                      </span>
+                      <span className="text-2xl font-bold text-foreground">{ridersCount}</span>
                     </div>
                   </div>
 
                   {includedNames.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5 mb-8">
                       {includedNames.map((c) => (
-                        <Badge key={c} variant="outline" className="font-mono text-[10px]">{c}</Badge>
+                        <span
+                          key={c}
+                          className="px-2 py-1 bg-card border border-border rounded text-[11px] font-medium text-muted-foreground font-mono"
+                        >
+                          {c}
+                        </span>
                       ))}
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-border space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Premium</span>
-                      {overrideBadge(t)}
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div>
+                      <div className="flex justify-between items-center mb-1 gap-2">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Premium
+                        </span>
+                        {overrideBadge(t)}
+                      </div>
+                      <p className="text-sm text-foreground/80">{overrideSummary(t, t.defaultCurrency)}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-snug">
-                      {overrideSummary(t, t.defaultCurrency)}
-                    </p>
-                    <div className="flex items-center justify-between text-xs pt-1">
+
+                    <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Default currency</span>
-                      <Badge className="font-mono bg-accent text-accent-foreground border-0 text-[10px]">{t.defaultCurrency}</Badge>
+                      <span className="font-bold font-mono text-accent">{t.defaultCurrency}</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Agent commission</span>
-                      <span className="font-medium font-mono">{(t.agentCommission * 100).toFixed(2)} %</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Bank commission</span>
-                      <span className="font-medium font-mono">{(t.bankCommission * 100).toFixed(2)} %</span>
+
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 py-3 bg-muted/30 px-3 rounded-lg border border-border">
+                      <div>
+                        <span className="block text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Agent Comm.
+                        </span>
+                        <span className="text-sm font-semibold text-foreground font-mono">
+                          {(t.agentCommission * 100).toFixed(2)} %
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Bank Comm.
+                        </span>
+                        <span className="text-sm font-semibold text-foreground font-mono">
+                          {(t.bankCommission * 100).toFixed(2)} %
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-3 border-t border-border bg-muted/20 flex gap-2">
+                <div className="p-4 bg-muted/30 border-t border-border flex gap-3">
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => setDetail(t)}>
-                    <Eye className="h-3.5 w-3.5 mr-1" /> View
+                    <Eye className="h-3.5 w-3.5 mr-1.5" /> View
                   </Button>
-                  <Button size="sm" className="flex-1 bg-accent hover:bg-accent/90 text-accent-foreground" onClick={() => openEdit(t)}>
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Configure
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-accent hover:bg-accent/90 text-accent-foreground"
+                    onClick={() => openEdit(t)}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" /> Configure
                   </Button>
                 </div>
               </Card>
