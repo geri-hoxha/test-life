@@ -255,7 +255,12 @@ const PermissionMatrix = () => {
               onOpenTemplate={(id) => setDrawerTplId(id)}
               askBulk={askBulk}
               onClone={(tpl) => { setCloneTarget(tpl); setCloneFromId(""); }}
+              bankSearch={bankSearch}
+              setBankSearch={setBankSearch}
+              agentSearch={agentSearch}
+              setAgentSearch={setAgentSearch}
             />
+
           )}
         </CardContent>
       </Card>
