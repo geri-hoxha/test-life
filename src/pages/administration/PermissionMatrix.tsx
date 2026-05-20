@@ -503,14 +503,20 @@ const MatrixTable = ({
                     </div>
                   </button>
                 </td>
-                {showBanks && banks.map((b) => {
+                {showBanks && banksEmpty && (
+                  <td className="border-b border-border bg-muted/10" />
+                )}
+                {showBanks && !banksEmpty && banks.map((b) => {
                   const p = permIndex.get(`${t.id}::BANK::${b.id}`);
                   return (
                     <Cell key={b.id} allowed={!!p?.canAccess} onClick={() => onToggle(t.id, "BANK", b.id)} />
                   );
                 })}
                 {showBanks && showAgents && <td className="border-b border-l-2 border-border bg-muted/40" />}
-                {showAgents && agents.map((a) => {
+                {showAgents && agentsEmpty && (
+                  <td className="border-b border-border bg-muted/10" />
+                )}
+                {showAgents && !agentsEmpty && agents.map((a) => {
                   const p = permIndex.get(`${t.id}::AGENT::${a.id}`);
                   return (
                     <Cell key={a.id} allowed={!!p?.canAccess} onClick={() => onToggle(t.id, "AGENT", a.id)} />
