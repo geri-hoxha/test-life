@@ -162,6 +162,33 @@ const PermissionMatrix = () => {
         </CardContent>
       </Card>
 
+      {/* Branch / Agency multi-select pickers */}
+      <Card className="mt-4">
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <MultiPicker
+            label="Bank branches"
+            icon={Building2}
+            accent="text-blue-500"
+            tint="bg-blue-500/5 border-blue-500/20"
+            selected={fBranches}
+            onChange={setFBranches}
+            items={matrixBankBranches.map((b) => {
+              const bk = matrixBanks.find((x) => x.id === b.bankId);
+              return { id: b.id, name: `${b.name} (${b.region})`, meta: bk?.name ?? "" };
+            })}
+          />
+          <MultiPicker
+            label="Agency branches"
+            icon={UserCircle2}
+            accent="text-purple-500"
+            tint="bg-purple-500/5 border-purple-500/20"
+            selected={fAgencies}
+            onChange={setFAgencies}
+            items={matrixAgencies.map((a) => ({ id: a.id, name: a.name, meta: `${a.code} · ${a.region}` }))}
+          />
+        </CardContent>
+      </Card>
+
       {/* Table */}
       <Card className="mt-4 overflow-hidden">
         <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
@@ -173,7 +200,7 @@ const PermissionMatrix = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-340px)] border-t border-border">
+          <div className="overflow-auto max-h-[calc(100vh-460px)] border-t border-border">
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
                 <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -193,30 +220,16 @@ const PermissionMatrix = () => {
                       options={templatesForFilter.map((t) => ({ value: t.id, label: t.name }))}
                     />
                   </th>
-                  <th className="p-2 border-b border-border font-semibold min-w-[180px]">
-                    <HeaderFilter
-                      label="Bank Branch"
-                      value={fBranch}
-                      onChange={setFBranch}
-                      options={branchesForFilter.map((b) => ({ value: b.id, label: `${b.name} (${b.region})` }))}
-                    />
-                  </th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[180px]">Bank Branch</th>
                   <th className="p-2 border-b border-border font-semibold min-w-[160px]">
                     <HeaderFilter
                       label="Bank"
                       value={fBank}
-                      onChange={(v) => { setFBank(v); setFBranch(ALL); }}
+                      onChange={(v) => { setFBank(v); setFBranches([]); }}
                       options={matrixBanks.map((b) => ({ value: b.id, label: b.name }))}
                     />
                   </th>
-                  <th className="p-2 border-b border-border font-semibold min-w-[160px]">
-                    <HeaderFilter
-                      label="Agency Branch"
-                      value={fAgency}
-                      onChange={(v) => { setFAgency(v); setFAgent(ALL); }}
-                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
-                    />
-                  </th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[160px]">Agency Branch</th>
                   <th className="p-2 border-b border-border font-semibold min-w-[180px]">
                     <HeaderFilter
                       label="Agent"
