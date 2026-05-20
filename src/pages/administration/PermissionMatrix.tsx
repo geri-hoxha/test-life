@@ -195,39 +195,41 @@ const PermissionMatrix = () => {
                         const draft = pending[r.id] ?? r.commissionPct;
                         const dirty = pending[r.id] !== undefined && pending[r.id] !== r.commissionPct;
                         return (
-                          <div className="inline-flex items-center gap-1">
-                            <div className="relative inline-flex items-center w-24">
-                              <Input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step={0.1}
-                                value={draft}
-                                disabled={!r.canSell}
-                                onChange={(e) => {
-                                  const raw = parseFloat(e.target.value);
-                                  const next = isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
-                                  setPending((p) => ({ ...p, [r.id]: next }));
-                                }}
-                                className="h-8 text-sm pr-7 text-right tabular-nums"
-                              />
-                              <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-emerald-600 hover:text-emerald-700 disabled:opacity-30"
-                              disabled={!dirty || !r.canSell}
-                              onClick={() => {
-                                updateGrant(r.id, { commissionPct: draft });
-                                setPending((p) => { const n = { ...p }; delete n[r.id]; return n; });
-                                refresh();
-                                toast.success("Commission saved");
+                          <div className="relative inline-flex items-center w-28">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={draft}
+                              disabled={!r.canSell}
+                              onChange={(e) => {
+                                const raw = parseFloat(e.target.value);
+                                const next = isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
+                                setPending((p) => ({ ...p, [r.id]: next }));
                               }}
-                              title="Save commission"
-                            >
-                              <Save className="h-3.5 w-3.5" />
-                            </Button>
+                              className="h-8 text-sm pr-14 text-right tabular-nums"
+                            />
+                            <div className="absolute right-1.5 flex items-center gap-0.5">
+                              {dirty ? (
+                                <button
+                                  type="button"
+                                  disabled={!r.canSell}
+                                  onClick={() => {
+                                    updateGrant(r.id, { commissionPct: draft });
+                                    setPending((p) => { const n = { ...p }; delete n[r.id]; return n; });
+                                    refresh();
+                                    toast.success("Commission saved");
+                                  }}
+                                  className="inline-flex items-center justify-center h-5 w-5 rounded bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-30"
+                                  title="Save commission"
+                                >
+                                  <Save className="h-3 w-3" />
+                                </button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground pointer-events-none">%</span>
+                              )}
+                            </div>
                           </div>
                         );
                       })()}
