@@ -86,7 +86,7 @@ const TemplatesTab = ({ productId }: Props) => {
     <>
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
+        <div className="hidden items-center gap-3">
           <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Version</span>
           <Select value={versionId} onValueChange={setVersionId}>
             <SelectTrigger className="w-[280px] h-9">
