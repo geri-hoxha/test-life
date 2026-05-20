@@ -96,7 +96,9 @@ const ProductDetail = () => {
     fields.type !== product.type ||
     fields.description !== product.description ||
     JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
-    JSON.stringify(fields.requiredDocuments) !== JSON.stringify(product.requiredDocuments);
+    JSON.stringify(fields.requiredDocuments) !== JSON.stringify(product.requiredDocuments) ||
+    (parseFloat(fields.agentCommissionPct) || 0) / 100 !== product.agentCommission ||
+    (parseFloat(fields.bankCommissionPct) || 0) / 100 !== product.bankCommission;
 
   const toggleFlag = (key: keyof Product["flags"]) =>
     setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
