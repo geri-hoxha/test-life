@@ -101,8 +101,10 @@ const TemplateDetailDialog = ({ open, onOpenChange, template }: Props) => {
               <div className="text-sm font-medium mt-0.5">{template.premiumOverrideType}</div>
               <div className="mt-3 text-xs text-muted-foreground">Effect</div>
               <div className="text-sm mt-0.5">{overrideSummary(template, template.defaultCurrency)}</div>
-              <div className="mt-3 text-xs text-muted-foreground">Commission override</div>
-              <div className="text-sm font-medium mt-0.5">{(template.commissionOverridePct ?? 0).toFixed(1)} %</div>
+              <div className="mt-3 text-xs text-muted-foreground">Agent commission</div>
+              <div className="text-sm font-medium font-mono mt-0.5">{(template.agentCommission * 100).toFixed(2)} %</div>
+              <div className="mt-3 text-xs text-muted-foreground">Bank commission</div>
+              <div className="text-sm font-medium font-mono mt-0.5">{(template.bankCommission * 100).toFixed(2)} %</div>
             </Card>
           </Section>
 
