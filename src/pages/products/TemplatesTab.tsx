@@ -224,9 +224,9 @@ const TemplatesTab = ({ productId }: Props) => {
                       <p className="text-sm text-foreground/80">{overrideSummary(t, t.defaultCurrency)}</p>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Default currency</span>
-                      <span className="font-bold font-mono text-accent">{t.defaultCurrency}</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground text-xs">Default currency</span>
+                      <span className="font-bold font-mono text-accent text-base">{t.defaultCurrency}</span>
                     </div>
 
                     <div className="grid grid-cols-1 gap-y-2 text-xs">
