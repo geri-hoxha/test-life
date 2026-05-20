@@ -151,7 +151,7 @@ const PremiumRulesTab = ({ productId }: Props) => {
             </SelectContent>
           </Select>
         </div>
-        <Button size="sm" onClick={handleSave} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+        <Button size="sm" onClick={handleSave} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
           <Save className="h-4 w-4" /> Save Premium Rule
         </Button>
       </div>
