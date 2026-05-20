@@ -140,57 +140,17 @@ const PermissionMatrix = () => {
         }
       />
 
-      {/* Search + clear */}
-      <Card className="mt-6">
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search across all columns…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10"
-            />
-          </div>
-          {activeFilters > 0 && (
-            <>
-              <Badge variant="secondary" className="text-[10px] h-6 gap-1">
-                <Filter className="h-3 w-3" />{activeFilters} active
-              </Badge>
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}>
-                <XIcon className="h-3.5 w-3.5 mr-1" /> Clear all
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {activeFilters > 0 && (
+        <div className="mt-6 flex items-center gap-3">
+          <Badge variant="secondary" className="text-[10px] h-6 gap-1">
+            <Filter className="h-3 w-3" />{activeFilters} active
+          </Badge>
+          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}>
+            <XIcon className="h-3.5 w-3.5 mr-1" /> Clear all
+          </Button>
+        </div>
+      )}
 
-      {/* Branch / Agency multi-select pickers */}
-      <Card className="mt-4">
-        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <MultiPicker
-            label="Bank branches"
-            icon={Building2}
-            accent="text-blue-500"
-            tint="bg-blue-500/5 border-blue-500/20"
-            selected={fBranches}
-            onChange={setFBranches}
-            items={matrixBankBranches.map((b) => {
-              const bk = matrixBanks.find((x) => x.id === b.bankId);
-              return { id: b.id, name: `${b.name} (${b.region})`, meta: bk?.name ?? "" };
-            })}
-          />
-          <MultiPicker
-            label="Agency branches"
-            icon={UserCircle2}
-            accent="text-purple-500"
-            tint="bg-purple-500/5 border-purple-500/20"
-            selected={fAgencies}
-            onChange={setFAgencies}
-            items={matrixAgencies.map((a) => ({ id: a.id, name: a.name, meta: `${a.code} · ${a.region}` }))}
-          />
-        </CardContent>
-      </Card>
 
       {/* Table */}
       <Card className="mt-4 overflow-hidden">
