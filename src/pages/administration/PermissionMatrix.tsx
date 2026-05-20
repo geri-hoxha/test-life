@@ -20,32 +20,36 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   matrixProducts, matrixTemplates, matrixBanks, matrixAgents,
   listPermissions, setAccess, bulkSetForTemplate, clonePermissions,
-  templateStats, globalStats, listAudit, recordAudit,
+  templateStats, listAudit, recordAudit,
   type Permission, type MatrixTemplate,
 } from "@/data/permissions";
 import {
-  Search, Filter, Building2, UserCircle2, MoreHorizontal,
-  Download, Copy, ShieldCheck, ShieldOff, Activity, Layers,
-  Check, X as XIcon, Clock, BadgeCheck, ChevronRight,
+  Search, Building2, UserCircle2, MoreHorizontal,
+  Download, Copy, ShieldCheck, ShieldOff, Layers,
+  Check, X as XIcon, Clock, BadgeCheck, ChevronRight, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
-type SubjectTab = "BANK" | "AGENT" | "BOTH";
-
 const PermissionMatrix = () => {
-  const [productId, setProductId] = useState<string>("ALL");
+  const [productId, setProductId] = useState<string>(matrixProducts[0].id);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [subjectTab, setSubjectTab] = useState<SubjectTab>("BOTH");
-  const [filterRegion, setFilterRegion] = useState<string>("ALL");
-  const [filterTier, setFilterTier] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
-  const [version, setVersion] = useState(0); // force-rerender after mutation
+  const [version, setVersion] = useState(0);
   const [drawerTplId, setDrawerTplId] = useState<string | null>(null);
+
+  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
+  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
 
   const [pendingBulk, setPendingBulk] = useState<{
     title: string;
@@ -55,10 +59,9 @@ const PermissionMatrix = () => {
   const [cloneTarget, setCloneTarget] = useState<MatrixTemplate | null>(null);
   const [cloneFromId, setCloneFromId] = useState<string>("");
 
-  // Loading sim + debounce
   useEffect(() => {
     setLoading(true);
-    const t = setTimeout(() => setLoading(false), 350);
+    const t = setTimeout(() => setLoading(false), 300);
     return () => clearTimeout(t);
   }, [productId]);
 
@@ -75,50 +78,30 @@ const PermissionMatrix = () => {
   const templates = useMemo(
     () =>
       matrixTemplates
-        .filter((t) => productId === "ALL" || t.productId === productId)
+        .filter((t) => t.productId === productId)
         .filter((t) => {
           if (!debounced) return true;
-          const productName = productById.get(t.productId)?.name.toLowerCase() ?? "";
-          return (
-            t.name.toLowerCase().includes(debounced) ||
-            t.id.toLowerCase().includes(debounced) ||
-            productName.includes(debounced)
-          );
+          return t.name.toLowerCase().includes(debounced) || t.id.toLowerCase().includes(debounced);
         }),
-    [productId, debounced, productById]
+    [productId, debounced]
   );
 
-  const [bankSearch, setBankSearch] = useState("");
-  const [agentSearch, setAgentSearch] = useState("");
+  const banks = useMemo(
+    () => selectedBankIds.map((id) => matrixBanks.find((b) => b.id === id)!).filter(Boolean),
+    [selectedBankIds]
+  );
+  const agents = useMemo(
+    () => selectedAgentIds.map((id) => matrixAgents.find((a) => a.id === id)!).filter(Boolean),
+    [selectedAgentIds]
+  );
 
-  const banks = useMemo(() => {
-    const q = bankSearch.trim().toLowerCase();
-    if (!q) return [] as typeof matrixBanks;
-    return matrixBanks
-      .filter((b) => filterRegion === "ALL" || b.region === filterRegion)
-      .filter((b) => b.name.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.region.toLowerCase().includes(q));
-  }, [filterRegion, bankSearch]);
-
-  const agents = useMemo(() => {
-    const q = agentSearch.trim().toLowerCase();
-    if (!q) return [] as typeof matrixAgents;
-    return matrixAgents
-      .filter((a) => filterTier === "ALL" || a.tier === filterTier)
-      .filter((a) => a.name.toLowerCase().includes(q) || a.code.toLowerCase().includes(q) || a.tier.toLowerCase().includes(q));
-  }, [filterTier, agentSearch]);
-
-  // Index permissions for O(1) lookup
   const permIndex = useMemo(() => {
     void version;
-    const targetProduct = productId === "ALL" ? undefined : productId;
-    const perms = listPermissions(targetProduct, templates.map((t) => t.id));
+    const perms = listPermissions(productId, templates.map((t) => t.id));
     const map = new Map<string, Permission>();
     for (const p of perms) map.set(`${p.templateId}::${p.subjectType}::${p.subjectId}`, p);
     return map;
   }, [productId, templates, version]);
-
-  const regions = useMemo(() => Array.from(new Set(matrixBanks.map((b) => b.region))), []);
-  const tiers = ["Junior", "Senior", "Lead"];
 
   const refresh = () => setVersion((v) => v + 1);
 
@@ -126,7 +109,6 @@ const PermissionMatrix = () => {
     const key = `${templateId}::${subjectType}::${subjectId}`;
     const current = permIndex.get(key);
     const next = !current?.canAccess;
-    // Optimistic mutation
     setAccess(templateId, subjectType, subjectId, next);
     recordAudit(templateId, "Permission toggled", `${subjectType} ${subjectId} → ${next ? "ALLOWED" : "DENIED"}`, "Erin Hoxha");
     refresh();
@@ -137,8 +119,8 @@ const PermissionMatrix = () => {
 
   const handleExport = () => {
     const subjects = [
-      ...(subjectTab !== "AGENT" ? banks.map((b) => ({ k: `BANK::${b.id}`, label: `${b.name} (Bank)` })) : []),
-      ...(subjectTab !== "BANK" ? agents.map((a) => ({ k: `AGENT::${a.id}`, label: `${a.name} (Agent)` })) : []),
+      ...banks.map((b) => ({ k: `BANK::${b.id}`, label: `${b.name} (Bank)` })),
+      ...agents.map((a) => ({ k: `AGENT::${a.id}`, label: `${a.name} (Agent)` })),
     ];
     const rows = templates.map((t) => {
       const productName = productById.get(t.productId)?.name ?? "";
@@ -162,6 +144,8 @@ const PermissionMatrix = () => {
   };
 
   const drawerTpl = drawerTplId ? matrixTemplates.find((t) => t.id === drawerTplId) ?? null : null;
+  const hasSubjects = banks.length > 0 || agents.length > 0;
+  const currentProduct = productById.get(productId);
 
   return (
     <AppShell>
@@ -169,30 +153,24 @@ const PermissionMatrix = () => {
         title="Template Permission Matrix"
         description="Manage which banks and agents can access each product template."
         actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-1.5" /> Export to Excel
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!hasSubjects}>
+            <Download className="h-4 w-4 mr-1.5" /> Export to Excel
+          </Button>
         }
       />
 
-      {/* Filters */}
+      {/* Step 1 — Product */}
       <Card className="mt-6">
-        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-center">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by product or template…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9"
-            />
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">1</span>
+            <CardTitle className="text-sm">Select a product</CardTitle>
           </div>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-3">
           <Select value={productId} onValueChange={setProductId}>
-            <SelectTrigger className="h-9 w-[260px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All products</SelectItem>
               {matrixProducts.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   <span className="font-mono text-xs mr-2 text-muted-foreground">{p.code}</span>{p.name}
@@ -200,28 +178,44 @@ const PermissionMatrix = () => {
               ))}
             </SelectContent>
           </Select>
-          <Select value={subjectTab} onValueChange={(v) => setSubjectTab(v as SubjectTab)}>
-            <SelectTrigger className="h-9 w-[150px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="BOTH">Banks &amp; Agents</SelectItem>
-              <SelectItem value="BANK">Banks only</SelectItem>
-              <SelectItem value="AGENT">Agents only</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterRegion} onValueChange={setFilterRegion}>
-            <SelectTrigger className="h-9 w-[140px]"><Filter className="h-3.5 w-3.5 mr-1.5" /><SelectValue placeholder="Region" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All regions</SelectItem>
-              {regions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterTier} onValueChange={setFilterTier}>
-            <SelectTrigger className="h-9 w-[130px]"><SelectValue placeholder="Tier" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All tiers</SelectItem>
-              {tiers.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Filter templates within the selected product…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 2 — Subjects */}
+      <Card className="mt-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">2</span>
+            <CardTitle className="text-sm">Choose banks / branches or agents</CardTitle>
+          </div>
+          <CardDescription className="text-xs">
+            Pick one or more subjects to load the matrix. You can mix banks and agents.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SubjectPicker
+            kind="BANK"
+            label="Banks & branches"
+            items={matrixBanks.map((b) => ({ id: b.id, name: b.name, meta: `${b.code} · ${b.region}` }))}
+            selected={selectedBankIds}
+            onChange={setSelectedBankIds}
+          />
+          <SubjectPicker
+            kind="AGENT"
+            label="Agents"
+            items={matrixAgents.map((a) => ({ id: a.id, name: a.name, meta: `${a.code} · ${a.tier}` }))}
+            selected={selectedAgentIds}
+            onChange={setSelectedAgentIds}
+          />
         </CardContent>
       </Card>
 
@@ -229,7 +223,9 @@ const PermissionMatrix = () => {
       <Card className="mt-4 overflow-hidden">
         <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="text-base">Matrix</CardTitle>
+            <CardTitle className="text-base">
+              Matrix {currentProduct && <span className="text-muted-foreground font-normal text-xs ml-1">· {currentProduct.name}</span>}
+            </CardTitle>
             <CardDescription>Click a cell to toggle access. Click a template name to view details.</CardDescription>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
@@ -243,36 +239,34 @@ const PermissionMatrix = () => {
               {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : templates.length === 0 ? (
-            <EmptyState />
+            <EmptyState message="No templates match the current filters." />
+          ) : !hasSubjects ? (
+            <EmptyState
+              message="Choose at least one bank or agent above to display the matrix."
+              hint={`${templates.length} template${templates.length === 1 ? "" : "s"} ready for "${currentProduct?.name}"`}
+            />
           ) : (
             <MatrixTable
               templates={templates}
               banks={banks}
               agents={agents}
-              subjectTab={subjectTab}
+              productName={currentProduct?.name ?? ""}
               permIndex={permIndex}
               onToggle={toggleCell}
               onOpenTemplate={(id) => setDrawerTplId(id)}
               askBulk={askBulk}
               onClone={(tpl) => { setCloneTarget(tpl); setCloneFromId(""); }}
-              bankSearch={bankSearch}
-              setBankSearch={setBankSearch}
-              agentSearch={agentSearch}
-              setAgentSearch={setAgentSearch}
             />
-
           )}
         </CardContent>
       </Card>
 
-      {/* Drawer */}
       <Sheet open={!!drawerTpl} onOpenChange={(o) => !o && setDrawerTplId(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           {drawerTpl && <DrawerBody tpl={drawerTpl} version={version} />}
         </SheetContent>
       </Sheet>
 
-      {/* Bulk confirm */}
       <AlertDialog open={!!pendingBulk} onOpenChange={(o) => !o && setPendingBulk(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -286,7 +280,6 @@ const PermissionMatrix = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Clone modal */}
       <AlertDialog open={!!cloneTarget} onOpenChange={(o) => !o && setCloneTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -331,30 +324,99 @@ const PermissionMatrix = () => {
 
 export default PermissionMatrix;
 
-/* ------------ Sub components ------------ */
+/* ------------ Subject picker ------------ */
 
-const StatCard = ({
-  label, value, hint, icon: Icon, accent, progress,
+const SubjectPicker = ({
+  kind, label, items, selected, onChange,
 }: {
-  label: string; value: string | number; hint?: string; icon: React.ComponentType<{ className?: string }>;
-  accent?: boolean; progress?: number;
-}) => (
-  <Card className={accent ? "border-accent/40" : ""}>
-    <CardContent className="p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">{label}</span>
-        <Icon className={`h-4 w-4 ${accent ? "text-accent" : "text-muted-foreground"}`} />
+  kind: "BANK" | "AGENT";
+  label: string;
+  items: { id: string; name: string; meta: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const Icon = kind === "BANK" ? Building2 : UserCircle2;
+  const accent = kind === "BANK" ? "text-blue-500" : "text-purple-500";
+  const tint = kind === "BANK" ? "bg-blue-500/5 border-blue-500/20" : "bg-purple-500/5 border-purple-500/20";
+  const selectedItems = selected.map((id) => items.find((i) => i.id === id)!).filter(Boolean);
+
+  const toggle = (id: string) => {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  };
+
+  return (
+    <div className={`rounded-lg border ${tint} p-3`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${accent}`} />
+          <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
+          <Badge variant="secondary" className="text-[10px] h-5">{selected.length}</Badge>
+        </div>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="outline" className="h-7 text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-0" align="end">
+            <Command>
+              <CommandInput placeholder={`Search ${kind === "BANK" ? "bank or branch" : "agent"}…`} />
+              <CommandList>
+                <CommandEmpty>No results found.</CommandEmpty>
+                <CommandGroup>
+                  {items.map((it) => {
+                    const isSel = selected.includes(it.id);
+                    return (
+                      <CommandItem key={it.id} value={`${it.name} ${it.meta}`} onSelect={() => toggle(it.id)}>
+                        <div className={`mr-2 h-4 w-4 rounded border flex items-center justify-center ${isSel ? "bg-accent border-accent text-accent-foreground" : "border-input"}`}>
+                          {isSel && <Check className="h-3 w-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{it.name}</div>
+                          <div className="text-[10px] text-muted-foreground font-mono truncate">{it.meta}</div>
+                        </div>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-0.5">{hint}</div>}
-      {typeof progress === "number" && (
-        <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
-          <div className="h-full bg-accent" style={{ width: `${Math.round(progress * 100)}%` }} />
+
+      {selectedItems.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground italic">None selected yet — click Add to choose.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedItems.map((it) => (
+            <button
+              key={it.id}
+              onClick={() => toggle(it.id)}
+              className="group inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-destructive/40"
+              title="Click to remove"
+            >
+              <Icon className={`h-3 w-3 ${accent}`} />
+              <span className="font-medium">{it.name}</span>
+              <XIcon className="h-3 w-3 text-muted-foreground group-hover:text-destructive" />
+            </button>
+          ))}
+          {selectedItems.length > 0 && (
+            <button
+              onClick={() => onChange([])}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:text-destructive"
+            >
+              Clear all
+            </button>
+          )}
         </div>
       )}
-    </CardContent>
-  </Card>
-);
+    </div>
+  );
+};
+
+/* ------------ Sub components ------------ */
 
 const LegendDot = ({ className, label }: { className: string; label: string }) => (
   <span className="inline-flex items-center gap-1.5">
@@ -362,108 +424,53 @@ const LegendDot = ({ className, label }: { className: string; label: string }) =
   </span>
 );
 
-const EmptyState = () => (
+const EmptyState = ({ message, hint }: { message: string; hint?: string }) => (
   <div className="p-12 text-center">
     <Layers className="h-10 w-10 mx-auto text-muted-foreground/60" />
-    <p className="mt-3 text-sm font-medium">No templates match the current filters.</p>
-    <p className="text-xs text-muted-foreground mt-1">Try clearing the search or changing the product.</p>
+    <p className="mt-3 text-sm font-medium">{message}</p>
+    {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
   </div>
 );
 
 /* ------------ Matrix table ------------ */
 
 const MatrixTable = ({
-  templates, banks, agents, subjectTab, permIndex, onToggle, onOpenTemplate, askBulk, onClone,
-  bankSearch, setBankSearch, agentSearch, setAgentSearch,
+  templates, banks, agents, productName, permIndex, onToggle, onOpenTemplate, askBulk, onClone,
 }: {
   templates: MatrixTemplate[];
   banks: typeof matrixBanks;
   agents: typeof matrixAgents;
-  subjectTab: SubjectTab;
+  productName: string;
   permIndex: Map<string, Permission>;
   onToggle: (templateId: string, st: "BANK" | "AGENT", sid: string) => void;
   onOpenTemplate: (id: string) => void;
   askBulk: (title: string, description: string, run: () => void) => void;
   onClone: (tpl: MatrixTemplate) => void;
-  bankSearch: string;
-  setBankSearch: (s: string) => void;
-  agentSearch: string;
-  setAgentSearch: (s: string) => void;
 }) => {
-  const showBanks = subjectTab !== "AGENT";
-  const showAgents = subjectTab !== "BANK";
-  const banksEmpty = banks.length === 0;
-  const agentsEmpty = agents.length === 0;
-  const banksColSpan = Math.max(banks.length, 1);
-  const agentsColSpan = Math.max(agents.length, 1);
+  const showBanks = banks.length > 0;
+  const showAgents = agents.length > 0;
 
   return (
-    <div className="relative w-full overflow-auto max-h-[calc(100vh-380px)] border-t border-border">
+    <div className="relative w-full overflow-auto max-h-[calc(100vh-460px)] border-t border-border">
       <table className="w-full text-xs border-collapse">
         <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur">
-          {/* Row 1: search inputs above each column group */}
-          <tr>
-            <th className="sticky left-0 z-40 bg-muted/95 backdrop-blur text-left p-2 border-b border-r border-border min-w-[280px]" />
-            {showBanks && (
-              <th colSpan={banksColSpan} className="p-2 border-b border-border bg-blue-500/5">
-                <div className="relative max-w-xs mx-auto">
-                  <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-blue-500" />
-                  <Input
-                    value={bankSearch}
-                    onChange={(e) => setBankSearch(e.target.value)}
-                    placeholder="Search bank by name, code or region…"
-                    className="pl-8 h-8 text-xs bg-background"
-                  />
-                </div>
-              </th>
-            )}
-            {showBanks && showAgents && (
-              <th className="border-b border-l-2 border-border bg-muted/80 min-w-[12px]" />
-            )}
-            {showAgents && (
-              <th colSpan={agentsColSpan} className="p-2 border-b border-border bg-purple-500/5">
-                <div className="relative max-w-xs mx-auto">
-                  <UserCircle2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-purple-500" />
-                  <Input
-                    value={agentSearch}
-                    onChange={(e) => setAgentSearch(e.target.value)}
-                    placeholder="Search agent by name, code or tier…"
-                    className="pl-8 h-8 text-xs bg-background"
-                  />
-                </div>
-              </th>
-            )}
-            <th className="sticky right-0 z-40 bg-muted/95 backdrop-blur border-b border-l border-border p-2 w-12" />
-          </tr>
-
-          {/* Row 2: column labels */}
           <tr>
             <th className="sticky left-0 z-40 bg-muted/95 backdrop-blur text-left p-3 border-b border-r border-border min-w-[280px] font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">
               Template
             </th>
-            {showBanks && banksEmpty && (
-              <th className="p-3 border-b border-border text-center text-[10px] text-muted-foreground italic min-w-[260px]">
-                No banks selected — search above to add columns
-              </th>
-            )}
-            {showBanks && !banksEmpty && banks.map((b) => (
-              <th key={b.id} className="p-2 border-b border-border min-w-[80px] max-w-[80px] align-bottom">
+            {showBanks && banks.map((b) => (
+              <th key={b.id} className="p-2 border-b border-border bg-blue-500/5 min-w-[80px] max-w-[80px] align-bottom">
                 <div className="flex flex-col items-center gap-1">
                   <Building2 className="h-3 w-3 text-blue-500" />
-                  <span className="font-medium text-foreground writing-vertical text-[10px] whitespace-nowrap rotate-180 [writing-mode:vertical-rl]">{b.name}</span>
+                  <span className="font-medium text-foreground text-[10px] whitespace-nowrap rotate-180 [writing-mode:vertical-rl]">{b.name}</span>
                 </div>
               </th>
             ))}
             {showBanks && showAgents && (
               <th className="p-2 border-b border-l-2 border-border bg-muted/80 min-w-[12px]" />
             )}
-            {showAgents && agentsEmpty && (
-              <th className="p-3 border-b border-border text-center text-[10px] text-muted-foreground italic min-w-[260px]">
-                No agents selected — search above to add columns
-              </th>
-            )}
-            {showAgents && !agentsEmpty && agents.map((a) => (
-              <th key={a.id} className="p-2 border-b border-border min-w-[70px] max-w-[70px] align-bottom">
+            {showAgents && agents.map((a) => (
+              <th key={a.id} className="p-2 border-b border-border bg-purple-500/5 min-w-[70px] max-w-[70px] align-bottom">
                 <div className="flex flex-col items-center gap-1">
                   <UserCircle2 className="h-3 w-3 text-purple-500" />
                   <span className="font-medium text-foreground text-[10px] whitespace-nowrap rotate-180 [writing-mode:vertical-rl]">{a.name}</span>
@@ -477,7 +484,6 @@ const MatrixTable = ({
         <tbody>
           {templates.map((t) => {
             const s = templateStats(t.id);
-            const product = matrixProducts.find((p) => p.id === t.productId);
             return (
               <tr key={t.id} className="hover:bg-muted/30 transition-colors">
                 <td className="sticky left-0 z-20 bg-card hover:bg-muted/30 transition-colors p-3 border-b border-r border-border min-w-[280px]">
@@ -488,7 +494,7 @@ const MatrixTable = ({
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm group-hover:text-accent transition-colors truncate">
-                        <span className="text-muted-foreground font-normal">{product?.name}</span>
+                        <span className="text-muted-foreground font-normal">{productName}</span>
                         <span className="text-muted-foreground font-normal mx-1.5">-</span>
                         {t.name}
                       </span>
@@ -503,20 +509,14 @@ const MatrixTable = ({
                     </div>
                   </button>
                 </td>
-                {showBanks && banksEmpty && (
-                  <td className="border-b border-border bg-muted/10" />
-                )}
-                {showBanks && !banksEmpty && banks.map((b) => {
+                {showBanks && banks.map((b) => {
                   const p = permIndex.get(`${t.id}::BANK::${b.id}`);
                   return (
                     <Cell key={b.id} allowed={!!p?.canAccess} onClick={() => onToggle(t.id, "BANK", b.id)} />
                   );
                 })}
                 {showBanks && showAgents && <td className="border-b border-l-2 border-border bg-muted/40" />}
-                {showAgents && agentsEmpty && (
-                  <td className="border-b border-border bg-muted/10" />
-                )}
-                {showAgents && !agentsEmpty && agents.map((a) => {
+                {showAgents && agents.map((a) => {
                   const p = permIndex.get(`${t.id}::AGENT::${a.id}`);
                   return (
                     <Cell key={a.id} allowed={!!p?.canAccess} onClick={() => onToggle(t.id, "AGENT", a.id)} />
