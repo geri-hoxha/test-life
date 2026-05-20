@@ -42,8 +42,8 @@ const PermissionMatrix = () => {
   const [fProduct, setFProduct] = useState<string>(ALL);
   const [fTemplate, setFTemplate] = useState<string>(ALL);
   const [fBank, setFBank] = useState<string>(ALL);
-  const [fBranch, setFBranch] = useState<string>(ALL);
-  const [fAgency, setFAgency] = useState<string>(ALL);
+  const [fBranches, setFBranches] = useState<string[]>([]);
+  const [fAgencies, setFAgencies] = useState<string[]>([]);
   const [fAgent, setFAgent] = useState<string>(ALL);
   const [search, setSearch] = useState("");
 
