@@ -176,6 +176,14 @@ const ProductDetail = () => {
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Created</div>
             <div className="text-sm mt-0.5">{product.createdDate}</div>
           </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Agent Comm.</div>
+            <div className="font-mono text-sm mt-0.5">{(product.agentCommission * 100).toFixed(2)}%</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Bank Comm.</div>
+            <div className="font-mono text-sm mt-0.5">{(product.bankCommission * 100).toFixed(2)}%</div>
+          </div>
         </div>
       </Card>
 
