@@ -233,6 +233,38 @@ const ProductDetail = () => {
                 <Label htmlFor="p-type">Type</Label>
                 <Input id="p-type" value={fields.type} onChange={(e) => setFields({ ...fields, type: e.target.value })} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-agent-comm">Agent Commission (%)</Label>
+                <div className="relative">
+                  <Input
+                    id="p-agent-comm"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={fields.agentCommissionPct}
+                    onChange={(e) => setFields({ ...fields, agentCommissionPct: e.target.value })}
+                    className="pr-7 font-mono"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-bank-comm">Bank Commission (%)</Label>
+                <div className="relative">
+                  <Input
+                    id="p-bank-comm"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={fields.bankCommissionPct}
+                    onChange={(e) => setFields({ ...fields, bankCommissionPct: e.target.value })}
+                    className="pr-7 font-mono"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="p-desc">Description</Label>
                 <Textarea
