@@ -17,7 +17,8 @@ export type Template = {
   allowedCurrencies: string[];
   premiumOverrideType: PremiumOverrideType;
   premiumOverrideValue?: number;
-  commissionOverridePct?: number;
+  agentCommission: number; // decimal, e.g. 0.07 = 7%
+  bankCommission: number;  // decimal
   isActive: boolean;
 };
 
