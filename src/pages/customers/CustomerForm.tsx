@@ -263,13 +263,9 @@ const CustomerForm = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5 md:col-span-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="pob">Place of Birth</Label>
                   <Input id="pob" value={c.placeOfBirth ?? ""} maxLength={120} onChange={(e) => set("placeOfBirth", e.target.value)} />
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label htmlFor="occ">Occupation</Label>
-                  <Input id="occ" value={c.occupation ?? ""} maxLength={100} onChange={(e) => set("occupation", e.target.value)} />
                 </div>
               </div>
             </Card>
