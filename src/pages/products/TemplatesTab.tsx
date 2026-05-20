@@ -181,7 +181,7 @@ const TemplatesTab = ({ productId }: Props) => {
                       </DropdownMenu>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-6 line-clamp-2 min-h-[2.5rem]">
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-3 line-clamp-2 min-h-[2.5rem]">
                     {t.description || "—"}
                   </p>
 
@@ -224,34 +224,23 @@ const TemplatesTab = ({ productId }: Props) => {
                       <p className="text-sm text-foreground/80">{overrideSummary(t, t.defaultCurrency)}</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Default currency</span>
+                      <span className="font-bold font-mono text-accent">{t.defaultCurrency}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-y-2 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Type</span>
-                        <span className="font-mono font-semibold text-foreground">{t.typeCode}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Currency</span>
-                        <span className="font-bold font-mono text-accent">{t.defaultCurrency}</span>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-between">
                         <span className="text-muted-foreground">Policy</span>
                         <span className="font-medium text-foreground truncate ml-2">{t.policyType}</span>
                       </div>
-                      <div className="col-span-2 flex items-center justify-between">
+                      <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Payment</span>
                         <span className="font-medium text-foreground truncate ml-2">{t.paymentType}</span>
                       </div>
-                      <div className="col-span-2 flex items-center justify-between">
+                      <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Renewal</span>
                         <span className="font-medium text-foreground truncate ml-2">{t.renewalType}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Max months</span>
-                        <span className="font-mono font-semibold text-foreground">{t.maxMonths}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Loan</span>
-                        <span className="font-medium text-foreground truncate ml-2">{t.loanType}</span>
                       </div>
                     </div>
 
