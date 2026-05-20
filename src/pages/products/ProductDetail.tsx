@@ -190,7 +190,7 @@ const ProductDetail = () => {
       <Tabs defaultValue="overview" className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="versions">Versions</TabsTrigger>
+          {/* <TabsTrigger value="versions">Versions</TabsTrigger> */}
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
           <TabsTrigger value="templates">Templates / Packages</TabsTrigger>
           <TabsTrigger value="premium">Premium Rules</TabsTrigger>
