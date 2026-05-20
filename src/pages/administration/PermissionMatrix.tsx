@@ -16,6 +16,10 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
 import {
   matrixProducts, matrixTemplates, matrixBanks, matrixBankBranches,
@@ -24,7 +28,7 @@ import {
   type GrantRow,
 } from "@/data/permissions";
 import {
-  Search, Building2, UserCircle2, Download, Plus, Trash2, Filter, X as XIcon,
+  Search, Building2, UserCircle2, Download, Plus, Trash2, Filter, X as XIcon, Check, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
