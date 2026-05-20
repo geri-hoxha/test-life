@@ -35,6 +35,8 @@ export const seedProducts: Product[] = [
     description: "Sigurim jete me mbulim baze Death dhe mbulime shtese opsionale (aksident, paaftesi, semundje kritike).",
     requiredDocuments: ["ID document", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.1,
+    bankCommission: 0.02,
   },
   {
     id: "PRD-002",
@@ -48,6 +50,8 @@ export const seedProducts: Product[] = [
     description: "Sigurim jete per debitorin me pagese primi te rregullt — mbulim baze Death, distribuim nepermjet bankave partnere.",
     requiredDocuments: ["ID document", "Loan agreement", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.08,
+    bankCommission: 0.05,
   },
   {
     id: "PRD-003",
@@ -61,6 +65,8 @@ export const seedProducts: Product[] = [
     description: "Sigurim jete per debitorin me pagese te vetme upfront per gjithe periudhen — mbulim baze Death.",
     requiredDocuments: ["ID document", "Loan agreement", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.12,
+    bankCommission: 0.04,
   },
   {
     id: "PRD-004",
@@ -74,6 +80,8 @@ export const seedProducts: Product[] = [
     description: "Variant i kombinuar i sigurimit te jetes me mbulim baze Death dhe rider opsionale per aksident dhe paaftesi.",
     requiredDocuments: ["ID document", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: false },
+    agentCommission: 0.09,
+    bankCommission: 0.03,
   },
   {
     id: "PRD-005",
@@ -87,6 +95,8 @@ export const seedProducts: Product[] = [
     description: "Variant i zgjeruar i sigurimit te jetes te kombinuar — mbulim baze Death plus pakete e plote rider-ash opsionale.",
     requiredDocuments: ["ID document", "Medical report"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: true, compliance: true },
+    agentCommission: 0.11,
+    bankCommission: 0.04,
   },
   {
     id: "PRD-006",
@@ -100,6 +110,8 @@ export const seedProducts: Product[] = [
     description: "Sigurim jete me komponent kursimi — mbulim baze Death me akumulim kapitali ne maturim dhe rider opsionale.",
     requiredDocuments: ["ID document", "Medical questionnaire", "Proof of income"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: false, manualUnderwriting: true, compliance: true },
+    agentCommission: 0.15,
+    bankCommission: 0.06,
   },
 ];
 
