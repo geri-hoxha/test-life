@@ -47,6 +47,8 @@ type EditableFields = {
   description: string;
   currencies: string[];
   requiredDocuments: string[];
+  agentCommissionPct: string;
+  bankCommissionPct: string;
 };
 
 const ProductDetail = () => {
@@ -64,6 +66,8 @@ const ProductDetail = () => {
           description: product.description,
           currencies: [...product.currencies],
           requiredDocuments: [...product.requiredDocuments],
+          agentCommissionPct: (product.agentCommission * 100).toString(),
+          bankCommissionPct: (product.bankCommission * 100).toString(),
         }
       : null
   );
@@ -92,7 +96,9 @@ const ProductDetail = () => {
     fields.type !== product.type ||
     fields.description !== product.description ||
     JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
-    JSON.stringify(fields.requiredDocuments) !== JSON.stringify(product.requiredDocuments);
+    JSON.stringify(fields.requiredDocuments) !== JSON.stringify(product.requiredDocuments) ||
+    (parseFloat(fields.agentCommissionPct) || 0) / 100 !== product.agentCommission ||
+    (parseFloat(fields.bankCommissionPct) || 0) / 100 !== product.bankCommission;
 
   const toggleFlag = (key: keyof Product["flags"]) =>
     setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
@@ -103,7 +109,12 @@ const ProductDetail = () => {
   };
 
   const saveFields = () => {
-    updateProduct(product.id, fields);
+    const { agentCommissionPct, bankCommissionPct, ...rest } = fields;
+    updateProduct(product.id, {
+      ...rest,
+      agentCommission: (parseFloat(agentCommissionPct) || 0) / 100,
+      bankCommission: (parseFloat(bankCommissionPct) || 0) / 100,
+    });
     toast.success("Product details saved");
   };
 
@@ -165,6 +176,14 @@ const ProductDetail = () => {
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Created</div>
             <div className="text-sm mt-0.5">{product.createdDate}</div>
           </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Agent Comm.</div>
+            <div className="font-mono text-sm mt-0.5">{(product.agentCommission * 100).toFixed(2)}%</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Bank Comm.</div>
+            <div className="font-mono text-sm mt-0.5">{(product.bankCommission * 100).toFixed(2)}%</div>
+          </div>
         </div>
       </Card>
 
@@ -221,6 +240,38 @@ const ProductDetail = () => {
               <div className="space-y-2">
                 <Label htmlFor="p-type">Type</Label>
                 <Input id="p-type" value={fields.type} onChange={(e) => setFields({ ...fields, type: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-agent-comm">Agent Commission (%)</Label>
+                <div className="relative">
+                  <Input
+                    id="p-agent-comm"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={fields.agentCommissionPct}
+                    onChange={(e) => setFields({ ...fields, agentCommissionPct: e.target.value })}
+                    className="pr-7 font-mono"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-bank-comm">Bank Commission (%)</Label>
+                <div className="relative">
+                  <Input
+                    id="p-bank-comm"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={fields.bankCommissionPct}
+                    onChange={(e) => setFields({ ...fields, bankCommissionPct: e.target.value })}
+                    className="pr-7 font-mono"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="p-desc">Description</Label>
