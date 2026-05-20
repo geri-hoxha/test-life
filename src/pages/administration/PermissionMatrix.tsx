@@ -195,7 +195,7 @@ const PermissionMatrix = () => {
                         const draft = pending[r.id] ?? r.commissionPct;
                         const dirty = pending[r.id] !== undefined && pending[r.id] !== r.commissionPct;
                         return (
-                          <div className="relative inline-flex items-center w-28">
+                          <div className="relative inline-flex items-center w-36">
                             <Input
                               type="number"
                               min={0}
