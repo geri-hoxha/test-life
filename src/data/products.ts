@@ -18,6 +18,8 @@ export type Product = {
     manualUnderwriting: boolean;
     compliance: boolean;
   };
+  agentCommission: number; // stored as decimal, e.g. 0.05 = 5%
+  bankCommission: number;  // stored as decimal
 };
 
 export const seedProducts: Product[] = [
