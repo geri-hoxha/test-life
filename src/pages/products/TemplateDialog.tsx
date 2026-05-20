@@ -39,7 +39,8 @@ const blank = (productId: string, versionId: string, currencies: string[]): Temp
   allowedCurrencies: [currencies[0] ?? "EUR"],
   premiumOverrideType: "No override",
   premiumOverrideValue: 0,
-  commissionOverridePct: 10,
+  agentCommission: 0.07,
+  bankCommission: 0.03,
   isActive: true,
 });
 
