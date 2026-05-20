@@ -47,6 +47,8 @@ type EditableFields = {
   description: string;
   currencies: string[];
   requiredDocuments: string[];
+  agentCommissionPct: string;
+  bankCommissionPct: string;
 };
 
 const ProductDetail = () => {
