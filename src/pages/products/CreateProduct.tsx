@@ -130,6 +130,20 @@ const CreateProduct = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="agent-comm">Agent Commission (%)</Label>
+                <div className="relative">
+                  <Input id="agent-comm" type="number" min="0" max="100" step="0.01" value={agentCommissionPct} onChange={(e) => setAgentCommissionPct(e.target.value)} className="pr-7 font-mono" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bank-comm">Bank Commission (%)</Label>
+                <div className="relative">
+                  <Input id="bank-comm" type="number" min="0" max="100" step="0.01" value={bankCommissionPct} onChange={(e) => setBankCommissionPct(e.target.value)} className="pr-7 font-mono" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label htmlFor="desc">Description</Label>
                 <Textarea id="desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short marketing or internal description" />
