@@ -37,7 +37,7 @@ import { toast } from "sonner";
 type SubjectTab = "BANK" | "AGENT" | "BOTH";
 
 const PermissionMatrix = () => {
-  const [productId, setProductId] = useState<string>(matrixProducts[0].id);
+  const [productId, setProductId] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [subjectTab, setSubjectTab] = useState<SubjectTab>("BOTH");
@@ -67,12 +67,25 @@ const PermissionMatrix = () => {
     return () => clearTimeout(t);
   }, [search]);
 
+  const productById = useMemo(
+    () => new Map(matrixProducts.map((p) => [p.id, p])),
+    []
+  );
+
   const templates = useMemo(
     () =>
       matrixTemplates
-        .filter((t) => t.productId === productId)
-        .filter((t) => !debounced || t.name.toLowerCase().includes(debounced) || t.id.toLowerCase().includes(debounced)),
-    [productId, debounced]
+        .filter((t) => productId === "ALL" || t.productId === productId)
+        .filter((t) => {
+          if (!debounced) return true;
+          const productName = productById.get(t.productId)?.name.toLowerCase() ?? "";
+          return (
+            t.name.toLowerCase().includes(debounced) ||
+            t.id.toLowerCase().includes(debounced) ||
+            productName.includes(debounced)
+          );
+        }),
+    [productId, debounced, productById]
   );
 
   const banks = useMemo(
@@ -87,16 +100,12 @@ const PermissionMatrix = () => {
   // Index permissions for O(1) lookup
   const permIndex = useMemo(() => {
     void version;
-    const perms = listPermissions(productId, templates.map((t) => t.id));
+    const targetProduct = productId === "ALL" ? undefined : productId;
+    const perms = listPermissions(targetProduct, templates.map((t) => t.id));
     const map = new Map<string, Permission>();
     for (const p of perms) map.set(`${p.templateId}::${p.subjectType}::${p.subjectId}`, p);
     return map;
   }, [productId, templates, version]);
-
-  const stats = useMemo(() => {
-    void version;
-    return globalStats(productId);
-  }, [productId, version]);
 
   const regions = useMemo(() => Array.from(new Set(matrixBanks.map((b) => b.region))), []);
   const tiers = ["Junior", "Senior", "Lead"];
@@ -122,7 +131,12 @@ const PermissionMatrix = () => {
       ...(subjectTab !== "BANK" ? agents.map((a) => ({ k: `AGENT::${a.id}`, label: `${a.name} (Agent)` })) : []),
     ];
     const rows = templates.map((t) => {
-      const row: Record<string, string> = { Template: t.name, ID: t.id, Type: t.type };
+      const productName = productById.get(t.productId)?.name ?? "";
+      const row: Record<string, string> = {
+        Template: `${productName} - ${t.name}`,
+        ID: t.id,
+        Type: t.type,
+      };
       for (const s of subjects) {
         const [stype, sid] = s.k.split("::") as ["BANK" | "AGENT", string];
         const p = permIndex.get(`${t.id}::${stype}::${sid}`);
