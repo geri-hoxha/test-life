@@ -167,22 +167,13 @@ const PermissionMatrix = () => {
         }
       />
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-6">
-        <StatCard label="Templates" value={stats.templates} hint={`${stats.openTemplates} with grants`} icon={Layers} />
-        <StatCard label="Banks" value={stats.banks} hint="active distributors" icon={Building2} />
-        <StatCard label="Agents" value={stats.agents} hint={`across ${new Set(matrixAgents.map(a=>a.tier)).size} tiers`} icon={UserCircle2} />
-        <StatCard label="Total grants" value={stats.totalGrants} hint={`of ${stats.totalSlots} slots`} icon={ShieldCheck} accent />
-        <StatCard label="Coverage" value={`${(stats.coverage * 100).toFixed(0)}%`} hint="allowed cells" icon={Activity} progress={stats.coverage} />
-      </div>
-
       {/* Filters */}
-      <Card className="mt-4">
+      <Card className="mt-6">
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-center">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search template by name or ID…"
+              placeholder="Search by product or template…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-9"
@@ -191,6 +182,7 @@ const PermissionMatrix = () => {
           <Select value={productId} onValueChange={setProductId}>
             <SelectTrigger className="h-9 w-[260px]"><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="ALL">All products</SelectItem>
               {matrixProducts.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   <span className="font-mono text-xs mr-2 text-muted-foreground">{p.code}</span>{p.name}
