@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Shield, ShieldPlus, Calculator, FileText, AlertCircle, Check, Coins } from "lucide-react";
+import { Shield, ShieldPlus, Calculator, FileText, AlertCircle, Check, Coins, Settings2 } from "lucide-react";
 import { Template, overrideSummary } from "@/data/templates";
 import { listCoverages } from "@/data/coverages";
 import { getProduct } from "@/data/products";
@@ -117,6 +117,51 @@ const TemplateDetailDialog = ({ open, onOpenChange, template }: Props) => {
                 {template.allowedCurrencies.map((c) => (
                   <Badge key={c} variant="outline" className="font-mono text-[10px]">{c}</Badge>
                 ))}
+              </div>
+            </Card>
+          </Section>
+
+          <Section icon={Settings2} title="Classification & policy attributes">
+            <Card className="p-4 shadow-none border-border space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Type</div>
+                  <Badge className="mt-1 font-mono bg-accent-soft text-accent-soft-foreground border-0">{template.typeCode}</Badge>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Policy type</div>
+                  <div className="text-sm font-medium mt-0.5">{template.policyType}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Payment type</div>
+                  <div className="text-sm font-medium mt-0.5">{template.paymentType}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Renewal type</div>
+                  <div className="text-sm font-medium mt-0.5">{template.renewalType}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Loan type</div>
+                  <div className="text-sm font-medium mt-0.5">{template.loanType}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Quantity (Sasia)</div>
+                  <div className="text-sm font-medium font-mono mt-0.5">{template.quantity}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Max months</div>
+                  <div className="text-sm font-medium font-mono mt-0.5">{template.maxMonths}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Print type</div>
+                  <div className="text-sm font-medium font-mono mt-0.5">{template.printType}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Cancelled</div>
+                  <Badge className={`mt-1 border-0 ${template.cancelled ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"}`}>
+                    {template.cancelled ? "Yes" : "No"}
+                  </Badge>
+                </div>
               </div>
             </Card>
           </Section>

@@ -5,6 +5,34 @@ export type PremiumOverrideType =
   | "Fixed premium"
   | "Management approved manual premium";
 
+export type PaymentType =
+  | "Payment with regulated premium"
+  | "Single premium payment"
+  | "Flexible premium payment"
+  | "Bank-financed premium";
+
+export type RenewalType =
+  | "According to the bank information"
+  | "Automatic annual renewal"
+  | "Manual renewal on request"
+  | "Non-renewable";
+
+export type TemplateTypeCode = "LP" | "RP" | "SP" | "GP" | "BP";
+
+export type LoanType =
+  | "Personal loan"
+  | "Mortgage loan"
+  | "Business loan"
+  | "Consumer loan"
+  | "Not applicable";
+
+export type PolicyTypeCode =
+  | "D1V - Up to 1 year"
+  | "D5V - Up to 5 years"
+  | "D10V - Up to 10 years"
+  | "D20V - Up to 20 years"
+  | "WL - Whole life";
+
 export type Template = {
   id: string;
   productId: string;
@@ -19,6 +47,15 @@ export type Template = {
   premiumOverrideValue?: number;
   agentCommission: number; // decimal, e.g. 0.07 = 7%
   bankCommission: number;  // decimal
+  paymentType: PaymentType;
+  renewalType: RenewalType;
+  typeCode: TemplateTypeCode;
+  loanType: LoanType;
+  policyType: PolicyTypeCode;
+  quantity: number;        // Sasia
+  maxMonths: number;       // Max Muaj
+  printType: string;       // Tip Printimi
+  cancelled: boolean;      // Anulluar
   isActive: boolean;
 };
 
@@ -35,6 +72,15 @@ const seed: Template[] = [
     premiumOverrideValue: 5,
     agentCommission: 0.07,
     bankCommission: 0.03,
+    paymentType: "Payment with regulated premium",
+    renewalType: "Automatic annual renewal",
+    typeCode: "RP",
+    loanType: "Not applicable",
+    policyType: "D20V - Up to 20 years",
+    quantity: 1,
+    maxMonths: 240,
+    printType: "9",
+    cancelled: false,
     isActive: true,
   },
   {
@@ -48,6 +94,15 @@ const seed: Template[] = [
     premiumOverrideType: "No override",
     agentCommission: 0.08,
     bankCommission: 0.04,
+    paymentType: "Payment with regulated premium",
+    renewalType: "Automatic annual renewal",
+    typeCode: "RP",
+    loanType: "Not applicable",
+    policyType: "D20V - Up to 20 years",
+    quantity: 1,
+    maxMonths: 240,
+    printType: "9",
+    cancelled: false,
     isActive: true,
   },
   {
@@ -62,6 +117,15 @@ const seed: Template[] = [
     premiumOverrideValue: 25,
     agentCommission: 0.1,
     bankCommission: 0.04,
+    paymentType: "Flexible premium payment",
+    renewalType: "Manual renewal on request",
+    typeCode: "GP",
+    loanType: "Not applicable",
+    policyType: "WL - Whole life",
+    quantity: 1,
+    maxMonths: 360,
+    printType: "9",
+    cancelled: false,
     isActive: true,
   },
   {
@@ -75,6 +139,15 @@ const seed: Template[] = [
     premiumOverrideType: "Management approved manual premium",
     agentCommission: 0.05,
     bankCommission: 0.03,
+    paymentType: "Bank-financed premium",
+    renewalType: "According to the bank information",
+    typeCode: "LP",
+    loanType: "Mortgage loan",
+    policyType: "D10V - Up to 10 years",
+    quantity: 1,
+    maxMonths: 360,
+    printType: "7",
+    cancelled: false,
     isActive: true,
   },
 ];

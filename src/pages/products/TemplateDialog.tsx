@@ -13,7 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Template, PremiumOverrideType, newTemplateId,
+  Template, PremiumOverrideType, PaymentType, RenewalType,
+  TemplateTypeCode, LoanType, PolicyTypeCode, newTemplateId,
 } from "@/data/templates";
 import { listCoverages } from "@/data/coverages";
 import { Shield, ShieldPlus } from "lucide-react";
@@ -41,6 +42,15 @@ const blank = (productId: string, versionId: string, currencies: string[]): Temp
   premiumOverrideValue: 0,
   agentCommission: 0.07,
   bankCommission: 0.03,
+  paymentType: "Payment with regulated premium",
+  renewalType: "Automatic annual renewal",
+  typeCode: "RP",
+  loanType: "Not applicable",
+  policyType: "D20V - Up to 20 years",
+  quantity: 1,
+  maxMonths: 240,
+  printType: "9",
+  cancelled: false,
   isActive: true,
 });
 
@@ -50,6 +60,38 @@ const OVERRIDES: PremiumOverrideType[] = [
   "Percentage discount",
   "Fixed premium",
   "Management approved manual premium",
+];
+
+const PAYMENT_TYPES: PaymentType[] = [
+  "Payment with regulated premium",
+  "Single premium payment",
+  "Flexible premium payment",
+  "Bank-financed premium",
+];
+
+const RENEWAL_TYPES: RenewalType[] = [
+  "According to the bank information",
+  "Automatic annual renewal",
+  "Manual renewal on request",
+  "Non-renewable",
+];
+
+const TYPE_CODES: TemplateTypeCode[] = ["LP", "RP", "SP", "GP", "BP"];
+
+const LOAN_TYPES: LoanType[] = [
+  "Personal loan",
+  "Mortgage loan",
+  "Business loan",
+  "Consumer loan",
+  "Not applicable",
+];
+
+const POLICY_TYPES: PolicyTypeCode[] = [
+  "D1V - Up to 1 year",
+  "D5V - Up to 5 years",
+  "D10V - Up to 10 years",
+  "D20V - Up to 20 years",
+  "WL - Whole life",
 ];
 
 const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurrencies, initial, onSave }: Props) => {
@@ -242,6 +284,80 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                     className="pr-7 font-mono" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Classification & policy attributes */}
+          <div className="rounded-md border border-border p-4">
+            <h4 className="text-sm font-semibold mb-3">Classification & policy attributes</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Type</Label>
+                <Select value={t.typeCode} onValueChange={(v) => set("typeCode", v as TemplateTypeCode)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TYPE_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Policy type (Tip Police)</Label>
+                <Select value={t.policyType} onValueChange={(v) => set("policyType", v as PolicyTypeCode)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {POLICY_TYPES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Payment type</Label>
+                <Select value={t.paymentType} onValueChange={(v) => set("paymentType", v as PaymentType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_TYPES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Renewal type</Label>
+                <Select value={t.renewalType} onValueChange={(v) => set("renewalType", v as RenewalType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {RENEWAL_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Loan type</Label>
+                <Select value={t.loanType} onValueChange={(v) => set("loanType", v as LoanType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LOAN_TYPES.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="qty">Quantity (Sasia)</Label>
+                <Input id="qty" type="number" min="0" value={t.quantity}
+                  onChange={(e) => set("quantity", +e.target.value || 0)} className="font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="maxmonths">Max months (Max Muaj)</Label>
+                <Input id="maxmonths" type="number" min="0" value={t.maxMonths}
+                  onChange={(e) => set("maxMonths", +e.target.value || 0)} className="font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="printtype">Print type (Tip Printimi)</Label>
+                <Input id="printtype" value={t.printType}
+                  onChange={(e) => set("printType", e.target.value)} className="font-mono" />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="block">Cancelled (Anulluar)</Label>
+                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                  <span className="text-sm">{t.cancelled ? "Yes" : "No"}</span>
+                  <Switch checked={t.cancelled} onCheckedChange={(v) => set("cancelled", v)} />
+                </label>
               </div>
             </div>
           </div>
