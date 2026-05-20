@@ -406,6 +406,7 @@ const MatrixTable = ({
         <tbody>
           {templates.map((t) => {
             const s = templateStats(t.id);
+            const product = matrixProducts.find((p) => p.id === t.productId);
             return (
               <tr key={t.id} className="hover:bg-muted/30 transition-colors">
                 <td className="sticky left-0 z-20 bg-card hover:bg-muted/30 transition-colors p-3 border-b border-r border-border min-w-[280px]">
@@ -415,8 +416,12 @@ const MatrixTable = ({
                     className="text-left group w-full"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm group-hover:text-accent transition-colors truncate">{t.name}</span>
-                      <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0">{t.type}</Badge>
+                      <span className="font-semibold text-sm group-hover:text-accent transition-colors truncate">
+                        <span className="text-muted-foreground font-normal">{product?.name}</span>
+                        <span className="text-muted-foreground font-normal mx-1.5">-</span>
+                        {t.name}
+                      </span>
+                      <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0 shrink-0">{t.type}</Badge>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
                       <span className="font-mono">{t.id}</span>
