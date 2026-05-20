@@ -62,7 +62,7 @@ export type Template = {
 const seed: Template[] = [
   {
     id: "TPL-3001", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Basic",
+    name: "ABI i Pjesshem",
     description: "Entry-level package — death cover only at competitive rates.",
     includedCoverageIds: ["COV-2001"],
     optionalRiderIds: [],
@@ -85,7 +85,7 @@ const seed: Template[] = [
   },
   {
     id: "TPL-3002", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Standard",
+    name: "AFB Mortage",
     description: "Balanced cover with disability rider included.",
     includedCoverageIds: ["COV-2001"],
     optionalRiderIds: ["COV-2002", "COV-2003"],
@@ -107,7 +107,7 @@ const seed: Template[] = [
   },
   {
     id: "TPL-3003", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Premium",
+    name: "BKT i Pjesshem me tabele",
     description: "Top-tier package with all riders selectable, premium experience.",
     includedCoverageIds: ["COV-2001", "COV-2002"],
     optionalRiderIds: ["COV-2003", "COV-2004"],
