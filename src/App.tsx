@@ -21,6 +21,7 @@ import PolicyDetail from "./pages/policies/PolicyDetail.tsx";
 import PaymentsList from "./pages/payments/PaymentsList.tsx";
 import RecordPayment from "./pages/payments/RecordPayment.tsx";
 import Reports from "./pages/reports/Reports.tsx";
+import PermissionMatrix from "./pages/administration/PermissionMatrix.tsx";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/reports" element={<Reports />} />
           <Route path="/administration" element={<CurrencyExchange />} />
           <Route path="/administration/currency-exchange" element={<CurrencyExchange />} />
+          <Route path="/administration/permission-matrix" element={<PermissionMatrix />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
