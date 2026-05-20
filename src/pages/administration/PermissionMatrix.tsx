@@ -88,14 +88,24 @@ const PermissionMatrix = () => {
     [productId, debounced, productById]
   );
 
-  const banks = useMemo(
-    () => matrixBanks.filter((b) => filterRegion === "ALL" || b.region === filterRegion),
-    [filterRegion]
-  );
-  const agents = useMemo(
-    () => matrixAgents.filter((a) => filterTier === "ALL" || a.tier === filterTier),
-    [filterTier]
-  );
+  const [bankSearch, setBankSearch] = useState("");
+  const [agentSearch, setAgentSearch] = useState("");
+
+  const banks = useMemo(() => {
+    const q = bankSearch.trim().toLowerCase();
+    if (!q) return [] as typeof matrixBanks;
+    return matrixBanks
+      .filter((b) => filterRegion === "ALL" || b.region === filterRegion)
+      .filter((b) => b.name.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.region.toLowerCase().includes(q));
+  }, [filterRegion, bankSearch]);
+
+  const agents = useMemo(() => {
+    const q = agentSearch.trim().toLowerCase();
+    if (!q) return [] as typeof matrixAgents;
+    return matrixAgents
+      .filter((a) => filterTier === "ALL" || a.tier === filterTier)
+      .filter((a) => a.name.toLowerCase().includes(q) || a.code.toLowerCase().includes(q) || a.tier.toLowerCase().includes(q));
+  }, [filterTier, agentSearch]);
 
   // Index permissions for O(1) lookup
   const permIndex = useMemo(() => {
