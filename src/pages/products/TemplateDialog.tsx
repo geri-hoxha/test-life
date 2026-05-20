@@ -13,7 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Template, PremiumOverrideType, newTemplateId,
+  Template, PremiumOverrideType, PaymentType, RenewalType,
+  TemplateTypeCode, LoanType, PolicyTypeCode, newTemplateId,
 } from "@/data/templates";
 import { listCoverages } from "@/data/coverages";
 import { Shield, ShieldPlus } from "lucide-react";
@@ -41,6 +42,15 @@ const blank = (productId: string, versionId: string, currencies: string[]): Temp
   premiumOverrideValue: 0,
   agentCommission: 0.07,
   bankCommission: 0.03,
+  paymentType: "Payment with regulated premium",
+  renewalType: "Automatic annual renewal",
+  typeCode: "RP",
+  loanType: "Not applicable",
+  policyType: "D20V - Up to 20 years",
+  quantity: 1,
+  maxMonths: 240,
+  printType: "9",
+  cancelled: false,
   isActive: true,
 });
 
@@ -50,6 +60,38 @@ const OVERRIDES: PremiumOverrideType[] = [
   "Percentage discount",
   "Fixed premium",
   "Management approved manual premium",
+];
+
+const PAYMENT_TYPES: PaymentType[] = [
+  "Payment with regulated premium",
+  "Single premium payment",
+  "Flexible premium payment",
+  "Bank-financed premium",
+];
+
+const RENEWAL_TYPES: RenewalType[] = [
+  "According to the bank information",
+  "Automatic annual renewal",
+  "Manual renewal on request",
+  "Non-renewable",
+];
+
+const TYPE_CODES: TemplateTypeCode[] = ["LP", "RP", "SP", "GP", "BP"];
+
+const LOAN_TYPES: LoanType[] = [
+  "Personal loan",
+  "Mortgage loan",
+  "Business loan",
+  "Consumer loan",
+  "Not applicable",
+];
+
+const POLICY_TYPES: PolicyTypeCode[] = [
+  "D1V - Up to 1 year",
+  "D5V - Up to 5 years",
+  "D10V - Up to 10 years",
+  "D20V - Up to 20 years",
+  "WL - Whole life",
 ];
 
 const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurrencies, initial, onSave }: Props) => {
