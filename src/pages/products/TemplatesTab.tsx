@@ -201,8 +201,12 @@ const TemplatesTab = ({ productId }: Props) => {
                       <Badge className="font-mono bg-accent text-accent-foreground border-0 text-[10px]">{t.defaultCurrency}</Badge>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Commission</span>
-                      <span className="font-medium">{(t.commissionOverridePct ?? 0).toFixed(1)} %</span>
+                      <span className="text-muted-foreground">Agent commission</span>
+                      <span className="font-medium font-mono">{(t.agentCommission * 100).toFixed(2)} %</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Bank commission</span>
+                      <span className="font-medium font-mono">{(t.bankCommission * 100).toFixed(2)} %</span>
                     </div>
                   </div>
                 </div>

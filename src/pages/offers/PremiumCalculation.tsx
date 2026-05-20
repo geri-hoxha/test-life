@@ -256,7 +256,7 @@ const PremiumCalculation = ({
   // 7. Commission — paid to the agent, calculated on the NET premium.
   //    Not added to gross; it's a cost to the insurer, not a charge to the customer.
   const effectiveCommissionPct =
-    template?.commissionOverridePct ?? (subtotal > 0 ? (weightedCommission / subtotal) * 100 : 0);
+    template ? (template.agentCommission + template.bankCommission) * 100 : (subtotal > 0 ? (weightedCommission / subtotal) * 100 : 0);
   const commission = (netPremium * effectiveCommissionPct) / 100;
 
   // ---- Multi-year schedule ----

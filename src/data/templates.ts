@@ -17,7 +17,8 @@ export type Template = {
   allowedCurrencies: string[];
   premiumOverrideType: PremiumOverrideType;
   premiumOverrideValue?: number;
-  commissionOverridePct?: number;
+  agentCommission: number; // decimal, e.g. 0.07 = 7%
+  bankCommission: number;  // decimal
   isActive: boolean;
 };
 
@@ -32,7 +33,8 @@ const seed: Template[] = [
     allowedCurrencies: ["EUR"],
     premiumOverrideType: "Percentage discount",
     premiumOverrideValue: 5,
-    commissionOverridePct: 10,
+    agentCommission: 0.07,
+    bankCommission: 0.03,
     isActive: true,
   },
   {
@@ -44,7 +46,8 @@ const seed: Template[] = [
     defaultCurrency: "EUR",
     allowedCurrencies: ["EUR", "USD"],
     premiumOverrideType: "No override",
-    commissionOverridePct: 12,
+    agentCommission: 0.08,
+    bankCommission: 0.04,
     isActive: true,
   },
   {
@@ -57,7 +60,8 @@ const seed: Template[] = [
     allowedCurrencies: ["EUR", "USD"],
     premiumOverrideType: "Fixed discount",
     premiumOverrideValue: 25,
-    commissionOverridePct: 14,
+    agentCommission: 0.1,
+    bankCommission: 0.04,
     isActive: true,
   },
   {
@@ -69,7 +73,8 @@ const seed: Template[] = [
     defaultCurrency: "EUR",
     allowedCurrencies: ["EUR", "ALL"],
     premiumOverrideType: "Management approved manual premium",
-    commissionOverridePct: 8,
+    agentCommission: 0.05,
+    bankCommission: 0.03,
     isActive: true,
   },
 ];

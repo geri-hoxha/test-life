@@ -39,7 +39,8 @@ const blank = (productId: string, versionId: string, currencies: string[]): Temp
   allowedCurrencies: [currencies[0] ?? "EUR"],
   premiumOverrideType: "No override",
   premiumOverrideValue: 0,
-  commissionOverridePct: 10,
+  agentCommission: 0.07,
+  bankCommission: 0.03,
   isActive: true,
 });
 
@@ -216,9 +217,24 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label htmlFor="comm">Commission override (%)</Label>
-                <Input id="comm" type="number" step="0.1" value={t.commissionOverridePct ?? 0}
-                  onChange={(e) => set("commissionOverridePct", +e.target.value)} />
+                <Label htmlFor="agent-comm">Agent Commission (%)</Label>
+                <div className="relative">
+                  <Input id="agent-comm" type="number" step="0.01" min="0" max="100"
+                    value={(t.agentCommission * 100).toString()}
+                    onChange={(e) => set("agentCommission", (+e.target.value || 0) / 100)}
+                    className="pr-7 font-mono" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bank-comm">Bank Commission (%)</Label>
+                <div className="relative">
+                  <Input id="bank-comm" type="number" step="0.01" min="0" max="100"
+                    value={(t.bankCommission * 100).toString()}
+                    onChange={(e) => set("bankCommission", (+e.target.value || 0) / 100)}
+                    className="pr-7 font-mono" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
               </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label className="block">Status</Label>
