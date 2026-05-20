@@ -21,6 +21,7 @@ const navItems = [
   { label: "Offers", to: "/offers" },
   { label: "Policies", to: "/policies" },
   { label: "Payments", to: "/payments" },
+  { label: "Permissions", to: "/administration/permission-matrix" },
   { label: "Reports", to: "/reports" },
   { label: "Administration", to: "/administration" },
 ];
