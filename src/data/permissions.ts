@@ -171,6 +171,8 @@ export type GrantRow = {
   agencyName?: string;
   agentId?: string;
   agentName?: string;
+  canSell: boolean;
+  commissionPct: number;
   createdAt: string;
 };
 
@@ -192,6 +194,8 @@ export const listGrantRows = (): GrantRow[] =>
       templateId: g.templateId,
       templateName: tpl?.name ?? "",
       templateType: tpl?.type ?? "",
+      canSell: g.canSell,
+      commissionPct: g.commissionPct,
       createdAt: g.createdAt,
     };
     if (g.subjectType === "BANK_BRANCH") {
