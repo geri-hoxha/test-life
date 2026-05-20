@@ -15,7 +15,7 @@ import {
   type GrantRow,
 } from "@/data/permissions";
 import { Switch } from "@/components/ui/switch";
-import { Building2, UserCircle2, Download, Filter, X as XIcon } from "lucide-react";
+import { Building2, UserCircle2, Download, Filter, X as XIcon, Save } from "lucide-react";
 import { toast } from "sonner";
 
 const ALL = "ALL";
@@ -23,6 +23,7 @@ const ALL = "ALL";
 const PermissionMatrix = () => {
   const [version, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
+  const [pending, setPending] = useState<Record<string, number>>({});
 
   // Filters
   const [fProduct, setFProduct] = useState<string>(ALL);
@@ -186,28 +187,52 @@ const PermissionMatrix = () => {
                       <Switch
                         checked={r.canSell}
                         onCheckedChange={(v) => { updateGrant(r.id, { canSell: v }); refresh(); }}
+                        className="data-[state=checked]:bg-emerald-500"
                       />
                     </td>
                     <td className="p-2 border-b border-border text-center">
-                      <div className="relative inline-flex items-center w-24">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={0.1}
-                          value={r.commissionPct}
-                          disabled={!r.canSell}
-                          onChange={(e) => {
-                            const raw = parseFloat(e.target.value);
-                            const next = isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
-                            updateGrant(r.id, { commissionPct: next });
-                            refresh();
-                          }}
-                          className="h-8 text-sm pr-7 text-right tabular-nums"
-                        />
-                        <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
-                      </div>
+                      {(() => {
+                        const draft = pending[r.id] ?? r.commissionPct;
+                        const dirty = pending[r.id] !== undefined && pending[r.id] !== r.commissionPct;
+                        return (
+                          <div className="inline-flex items-center gap-1">
+                            <div className="relative inline-flex items-center w-24">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.1}
+                                value={draft}
+                                disabled={!r.canSell}
+                                onChange={(e) => {
+                                  const raw = parseFloat(e.target.value);
+                                  const next = isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
+                                  setPending((p) => ({ ...p, [r.id]: next }));
+                                }}
+                                className="h-8 text-sm pr-7 text-right tabular-nums"
+                              />
+                              <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-emerald-600 hover:text-emerald-700 disabled:opacity-30"
+                              disabled={!dirty || !r.canSell}
+                              onClick={() => {
+                                updateGrant(r.id, { commissionPct: draft });
+                                setPending((p) => { const n = { ...p }; delete n[r.id]; return n; });
+                                refresh();
+                                toast.success("Commission saved");
+                              }}
+                              title="Save commission"
+                            >
+                              <Save className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })()}
                     </td>
+
                   </tr>
                 ))}
               </tbody>
