@@ -10,9 +10,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  matrixProducts, matrixTemplates, matrixBanks, matrixAgencies,
+  matrixProducts, matrixTemplates, matrixAgencies, matrixAgents,
   listGrantRows, updateGrant,
-  type GrantRow,
 } from "@/data/permissions";
 import { Switch } from "@/components/ui/switch";
 import { Building2, UserCircle2, Download, Filter, X as XIcon, Save } from "lucide-react";
@@ -28,41 +27,44 @@ const PermissionMatrix = () => {
   // Filters
   const [fProduct, setFProduct] = useState<string>(ALL);
   const [fTemplate, setFTemplate] = useState<string>(ALL);
-  const [fBank, setFBank] = useState<string>(ALL);
   const [fAgency, setFAgency] = useState<string>(ALL);
+  const [fAgent, setFAgent] = useState<string>(ALL);
 
   const rows = useMemo(() => {
     void version;
     return listGrantRows().filter((r) => {
       if (fProduct !== ALL && r.productId !== fProduct) return false;
       if (fTemplate !== ALL && r.templateId !== fTemplate) return false;
-      if (fBank !== ALL && (r.subjectType !== "BANK" || r.bankId !== fBank)) return false;
-      if (fAgency !== ALL && (r.subjectType !== "AGENCY" || r.agencyId !== fAgency)) return false;
+      if (fAgency !== ALL && r.agencyId !== fAgency) return false;
+      if (fAgent !== ALL && r.agentId !== fAgent) return false;
       return true;
     });
-  }, [version, fProduct, fTemplate, fBank, fAgency]);
+  }, [version, fProduct, fTemplate, fAgency, fAgent]);
 
   const templatesForFilter = useMemo(
     () => matrixTemplates.filter((t) => fProduct === ALL || t.productId === fProduct),
     [fProduct]
   );
+  const agentsForFilter = useMemo(
+    () => matrixAgents.filter((a) => fAgency === ALL || a.agencyId === fAgency),
+    [fAgency]
+  );
 
   const clearFilters = () => {
-    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFAgency(ALL);
+    setFProduct(ALL); setFTemplate(ALL); setFAgency(ALL); setFAgent(ALL);
   };
 
   const activeFilters =
     (fProduct !== ALL ? 1 : 0) + (fTemplate !== ALL ? 1 : 0) +
-    (fBank !== ALL ? 1 : 0) + (fAgency !== ALL ? 1 : 0);
+    (fAgency !== ALL ? 1 : 0) + (fAgent !== ALL ? 1 : 0);
 
   const handleExport = () => {
     const data = rows.map((r) => ({
       Product: r.productName,
       Template: r.templateName,
       Type: r.templateType,
-      "Granted To": r.subjectType === "BANK" ? "Bank" : "Agency",
-      Bank: r.bankName ?? "",
-      Agency: r.agencyName ?? "",
+      Agency: r.agencyName,
+      Agent: r.agentName,
       "Can Sell": r.canSell ? "Yes" : "No",
       "Commission %": r.commissionPct,
     }));
@@ -72,6 +74,7 @@ const PermissionMatrix = () => {
     XLSX.writeFile(wb, `template-permissions.xlsx`);
     toast.success("Permissions exported");
   };
+
 
   return (
     <AppShell>
