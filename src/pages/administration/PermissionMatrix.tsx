@@ -166,7 +166,7 @@ const PermissionMatrix = () => {
                     <HeaderFilter
                       label="Bank"
                       value={fBank}
-                      onChange={(v) => { setFBank(v); setFBranches([]); }}
+                      onChange={setFBank}
                       options={matrixBanks.map((b) => ({ value: b.id, label: b.name }))}
                     />
                   </th>
