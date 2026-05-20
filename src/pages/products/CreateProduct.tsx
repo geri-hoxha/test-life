@@ -48,6 +48,8 @@ const CreateProduct = () => {
   const [flags, setFlags] = useState({
     pep: false, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: false,
   });
+  const [agentCommissionPct, setAgentCommissionPct] = useState<string>("0");
+  const [bankCommissionPct, setBankCommissionPct] = useState<string>("0");
 
   const toggleCurrency = (c: string) =>
     setCurrencies((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
