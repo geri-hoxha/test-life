@@ -10,9 +10,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  matrixProducts, matrixTemplates, matrixBanks, matrixAgencies,
+  matrixProducts, matrixTemplates, matrixAgencies, matrixAgents,
   listGrantRows, updateGrant,
-  type GrantRow,
 } from "@/data/permissions";
 import { Switch } from "@/components/ui/switch";
 import { Building2, UserCircle2, Download, Filter, X as XIcon, Save } from "lucide-react";
@@ -28,41 +27,44 @@ const PermissionMatrix = () => {
   // Filters
   const [fProduct, setFProduct] = useState<string>(ALL);
   const [fTemplate, setFTemplate] = useState<string>(ALL);
-  const [fBank, setFBank] = useState<string>(ALL);
   const [fAgency, setFAgency] = useState<string>(ALL);
+  const [fAgent, setFAgent] = useState<string>(ALL);
 
   const rows = useMemo(() => {
     void version;
     return listGrantRows().filter((r) => {
       if (fProduct !== ALL && r.productId !== fProduct) return false;
       if (fTemplate !== ALL && r.templateId !== fTemplate) return false;
-      if (fBank !== ALL && (r.subjectType !== "BANK" || r.bankId !== fBank)) return false;
-      if (fAgency !== ALL && (r.subjectType !== "AGENCY" || r.agencyId !== fAgency)) return false;
+      if (fAgency !== ALL && r.agencyId !== fAgency) return false;
+      if (fAgent !== ALL && r.agentId !== fAgent) return false;
       return true;
     });
-  }, [version, fProduct, fTemplate, fBank, fAgency]);
+  }, [version, fProduct, fTemplate, fAgency, fAgent]);
 
   const templatesForFilter = useMemo(
     () => matrixTemplates.filter((t) => fProduct === ALL || t.productId === fProduct),
     [fProduct]
   );
+  const agentsForFilter = useMemo(
+    () => matrixAgents.filter((a) => fAgency === ALL || a.agencyId === fAgency),
+    [fAgency]
+  );
 
   const clearFilters = () => {
-    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFAgency(ALL);
+    setFProduct(ALL); setFTemplate(ALL); setFAgency(ALL); setFAgent(ALL);
   };
 
   const activeFilters =
     (fProduct !== ALL ? 1 : 0) + (fTemplate !== ALL ? 1 : 0) +
-    (fBank !== ALL ? 1 : 0) + (fAgency !== ALL ? 1 : 0);
+    (fAgency !== ALL ? 1 : 0) + (fAgent !== ALL ? 1 : 0);
 
   const handleExport = () => {
     const data = rows.map((r) => ({
       Product: r.productName,
       Template: r.templateName,
       Type: r.templateType,
-      "Granted To": r.subjectType === "BANK" ? "Bank" : "Agency",
-      Bank: r.bankName ?? "",
-      Agency: r.agencyName ?? "",
+      Agency: r.agencyName,
+      Agent: r.agentName,
       "Can Sell": r.canSell ? "Yes" : "No",
       "Commission %": r.commissionPct,
     }));
@@ -72,6 +74,7 @@ const PermissionMatrix = () => {
     XLSX.writeFile(wb, `template-permissions.xlsx`);
     toast.success("Permissions exported");
   };
+
 
   return (
     <AppShell>
@@ -129,18 +132,18 @@ const PermissionMatrix = () => {
                   </th>
                   <th className="p-2 border-b border-border font-semibold min-w-[180px]">
                     <HeaderFilter
-                      label="Bank"
-                      value={fBank}
-                      onChange={(v) => { setFBank(v); if (v !== ALL) setFAgency(ALL); }}
-                      options={matrixBanks.map((b) => ({ value: b.id, label: b.name }))}
+                      label="Agency"
+                      value={fAgency}
+                      onChange={(v) => { setFAgency(v); setFAgent(ALL); }}
+                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
                     />
                   </th>
                   <th className="p-2 border-b border-border font-semibold min-w-[180px]">
                     <HeaderFilter
-                      label="Agency"
-                      value={fAgency}
-                      onChange={(v) => { setFAgency(v); if (v !== ALL) setFBank(ALL); }}
-                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
+                      label="Agent"
+                      value={fAgent}
+                      onChange={setFAgent}
+                      options={agentsForFilter.map((a) => ({ value: a.id, label: a.name }))}
                     />
                   </th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[110px]">Can Sell</th>
@@ -168,21 +171,18 @@ const PermissionMatrix = () => {
                       </div>
                     </td>
                     <td className="p-3 border-b border-border">
-                      {r.bankName ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-blue-500" />
-                          {r.bankName}
-                        </span>
-                      ) : <span className="text-muted-foreground/50">—</span>}
+                      <span className="inline-flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                        {r.agencyName}
+                      </span>
                     </td>
                     <td className="p-3 border-b border-border">
-                      {r.agencyName ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <UserCircle2 className="h-3.5 w-3.5 text-purple-500" />
-                          {r.agencyName}
-                        </span>
-                      ) : <span className="text-muted-foreground/50">—</span>}
+                      <span className="inline-flex items-center gap-1.5">
+                        <UserCircle2 className="h-3.5 w-3.5 text-purple-500" />
+                        {r.agentName}
+                      </span>
                     </td>
+
                     <td className="p-3 border-b border-border text-center">
                       <Switch
                         checked={r.canSell}
