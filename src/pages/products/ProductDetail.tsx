@@ -66,8 +66,8 @@ const ProductDetail = () => {
           description: product.description,
           currencies: [...product.currencies],
           requiredDocuments: [...product.requiredDocuments],
-          agentCommissionPct: (product.agentCommission * 100).toString(),
-          bankCommissionPct: (product.bankCommission * 100).toString(),
+          agentCommissionPct: parseFloat((product.agentCommission * 100).toFixed(6)).toString(),
+          bankCommissionPct: parseFloat((product.bankCommission * 100).toFixed(6)).toString(),
         }
       : null
   );
