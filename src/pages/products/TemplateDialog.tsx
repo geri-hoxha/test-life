@@ -110,11 +110,28 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
   const mandatory = allCoverages.filter((c) => c.coverageType === "Mandatory");
   const riders = allCoverages.filter((c) => c.coverageType === "Optional Rider");
 
-  const toggleArr = (key: "includedCoverageIds" | "optionalRiderIds" | "allowedCurrencies", val: string) =>
+  const toggleArr = (key: "includedCoverageIds" | "optionalRiderIds" | "allowedCurrencies" | "allowedSellerIds", val: string) =>
     setT((s) => ({
       ...s,
       [key]: s[key].includes(val) ? s[key].filter((x) => x !== val) : [...s[key], val],
     }));
+
+  const sellerResults = useMemo(() => {
+    const q = sellerQuery.trim().toLowerCase();
+    if (!q) return [];
+    return SELLER_DIRECTORY
+      .filter((s) => !t.allowedSellerIds.includes(s.id))
+      .filter((s) => s.name.toLowerCase().includes(q) || (s.code ?? "").toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [sellerQuery, t.allowedSellerIds]);
+
+  const selectedSellers = useMemo(
+    () => t.allowedSellerIds.map((id) => SELLER_DIRECTORY.find((s) => s.id === id)).filter(Boolean) as typeof SELLER_DIRECTORY,
+    [t.allowedSellerIds]
+  );
+
+  const sellerIcon = (type: SellerType) =>
+    type === "Agent" ? UserCircle2 : type === "Bank" ? Building2 : Store;
 
   const showValue = t.premiumOverrideType !== "No override" && t.premiumOverrideType !== "Management approved manual premium";
   const valueLabel =
