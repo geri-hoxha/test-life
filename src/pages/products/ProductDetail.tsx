@@ -109,7 +109,12 @@ const ProductDetail = () => {
   };
 
   const saveFields = () => {
-    updateProduct(product.id, fields);
+    const { agentCommissionPct, bankCommissionPct, ...rest } = fields;
+    updateProduct(product.id, {
+      ...rest,
+      agentCommission: (parseFloat(agentCommissionPct) || 0) / 100,
+      bankCommission: (parseFloat(bankCommissionPct) || 0) / 100,
+    });
     toast.success("Product details saved");
   };
 
