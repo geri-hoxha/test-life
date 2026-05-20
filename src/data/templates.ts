@@ -177,6 +177,7 @@ const seed: Template[] = [
     printType: "7",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["BNK-001", "BNK-003", "BNK-005", "BNK-007"],
   },
 ];
 
