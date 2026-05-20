@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
@@ -10,311 +10,314 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
-} from "@/components/ui/sheet";
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  matrixProducts, matrixTemplates, matrixBanks, matrixAgents,
-  listPermissions, setAccess, bulkSetForTemplate, clonePermissions,
-  templateStats, listAudit, recordAudit,
-  type Permission, type MatrixTemplate,
+  matrixProducts, matrixTemplates, matrixBanks, matrixBankBranches,
+  matrixAgencies, matrixAgents,
+  listGrantRows, addGrant, removeGrant,
+  type GrantRow,
 } from "@/data/permissions";
 import {
-  Search, Building2, UserCircle2, MoreHorizontal,
-  Download, Copy, ShieldCheck, ShieldOff, Layers,
-  Check, X as XIcon, Clock, BadgeCheck, ChevronRight, Plus,
+  Search, Building2, UserCircle2, Download, Plus, Trash2, Filter, X as XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
+const ALL = "ALL";
+
 const PermissionMatrix = () => {
-  const [productId, setProductId] = useState<string>(matrixProducts[0].id);
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
-  const [drawerTplId, setDrawerTplId] = useState<string | null>(null);
-
-  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
-  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
-
-  const [pendingBulk, setPendingBulk] = useState<{
-    title: string;
-    description: string;
-    onConfirm: () => void;
-  } | null>(null);
-  const [cloneTarget, setCloneTarget] = useState<MatrixTemplate | null>(null);
-  const [cloneFromId, setCloneFromId] = useState<string>("");
-
-  useEffect(() => {
-    setLoading(true);
-    const t = setTimeout(() => setLoading(false), 300);
-    return () => clearTimeout(t);
-  }, [productId]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(search.trim().toLowerCase()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  const productById = useMemo(
-    () => new Map(matrixProducts.map((p) => [p.id, p])),
-    []
-  );
-
-  const templates = useMemo(
-    () =>
-      matrixTemplates
-        .filter((t) => t.productId === productId)
-        .filter((t) => {
-          if (!debounced) return true;
-          return t.name.toLowerCase().includes(debounced) || t.id.toLowerCase().includes(debounced);
-        }),
-    [productId, debounced]
-  );
-
-  const banks = useMemo(
-    () => selectedBankIds.map((id) => matrixBanks.find((b) => b.id === id)!).filter(Boolean),
-    [selectedBankIds]
-  );
-  const agents = useMemo(
-    () => selectedAgentIds.map((id) => matrixAgents.find((a) => a.id === id)!).filter(Boolean),
-    [selectedAgentIds]
-  );
-
-  const permIndex = useMemo(() => {
-    void version;
-    const perms = listPermissions(productId, templates.map((t) => t.id));
-    const map = new Map<string, Permission>();
-    for (const p of perms) map.set(`${p.templateId}::${p.subjectType}::${p.subjectId}`, p);
-    return map;
-  }, [productId, templates, version]);
-
   const refresh = () => setVersion((v) => v + 1);
 
-  const toggleCell = (templateId: string, subjectType: "BANK" | "AGENT", subjectId: string) => {
-    const key = `${templateId}::${subjectType}::${subjectId}`;
-    const current = permIndex.get(key);
-    const next = !current?.canAccess;
-    setAccess(templateId, subjectType, subjectId, next);
-    recordAudit(templateId, "Permission toggled", `${subjectType} ${subjectId} → ${next ? "ALLOWED" : "DENIED"}`, "Erin Hoxha");
-    refresh();
+  // Filters
+  const [fProduct, setFProduct] = useState<string>(ALL);
+  const [fTemplate, setFTemplate] = useState<string>(ALL);
+  const [fBank, setFBank] = useState<string>(ALL);
+  const [fBranch, setFBranch] = useState<string>(ALL);
+  const [fAgency, setFAgency] = useState<string>(ALL);
+  const [fAgent, setFAgent] = useState<string>(ALL);
+  const [search, setSearch] = useState("");
+
+  // Dialogs
+  const [addOpen, setAddOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<GrantRow | null>(null);
+
+  const rows = useMemo(() => {
+    void version;
+    const q = search.trim().toLowerCase();
+    return listGrantRows().filter((r) => {
+      if (fProduct !== ALL && r.productId !== fProduct) return false;
+      if (fTemplate !== ALL && r.templateId !== fTemplate) return false;
+      if (fBank !== ALL && r.bankId !== fBank) return false;
+      if (fBranch !== ALL && r.bankBranchId !== fBranch) return false;
+      if (fAgency !== ALL && r.agencyId !== fAgency) return false;
+      if (fAgent !== ALL && r.agentId !== fAgent) return false;
+      if (q) {
+        const hay = [
+          r.productName, r.templateName, r.bankName, r.bankBranchName, r.agencyName, r.agentName,
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [version, fProduct, fTemplate, fBank, fBranch, fAgency, fAgent, search]);
+
+  const templatesForFilter = useMemo(
+    () => matrixTemplates.filter((t) => fProduct === ALL || t.productId === fProduct),
+    [fProduct]
+  );
+  const branchesForFilter = useMemo(
+    () => matrixBankBranches.filter((b) => fBank === ALL || b.bankId === fBank),
+    [fBank]
+  );
+  const agentsForFilter = useMemo(
+    () => matrixAgents.filter((a) => fAgency === ALL || a.agencyId === fAgency),
+    [fAgency]
+  );
+
+  const clearFilters = () => {
+    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFBranch(ALL);
+    setFAgency(ALL); setFAgent(ALL); setSearch("");
   };
 
-  const askBulk = (title: string, description: string, run: () => void) =>
-    setPendingBulk({ title, description, onConfirm: () => { run(); setPendingBulk(null); refresh(); } });
+  const activeFilters =
+    (fProduct !== ALL ? 1 : 0) + (fTemplate !== ALL ? 1 : 0) + (fBank !== ALL ? 1 : 0) +
+    (fBranch !== ALL ? 1 : 0) + (fAgency !== ALL ? 1 : 0) + (fAgent !== ALL ? 1 : 0) +
+    (search ? 1 : 0);
 
   const handleExport = () => {
-    const subjects = [
-      ...banks.map((b) => ({ k: `BANK::${b.id}`, label: `${b.name} (Bank)` })),
-      ...agents.map((a) => ({ k: `AGENT::${a.id}`, label: `${a.name} (Agent)` })),
-    ];
-    const rows = templates.map((t) => {
-      const productName = productById.get(t.productId)?.name ?? "";
-      const row: Record<string, string> = {
-        Template: `${productName} - ${t.name}`,
-        ID: t.id,
-        Type: t.type,
-      };
-      for (const s of subjects) {
-        const [stype, sid] = s.k.split("::") as ["BANK" | "AGENT", string];
-        const p = permIndex.get(`${t.id}::${stype}::${sid}`);
-        row[s.label] = p?.canAccess ? "Allowed" : "Denied";
-      }
-      return row;
-    });
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const data = rows.map((r) => ({
+      Product: r.productName,
+      Template: r.templateName,
+      Type: r.templateType,
+      Bank: r.bankName ?? "",
+      "Bank Branch": r.bankBranchName ?? "",
+      Agency: r.agencyName ?? "",
+      Agent: r.agentName ?? "",
+      "Granted At": new Date(r.createdAt).toLocaleString(),
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Permission Matrix");
-    XLSX.writeFile(wb, `permission-matrix-${productId}.xlsx`);
-    toast.success("Matrix exported to Excel");
+    XLSX.utils.book_append_sheet(wb, ws, "Permissions");
+    XLSX.writeFile(wb, `template-permissions.xlsx`);
+    toast.success("Permissions exported");
   };
 
-  const drawerTpl = drawerTplId ? matrixTemplates.find((t) => t.id === drawerTplId) ?? null : null;
-  const hasSubjects = banks.length > 0 || agents.length > 0;
-  const currentProduct = productById.get(productId);
+  const confirmDelete = () => {
+    if (!toDelete) return;
+    removeGrant(toDelete.id);
+    toast.success("Permission removed");
+    setToDelete(null);
+    refresh();
+  };
 
   return (
     <AppShell>
       <PageHeader
-        title="Template Permission Matrix"
-        description="Manage which banks and agents can access each product template."
+        title="Template Permissions"
+        description="Grant template access to bank branches or agents."
         actions={
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!hasSubjects}>
-            <Download className="h-4 w-4 mr-1.5" /> Export to Excel
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-1.5" /> Export
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Add permission
+            </Button>
+          </div>
         }
       />
 
-      {/* Step 1 — Product */}
+      {/* Filters */}
       <Card className="mt-6">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">1</span>
-            <CardTitle className="text-sm">Select a product</CardTitle>
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm">Filters</CardTitle>
+            {activeFilters > 0 && (
+              <Badge variant="secondary" className="text-[10px] h-5">{activeFilters} active</Badge>
+            )}
           </div>
+          {activeFilters > 0 && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearFilters}>
+              <XIcon className="h-3.5 w-3.5 mr-1" /> Clear all
+            </Button>
+          )}
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-3">
-          <Select value={productId} onValueChange={setProductId}>
-            <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {matrixProducts.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  <span className="font-mono text-xs mr-2 text-muted-foreground">{p.code}</span>{p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <CardContent className="space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Filter templates within the selected product…"
+              placeholder="Search across all columns…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-10"
             />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Step 2 — Subjects */}
-      <Card className="mt-4">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">2</span>
-            <CardTitle className="text-sm">Choose banks / branches or agents</CardTitle>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <FilterField label="Product">
+              <Select value={fProduct} onValueChange={(v) => { setFProduct(v); setFTemplate(ALL); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All products</SelectItem>
+                  {matrixProducts.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Template">
+              <Select value={fTemplate} onValueChange={setFTemplate}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All templates</SelectItem>
+                  {templatesForFilter.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Bank">
+              <Select value={fBank} onValueChange={(v) => { setFBank(v); setFBranch(ALL); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All banks</SelectItem>
+                  {matrixBanks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Bank branch">
+              <Select value={fBranch} onValueChange={setFBranch}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All branches</SelectItem>
+                  {branchesForFilter.map((b) => <SelectItem key={b.id} value={b.id}>{b.name} ({b.region})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Agency">
+              <Select value={fAgency} onValueChange={(v) => { setFAgency(v); setFAgent(ALL); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All agencies</SelectItem>
+                  {matrixAgencies.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Agent">
+              <Select value={fAgent} onValueChange={setFAgent}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All agents</SelectItem>
+                  {agentsForFilter.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
           </div>
-          <CardDescription className="text-xs">
-            Pick one or more subjects to load the matrix. You can mix banks and agents.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SubjectPicker
-            kind="BANK"
-            label="Banks & branches"
-            items={matrixBanks.map((b) => ({ id: b.id, name: b.name, meta: `${b.code} · ${b.region}` }))}
-            selected={selectedBankIds}
-            onChange={setSelectedBankIds}
-          />
-          <SubjectPicker
-            kind="AGENT"
-            label="Agents"
-            items={matrixAgents.map((a) => ({ id: a.id, name: a.name, meta: `${a.code} · ${a.tier}` }))}
-            selected={selectedAgentIds}
-            onChange={setSelectedAgentIds}
-          />
         </CardContent>
       </Card>
 
-      {/* Matrix */}
+      {/* Table */}
       <Card className="mt-4 overflow-hidden">
         <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="text-base">
-              Matrix {currentProduct && <span className="text-muted-foreground font-normal text-xs ml-1">· {currentProduct.name}</span>}
-            </CardTitle>
-            <CardDescription>Click a cell to toggle access. Click a template name to view details.</CardDescription>
-          </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-            <LegendDot className="bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400" label="Allowed" />
-            <LegendDot className="bg-muted border-border text-muted-foreground" label="Denied" />
+            <CardTitle className="text-base">Permissions</CardTitle>
+            <CardDescription>
+              {rows.length} {rows.length === 1 ? "permission" : "permissions"} found
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {loading ? (
-            <div className="p-6 space-y-2">
-              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
-          ) : templates.length === 0 ? (
-            <EmptyState message="No templates match the current filters." />
-          ) : !hasSubjects ? (
-            <EmptyState
-              message="Choose at least one bank or agent above to display the matrix."
-              hint={`${templates.length} template${templates.length === 1 ? "" : "s"} ready for "${currentProduct?.name}"`}
-            />
-          ) : (
-            <MatrixTable
-              templates={templates}
-              banks={banks}
-              agents={agents}
-              productName={currentProduct?.name ?? ""}
-              permIndex={permIndex}
-              onToggle={toggleCell}
-              onOpenTemplate={(id) => setDrawerTplId(id)}
-              askBulk={askBulk}
-              onClone={(tpl) => { setCloneTarget(tpl); setCloneFromId(""); }}
-            />
-          )}
+          <div className="overflow-auto max-h-[calc(100vh-420px)] border-t border-border">
+            <table className="w-full text-sm border-collapse">
+              <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="p-3 border-b border-border font-semibold">Product Name</th>
+                  <th className="p-3 border-b border-border font-semibold">Template Name</th>
+                  <th className="p-3 border-b border-border font-semibold">Bank Branch</th>
+                  <th className="p-3 border-b border-border font-semibold">Bank</th>
+                  <th className="p-3 border-b border-border font-semibold">Agency Branch</th>
+                  <th className="p-3 border-b border-border font-semibold">Agent</th>
+                  <th className="p-3 border-b border-border font-semibold w-12" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center">
+                      <p className="text-sm font-medium">No permissions match the current filters.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Try clearing the filters or add a new permission.</p>
+                    </td>
+                  </tr>
+                ) : rows.map((r) => (
+                  <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-3 border-b border-border">
+                      <span className="font-medium">{r.productName}</span>
+                    </td>
+                    <td className="p-3 border-b border-border">
+                      <div className="flex items-center gap-2">
+                        <span>{r.templateName}</span>
+                        <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0">{r.templateType}</Badge>
+                      </div>
+                    </td>
+                    <td className="p-3 border-b border-border">
+                      {r.bankBranchName ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                          {r.bankBranchName}
+                        </span>
+                      ) : <span className="text-muted-foreground/50">—</span>}
+                    </td>
+                    <td className="p-3 border-b border-border">
+                      {r.bankName ?? <span className="text-muted-foreground/50">—</span>}
+                    </td>
+                    <td className="p-3 border-b border-border">
+                      {r.agencyName ?? <span className="text-muted-foreground/50">—</span>}
+                    </td>
+                    <td className="p-3 border-b border-border">
+                      {r.agentName ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <UserCircle2 className="h-3.5 w-3.5 text-purple-500" />
+                          {r.agentName}
+                        </span>
+                      ) : <span className="text-muted-foreground/50">—</span>}
+                    </td>
+                    <td className="p-3 border-b border-border text-right">
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => setToDelete(r)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
-      <Sheet open={!!drawerTpl} onOpenChange={(o) => !o && setDrawerTplId(null)}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          {drawerTpl && <DrawerBody tpl={drawerTpl} version={version} />}
-        </SheetContent>
-      </Sheet>
+      <AddPermissionDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onSaved={() => { refresh(); setAddOpen(false); }}
+      />
 
-      <AlertDialog open={!!pendingBulk} onOpenChange={(o) => !o && setPendingBulk(null)}>
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{pendingBulk?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{pendingBulk?.description}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => pendingBulk?.onConfirm()}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!cloneTarget} onOpenChange={(o) => !o && setCloneTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Clone permissions into "{cloneTarget?.name}"</AlertDialogTitle>
+            <AlertDialogTitle>Remove permission?</AlertDialogTitle>
             <AlertDialogDescription>
-              All current bank &amp; agent permissions of the source template will be copied. Existing access on this template will be overwritten.
+              This will revoke access for{" "}
+              <span className="font-medium">{toDelete?.bankBranchName ?? toDelete?.agentName}</span>{" "}
+              on template <span className="font-medium">{toDelete?.templateName}</span>.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-2">
-            <Select value={cloneFromId} onValueChange={setCloneFromId}>
-              <SelectTrigger><SelectValue placeholder="Choose source template…" /></SelectTrigger>
-              <SelectContent>
-                {matrixTemplates
-                  .filter((t) => t.id !== cloneTarget?.id)
-                  .map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      <span className="font-mono text-[10px] text-muted-foreground mr-2">{t.id}</span>{t.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={!cloneFromId}
-              onClick={() => {
-                if (cloneFromId && cloneTarget) {
-                  clonePermissions(cloneFromId, cloneTarget.id);
-                  toast.success(`Permissions cloned into ${cloneTarget.name}`);
-                  setCloneTarget(null);
-                  refresh();
-                }
-              }}
-            >Clone</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete}>Remove</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -324,361 +327,155 @@ const PermissionMatrix = () => {
 
 export default PermissionMatrix;
 
-/* ------------ Subject picker ------------ */
-
-const SubjectPicker = ({
-  kind, label, items, selected, onChange,
-}: {
-  kind: "BANK" | "AGENT";
-  label: string;
-  items: { id: string; name: string; meta: string }[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-}) => {
-  const [open, setOpen] = useState(false);
-  const Icon = kind === "BANK" ? Building2 : UserCircle2;
-  const accent = kind === "BANK" ? "text-blue-500" : "text-purple-500";
-  const tint = kind === "BANK" ? "bg-blue-500/5 border-blue-500/20" : "bg-purple-500/5 border-purple-500/20";
-  const selectedItems = selected.map((id) => items.find((i) => i.id === id)!).filter(Boolean);
-
-  const toggle = (id: string) => {
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
-  };
-
-  return (
-    <div className={`rounded-lg border ${tint} p-3`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Icon className={`h-4 w-4 ${accent}`} />
-          <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
-          <Badge variant="secondary" className="text-[10px] h-5">{selected.length}</Badge>
-        </div>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button size="sm" variant="outline" className="h-7 text-xs">
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-0" align="end">
-            <Command>
-              <CommandInput placeholder={`Search ${kind === "BANK" ? "bank or branch" : "agent"}…`} />
-              <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
-                <CommandGroup>
-                  {items.map((it) => {
-                    const isSel = selected.includes(it.id);
-                    return (
-                      <CommandItem key={it.id} value={`${it.name} ${it.meta}`} onSelect={() => toggle(it.id)}>
-                        <div className={`mr-2 h-4 w-4 rounded border flex items-center justify-center ${isSel ? "bg-accent border-accent text-accent-foreground" : "border-input"}`}>
-                          {isSel && <Check className="h-3 w-3" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{it.name}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono truncate">{it.meta}</div>
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {selectedItems.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground italic">None selected yet — click Add to choose.</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {selectedItems.map((it) => (
-            <button
-              key={it.id}
-              onClick={() => toggle(it.id)}
-              className="group inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-destructive/40"
-              title="Click to remove"
-            >
-              <Icon className={`h-3 w-3 ${accent}`} />
-              <span className="font-medium">{it.name}</span>
-              <XIcon className="h-3 w-3 text-muted-foreground group-hover:text-destructive" />
-            </button>
-          ))}
-          {selectedItems.length > 0 && (
-            <button
-              onClick={() => onChange([])}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:text-destructive"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ------------ Sub components ------------ */
-
-const LegendDot = ({ className, label }: { className: string; label: string }) => (
-  <span className="inline-flex items-center gap-1.5">
-    <span className={`inline-block h-3 w-3 rounded-sm border ${className}`} />{label}
-  </span>
-);
-
-const EmptyState = ({ message, hint }: { message: string; hint?: string }) => (
-  <div className="p-12 text-center">
-    <Layers className="h-10 w-10 mx-auto text-muted-foreground/60" />
-    <p className="mt-3 text-sm font-medium">{message}</p>
-    {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
+const FilterField = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div>
+    <Label className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 block">{label}</Label>
+    {children}
   </div>
 );
 
-/* ------------ Matrix table ------------ */
+/* ---------------- Add dialog ---------------- */
 
-const MatrixTable = ({
-  templates, banks, agents, productName, permIndex, onToggle, onOpenTemplate, askBulk, onClone,
-}: {
-  templates: MatrixTemplate[];
-  banks: typeof matrixBanks;
-  agents: typeof matrixAgents;
-  productName: string;
-  permIndex: Map<string, Permission>;
-  onToggle: (templateId: string, st: "BANK" | "AGENT", sid: string) => void;
-  onOpenTemplate: (id: string) => void;
-  askBulk: (title: string, description: string, run: () => void) => void;
-  onClone: (tpl: MatrixTemplate) => void;
-}) => {
-  const showBanks = banks.length > 0;
-  const showAgents = agents.length > 0;
+const AddPermissionDialog = ({
+  open, onOpenChange, onSaved,
+}: { open: boolean; onOpenChange: (o: boolean) => void; onSaved: () => void }) => {
+  const [productId, setProductId] = useState<string>("");
+  const [templateId, setTemplateId] = useState<string>("");
+  const [subjectType, setSubjectType] = useState<"BANK_BRANCH" | "AGENT">("BANK_BRANCH");
+  const [bankId, setBankId] = useState<string>("");
+  const [branchId, setBranchId] = useState<string>("");
+  const [agencyId, setAgencyId] = useState<string>("");
+  const [agentId, setAgentId] = useState<string>("");
 
-  return (
-    <div className="relative w-full overflow-auto max-h-[calc(100vh-460px)] border-t border-border">
-      <table className="w-full text-xs border-collapse">
-        <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur">
-          <tr>
-            <th className="sticky left-0 z-40 bg-muted/95 backdrop-blur text-left p-3 border-b border-r border-border min-w-[280px] font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">
-              Template
-            </th>
-            {showBanks && banks.map((b) => (
-              <th key={b.id} className="p-2 border-b border-border bg-blue-500/5 min-w-[140px]">
-                <div className="flex items-center justify-center gap-1.5">
-                  <Building2 className="h-3 w-3 text-blue-500 shrink-0" />
-                  <span className="font-medium text-foreground text-[11px] truncate">{b.name}</span>
-                </div>
-              </th>
-            ))}
-            {showBanks && showAgents && (
-              <th className="p-2 border-b border-l-2 border-border bg-muted/80 min-w-[12px]" />
-            )}
-            {showAgents && agents.map((a) => (
-              <th key={a.id} className="p-2 border-b border-border bg-purple-500/5 min-w-[140px]">
-                <div className="flex items-center justify-center gap-1.5">
-                  <UserCircle2 className="h-3 w-3 text-purple-500 shrink-0" />
-                  <span className="font-medium text-foreground text-[11px] truncate">{a.name}</span>
-                </div>
-              </th>
-            ))}
-            <th className="sticky right-0 z-40 bg-muted/95 backdrop-blur border-b border-l border-border p-2 w-12" />
-          </tr>
-        </thead>
+  const templates = matrixTemplates.filter((t) => !productId || t.productId === productId);
+  const branches = matrixBankBranches.filter((b) => !bankId || b.bankId === bankId);
+  const agents = matrixAgents.filter((a) => !agencyId || a.agencyId === agencyId);
 
-        <tbody>
-          {templates.map((t) => {
-            const s = templateStats(t.id);
-            return (
-              <tr key={t.id} className="hover:bg-muted/30 transition-colors">
-                <td className="sticky left-0 z-20 bg-card hover:bg-muted/30 transition-colors p-3 border-b border-r border-border min-w-[280px]">
-                  <button
-                    type="button"
-                    onClick={() => onOpenTemplate(t.id)}
-                    className="text-left group w-full"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm group-hover:text-accent transition-colors truncate">
-                        <span className="text-muted-foreground font-normal">{productName}</span>
-                        <span className="text-muted-foreground font-normal mx-1.5">-</span>
-                        {t.name}
-                      </span>
-                      <Badge variant="outline" className="text-[9px] font-mono px-1.5 py-0 shrink-0">{t.type}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
-                      <span className="font-mono">{t.id}</span>
-                      <span>·</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">{s.banksAllowed}/{s.banksTotal} banks</span>
-                      <span>·</span>
-                      <span className="text-purple-600 dark:text-purple-400 font-medium">{s.agentsAllowed}/{s.agentsTotal} agents</span>
-                    </div>
-                  </button>
-                </td>
-                {showBanks && banks.map((b) => {
-                  const p = permIndex.get(`${t.id}::BANK::${b.id}`);
-                  return (
-                    <Cell key={b.id} allowed={!!p?.canAccess} onClick={() => onToggle(t.id, "BANK", b.id)} />
-                  );
-                })}
-                {showBanks && showAgents && <td className="border-b border-l-2 border-border bg-muted/40" />}
-                {showAgents && agents.map((a) => {
-                  const p = permIndex.get(`${t.id}::AGENT::${a.id}`);
-                  return (
-                    <Cell key={a.id} allowed={!!p?.canAccess} onClick={() => onToggle(t.id, "AGENT", a.id)} />
-                  );
-                })}
-                <td className="sticky right-0 z-20 bg-card hover:bg-muted/30 transition-colors border-b border-l border-border p-1 text-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel className="text-[10px]">Bulk actions · {t.name}</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => askBulk("Allow all banks", `Grant all ${matrixBanks.length} banks access to "${t.name}".`, () => { bulkSetForTemplate(t.id, "BANK", true); toast.success("All banks allowed"); })}>
-                        <ShieldCheck className="h-4 w-4 mr-2 text-emerald-500" />Allow all banks
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => askBulk("Deny all banks", `Revoke access from all banks on "${t.name}".`, () => { bulkSetForTemplate(t.id, "BANK", false); toast.success("All banks denied"); })}>
-                        <ShieldOff className="h-4 w-4 mr-2 text-muted-foreground" />Deny all banks
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => askBulk("Allow all agents", `Grant all ${matrixAgents.length} agents access to "${t.name}".`, () => { bulkSetForTemplate(t.id, "AGENT", true); toast.success("All agents allowed"); })}>
-                        <ShieldCheck className="h-4 w-4 mr-2 text-emerald-500" />Allow all agents
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => askBulk("Deny all agents", `Revoke access from all agents on "${t.name}".`, () => { bulkSetForTemplate(t.id, "AGENT", false); toast.success("All agents denied"); })}>
-                        <ShieldOff className="h-4 w-4 mr-2 text-muted-foreground" />Deny all agents
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onClone(t)}>
-                        <Copy className="h-4 w-4 mr-2" />Clone from another template…
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-};
+  const reset = () => {
+    setProductId(""); setTemplateId(""); setSubjectType("BANK_BRANCH");
+    setBankId(""); setBranchId(""); setAgencyId(""); setAgentId("");
+  };
 
-const Cell = ({ allowed, onClick }: { allowed: boolean; onClick: () => void }) => (
-  <td className="border-b border-border p-0 text-center">
-    <button
-      type="button"
-      onClick={onClick}
-      title={allowed ? "Allowed — click to deny" : "Denied — click to allow"}
-      className={`w-full h-10 flex items-center justify-center transition-colors ${
-        allowed
-          ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-          : "hover:bg-rose-500/10 text-muted-foreground/40 hover:text-rose-500"
-      }`}
-    >
-      {allowed ? <Check className="h-4 w-4" strokeWidth={3} /> : <XIcon className="h-3.5 w-3.5" />}
-    </button>
-  </td>
-);
+  const canSave = !!productId && !!templateId &&
+    (subjectType === "BANK_BRANCH" ? !!branchId : !!agentId);
 
-/* ------------ Drawer body ------------ */
-
-const DrawerBody = ({ tpl, version }: { tpl: MatrixTemplate; version: number }) => {
-  void version;
-  const s = templateStats(tpl.id);
-  const product = matrixProducts.find((p) => p.id === tpl.productId);
-  const audit = listAudit(tpl.id).slice(0, 8);
-  const banksAllowed = matrixBanks.filter((b) => listPermissions(undefined, [tpl.id]).find((p) => p.subjectType === "BANK" && p.subjectId === b.id)?.canAccess);
-  const agentsAllowed = matrixAgents.filter((a) => listPermissions(undefined, [tpl.id]).find((p) => p.subjectType === "AGENT" && p.subjectId === a.id)?.canAccess);
+  const save = () => {
+    if (!canSave) return;
+    addGrant({
+      productId,
+      templateId,
+      subjectType,
+      subjectId: subjectType === "BANK_BRANCH" ? branchId : agentId,
+    });
+    toast.success("Permission added");
+    reset();
+    onSaved();
+  };
 
   return (
-    <>
-      <SheetHeader className="pb-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="font-mono text-[10px]">{tpl.id}</Badge>
-          <Badge variant="secondary" className="text-[10px]">{tpl.type}</Badge>
-        </div>
-        <SheetTitle className="text-xl">{tpl.name}</SheetTitle>
-        <SheetDescription>
-          <span className="font-mono text-[10px] text-muted-foreground mr-1.5">{product?.code}</span>
-          {product?.name}
-        </SheetDescription>
-      </SheetHeader>
-
-      <div className="py-5 space-y-5">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-md border border-border p-3 bg-card">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Bank coverage</div>
-            <div className="text-lg font-semibold mt-0.5 tabular-nums">{s.banksAllowed}<span className="text-muted-foreground text-sm">/{s.banksTotal}</span></div>
-            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
-              <div className="h-full bg-emerald-500" style={{ width: `${(s.banksAllowed / Math.max(s.banksTotal, 1)) * 100}%` }} />
+    <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add permission</DialogTitle>
+          <DialogDescription>Grant access to a template for a bank branch or an agent.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs mb-1 block">Product</Label>
+              <Select value={productId} onValueChange={(v) => { setProductId(v); setTemplateId(""); }}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select product" /></SelectTrigger>
+                <SelectContent>
+                  {matrixProducts.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">Template</Label>
+              <Select value={templateId} onValueChange={setTemplateId} disabled={!productId}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select template" /></SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <div className="rounded-md border border-border p-3 bg-card">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Agent coverage</div>
-            <div className="text-lg font-semibold mt-0.5 tabular-nums">{s.agentsAllowed}<span className="text-muted-foreground text-sm">/{s.agentsTotal}</span></div>
-            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
-              <div className="h-full bg-purple-500" style={{ width: `${(s.agentsAllowed / Math.max(s.agentsTotal, 1)) * 100}%` }} />
+
+          <div>
+            <Label className="text-xs mb-1.5 block">Grant to</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSubjectType("BANK_BRANCH")}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition ${
+                  subjectType === "BANK_BRANCH" ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+                }`}
+              >
+                <Building2 className="h-4 w-4 text-blue-500" />
+                Bank branch
+              </button>
+              <button
+                type="button"
+                onClick={() => setSubjectType("AGENT")}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition ${
+                  subjectType === "AGENT" ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+                }`}
+              >
+                <UserCircle2 className="h-4 w-4 text-purple-500" />
+                Agent
+              </button>
             </div>
           </div>
-        </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Assigned banks</h4>
-            <Badge variant="secondary" className="text-[10px]">{banksAllowed.length}</Badge>
-          </div>
-          <div className="space-y-1">
-            {banksAllowed.length === 0 && <p className="text-xs text-muted-foreground italic">No banks assigned.</p>}
-            {banksAllowed.map((b) => (
-              <div key={b.id} className="flex items-center gap-2 px-2 py-1.5 rounded border border-border bg-background">
-                <Building2 className="h-3.5 w-3.5 text-blue-500" />
-                <span className="text-sm font-medium flex-1 truncate">{b.name}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">{b.region}</span>
+          {subjectType === "BANK_BRANCH" ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1 block">Bank</Label>
+                <Select value={bankId} onValueChange={(v) => { setBankId(v); setBranchId(""); }}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select bank" /></SelectTrigger>
+                  <SelectContent>
+                    {matrixBanks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Assigned agents</h4>
-            <Badge variant="secondary" className="text-[10px]">{agentsAllowed.length}</Badge>
-          </div>
-          <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-            {agentsAllowed.length === 0 && <p className="text-xs text-muted-foreground italic">No agents assigned.</p>}
-            {agentsAllowed.map((a) => (
-              <div key={a.id} className="flex items-center gap-2 px-2 py-1.5 rounded border border-border bg-background">
-                <UserCircle2 className="h-3.5 w-3.5 text-purple-500" />
-                <span className="text-sm font-medium flex-1 truncate">{a.name}</span>
-                <Badge variant="outline" className="text-[9px] px-1.5 py-0">{a.tier}</Badge>
+              <div>
+                <Label className="text-xs mb-1 block">Branch</Label>
+                <Select value={branchId} onValueChange={setBranchId} disabled={!bankId}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select branch" /></SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name} ({b.region})</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Audit activity</h4>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>Last update {s.lastUpdated ? new Date(s.lastUpdated).toLocaleString() : "—"}</span>
             </div>
-          </div>
-          <div className="relative pl-5 border-l border-border space-y-3">
-            {audit.length === 0 && <p className="text-xs text-muted-foreground italic">No activity yet.</p>}
-            {audit.map((a) => (
-              <div key={a.id} className="relative">
-                <span className="absolute -left-[22px] top-1 h-2 w-2 rounded-full bg-accent ring-4 ring-background" />
-                <div className="flex items-center gap-2">
-                  <BadgeCheck className="h-3.5 w-3.5 text-accent" />
-                  <span className="text-xs font-semibold">{a.action}</span>
-                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground truncate">{a.detail}</span>
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {a.actor} · {new Date(a.at).toLocaleString()}
-                </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1 block">Agency</Label>
+                <Select value={agencyId} onValueChange={(v) => { setAgencyId(v); setAgentId(""); }}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select agency" /></SelectTrigger>
+                  <SelectContent>
+                    {matrixAgencies.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
-          </div>
+              <div>
+                <Label className="text-xs mb-1 block">Agent</Label>
+                <Select value={agentId} onValueChange={setAgentId} disabled={!agencyId}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select agent" /></SelectTrigger>
+                  <SelectContent>
+                    {agents.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    </>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={!canSave}>Add permission</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
