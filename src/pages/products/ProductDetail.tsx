@@ -66,6 +66,8 @@ const ProductDetail = () => {
           description: product.description,
           currencies: [...product.currencies],
           requiredDocuments: [...product.requiredDocuments],
+          agentCommissionPct: (product.agentCommission * 100).toString(),
+          bankCommissionPct: (product.bankCommission * 100).toString(),
         }
       : null
   );
