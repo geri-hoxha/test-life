@@ -459,10 +459,10 @@ const MatrixTable = ({
               Template
             </th>
             {showBanks && banks.map((b) => (
-              <th key={b.id} className="p-2 border-b border-border bg-blue-500/5 min-w-[80px] max-w-[80px] align-bottom">
-                <div className="flex flex-col items-center gap-1">
-                  <Building2 className="h-3 w-3 text-blue-500" />
-                  <span className="font-medium text-foreground text-[10px] whitespace-nowrap rotate-180 [writing-mode:vertical-rl]">{b.name}</span>
+              <th key={b.id} className="p-2 border-b border-border bg-blue-500/5 min-w-[140px]">
+                <div className="flex items-center justify-center gap-1.5">
+                  <Building2 className="h-3 w-3 text-blue-500 shrink-0" />
+                  <span className="font-medium text-foreground text-[11px] truncate">{b.name}</span>
                 </div>
               </th>
             ))}
@@ -470,10 +470,10 @@ const MatrixTable = ({
               <th className="p-2 border-b border-l-2 border-border bg-muted/80 min-w-[12px]" />
             )}
             {showAgents && agents.map((a) => (
-              <th key={a.id} className="p-2 border-b border-border bg-purple-500/5 min-w-[70px] max-w-[70px] align-bottom">
-                <div className="flex flex-col items-center gap-1">
-                  <UserCircle2 className="h-3 w-3 text-purple-500" />
-                  <span className="font-medium text-foreground text-[10px] whitespace-nowrap rotate-180 [writing-mode:vertical-rl]">{a.name}</span>
+              <th key={a.id} className="p-2 border-b border-border bg-purple-500/5 min-w-[140px]">
+                <div className="flex items-center justify-center gap-1.5">
+                  <UserCircle2 className="h-3 w-3 text-purple-500 shrink-0" />
+                  <span className="font-medium text-foreground text-[11px] truncate">{a.name}</span>
                 </div>
               </th>
             ))}
