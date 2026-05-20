@@ -133,24 +133,10 @@ const PermissionMatrix = () => {
         }
       />
 
-      {/* Filters */}
+      {/* Search + clear */}
       <Card className="mt-6">
-        <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm">Filters</CardTitle>
-            {activeFilters > 0 && (
-              <Badge variant="secondary" className="text-[10px] h-5">{activeFilters} active</Badge>
-            )}
-          </div>
-          {activeFilters > 0 && (
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearFilters}>
-              <XIcon className="h-3.5 w-3.5 mr-1" /> Clear all
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="relative">
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search across all columns…"
@@ -159,62 +145,16 @@ const PermissionMatrix = () => {
               className="pl-9 h-10"
             />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <FilterField label="Product">
-              <Select value={fProduct} onValueChange={(v) => { setFProduct(v); setFTemplate(ALL); }}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All products</SelectItem>
-                  {matrixProducts.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Template">
-              <Select value={fTemplate} onValueChange={setFTemplate}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All templates</SelectItem>
-                  {templatesForFilter.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Bank">
-              <Select value={fBank} onValueChange={(v) => { setFBank(v); setFBranch(ALL); }}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All banks</SelectItem>
-                  {matrixBanks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Bank branch">
-              <Select value={fBranch} onValueChange={setFBranch}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All branches</SelectItem>
-                  {branchesForFilter.map((b) => <SelectItem key={b.id} value={b.id}>{b.name} ({b.region})</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Agency">
-              <Select value={fAgency} onValueChange={(v) => { setFAgency(v); setFAgent(ALL); }}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All agencies</SelectItem>
-                  {matrixAgencies.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Agent">
-              <Select value={fAgent} onValueChange={setFAgent}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All agents</SelectItem>
-                  {agentsForFilter.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-          </div>
+          {activeFilters > 0 && (
+            <>
+              <Badge variant="secondary" className="text-[10px] h-6 gap-1">
+                <Filter className="h-3 w-3" />{activeFilters} active
+              </Badge>
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}>
+                <XIcon className="h-3.5 w-3.5 mr-1" /> Clear all
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -229,19 +169,62 @@ const PermissionMatrix = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-420px)] border-t border-border">
+          <div className="overflow-auto max-h-[calc(100vh-340px)] border-t border-border">
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
                 <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <th className="p-3 border-b border-border font-semibold">Product Name</th>
-                  <th className="p-3 border-b border-border font-semibold">Template Name</th>
-                  <th className="p-3 border-b border-border font-semibold">Bank Branch</th>
-                  <th className="p-3 border-b border-border font-semibold">Bank</th>
-                  <th className="p-3 border-b border-border font-semibold">Agency Branch</th>
-                  <th className="p-3 border-b border-border font-semibold">Agent</th>
+                  <th className="p-2 border-b border-border font-semibold min-w-[180px]">
+                    <HeaderFilter
+                      label="Product Name"
+                      value={fProduct}
+                      onChange={(v) => { setFProduct(v); setFTemplate(ALL); }}
+                      options={matrixProducts.map((p) => ({ value: p.id, label: p.name }))}
+                    />
+                  </th>
+                  <th className="p-2 border-b border-border font-semibold min-w-[200px]">
+                    <HeaderFilter
+                      label="Template Name"
+                      value={fTemplate}
+                      onChange={setFTemplate}
+                      options={templatesForFilter.map((t) => ({ value: t.id, label: t.name }))}
+                    />
+                  </th>
+                  <th className="p-2 border-b border-border font-semibold min-w-[180px]">
+                    <HeaderFilter
+                      label="Bank Branch"
+                      value={fBranch}
+                      onChange={setFBranch}
+                      options={branchesForFilter.map((b) => ({ value: b.id, label: `${b.name} (${b.region})` }))}
+                    />
+                  </th>
+                  <th className="p-2 border-b border-border font-semibold min-w-[160px]">
+                    <HeaderFilter
+                      label="Bank"
+                      value={fBank}
+                      onChange={(v) => { setFBank(v); setFBranch(ALL); }}
+                      options={matrixBanks.map((b) => ({ value: b.id, label: b.name }))}
+                    />
+                  </th>
+                  <th className="p-2 border-b border-border font-semibold min-w-[160px]">
+                    <HeaderFilter
+                      label="Agency Branch"
+                      value={fAgency}
+                      onChange={(v) => { setFAgency(v); setFAgent(ALL); }}
+                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
+                    />
+                  </th>
+                  <th className="p-2 border-b border-border font-semibold min-w-[180px]">
+                    <HeaderFilter
+                      label="Agent"
+                      value={fAgent}
+                      onChange={setFAgent}
+                      options={agentsForFilter.map((a) => ({ value: a.id, label: a.name }))}
+                    />
+                  </th>
                   <th className="p-3 border-b border-border font-semibold w-12" />
                 </tr>
               </thead>
+
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
