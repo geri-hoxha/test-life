@@ -33,6 +33,30 @@ export type PolicyTypeCode =
   | "D20V - Up to 20 years"
   | "WL - Whole life";
 
+export type SellerType = "Agent" | "Bank" | "Branch";
+
+export type SellerEntity = {
+  id: string;
+  name: string;
+  type: SellerType;
+  code?: string;
+};
+
+export const SELLER_DIRECTORY: SellerEntity[] = [
+  { id: "AGT-001", name: "Arben Hoxha",        type: "Agent",  code: "AG-AH-001" },
+  { id: "AGT-002", name: "Erida Kola",         type: "Agent",  code: "AG-EK-002" },
+  { id: "AGT-003", name: "Besnik Rama",        type: "Agent",  code: "AG-BR-003" },
+  { id: "AGT-004", name: "Mirela Hysa",        type: "Agent",  code: "AG-MH-004" },
+  { id: "BNK-001", name: "BKT — Tirana HQ",    type: "Bank",   code: "BKT-TR-HQ" },
+  { id: "BNK-002", name: "BKT — Durres",       type: "Branch", code: "BKT-DR-01" },
+  { id: "BNK-003", name: "Raiffeisen — Tirana",type: "Bank",   code: "RBA-TR-HQ" },
+  { id: "BNK-004", name: "Raiffeisen — Vlore", type: "Branch", code: "RBA-VL-01" },
+  { id: "BNK-005", name: "Credins — Tirana",   type: "Bank",   code: "CRD-TR-HQ" },
+  { id: "BNK-006", name: "Credins — Shkoder",  type: "Branch", code: "CRD-SH-01" },
+  { id: "BNK-007", name: "Intesa Sanpaolo Albania", type: "Bank", code: "ISP-AL-HQ" },
+  { id: "BNK-008", name: "OTP Bank — Tirana",  type: "Bank",   code: "OTP-TR-HQ" },
+];
+
 export type Template = {
   id: string;
   productId: string;
@@ -57,6 +81,7 @@ export type Template = {
   printType: string;       // Tip Printimi
   cancelled: boolean;      // Anulluar
   isActive: boolean;
+  allowedSellerIds: string[]; // who can sell this package
 };
 
 const seed: Template[] = [
@@ -82,6 +107,7 @@ const seed: Template[] = [
     printType: "9",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["AGT-001", "AGT-002", "BNK-001"],
   },
   {
     id: "TPL-3002", productId: "PRD-001", versionId: "VRS-1001",
@@ -104,6 +130,7 @@ const seed: Template[] = [
     printType: "9",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["AGT-001", "AGT-003", "BNK-003", "BNK-004"],
   },
   {
     id: "TPL-3003", productId: "PRD-001", versionId: "VRS-1001",
@@ -127,6 +154,7 @@ const seed: Template[] = [
     printType: "9",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["AGT-001", "AGT-002", "AGT-003", "AGT-004", "BNK-001", "BNK-002"],
   },
   {
     id: "TPL-3010", productId: "PRD-002", versionId: "VRS-1010",
@@ -149,6 +177,7 @@ const seed: Template[] = [
     printType: "7",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["BNK-001", "BNK-003", "BNK-005", "BNK-007"],
   },
 ];
 

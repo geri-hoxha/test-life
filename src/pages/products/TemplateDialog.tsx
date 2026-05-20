@@ -15,9 +15,10 @@ import {
 import {
   Template, PremiumOverrideType, PaymentType, RenewalType,
   TemplateTypeCode, LoanType, PolicyTypeCode, newTemplateId,
+  SELLER_DIRECTORY, SellerType,
 } from "@/data/templates";
 import { listCoverages } from "@/data/coverages";
-import { Shield, ShieldPlus } from "lucide-react";
+import { Shield, ShieldPlus, Search, X, UserCircle2, Building2, Store } from "lucide-react";
 
 type Props = {
   open: boolean;
@@ -52,6 +53,7 @@ const blank = (productId: string, versionId: string, currencies: string[]): Temp
   printType: "9",
   cancelled: false,
   isActive: true,
+  allowedSellerIds: [],
 });
 
 const OVERRIDES: PremiumOverrideType[] = [
@@ -96,6 +98,7 @@ const POLICY_TYPES: PolicyTypeCode[] = [
 
 const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurrencies, initial, onSave }: Props) => {
   const [t, setT] = useState<Template>(initial ?? blank(productId, versionId, productCurrencies));
+  const [sellerQuery, setSellerQuery] = useState("");
 
   useEffect(() => {
     setT(initial ?? blank(productId, versionId, productCurrencies));
@@ -107,11 +110,28 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
   const mandatory = allCoverages.filter((c) => c.coverageType === "Mandatory");
   const riders = allCoverages.filter((c) => c.coverageType === "Optional Rider");
 
-  const toggleArr = (key: "includedCoverageIds" | "optionalRiderIds" | "allowedCurrencies", val: string) =>
+  const toggleArr = (key: "includedCoverageIds" | "optionalRiderIds" | "allowedCurrencies" | "allowedSellerIds", val: string) =>
     setT((s) => ({
       ...s,
       [key]: s[key].includes(val) ? s[key].filter((x) => x !== val) : [...s[key], val],
     }));
+
+  const sellerResults = useMemo(() => {
+    const q = sellerQuery.trim().toLowerCase();
+    if (!q) return [];
+    return SELLER_DIRECTORY
+      .filter((s) => !t.allowedSellerIds.includes(s.id))
+      .filter((s) => s.name.toLowerCase().includes(q) || (s.code ?? "").toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [sellerQuery, t.allowedSellerIds]);
+
+  const selectedSellers = useMemo(
+    () => t.allowedSellerIds.map((id) => SELLER_DIRECTORY.find((s) => s.id === id)).filter(Boolean) as typeof SELLER_DIRECTORY,
+    [t.allowedSellerIds]
+  );
+
+  const sellerIcon = (type: SellerType) =>
+    type === "Agent" ? UserCircle2 : type === "Bank" ? Building2 : Store;
 
   const showValue = t.premiumOverrideType !== "No override" && t.premiumOverrideType !== "Management approved manual premium";
   const valueLabel =
@@ -197,83 +217,161 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
             </div>
           </section>
 
-          {/* Pricing & currencies */}
-          <section className="space-y-3 rounded-lg border border-border bg-card p-5">
-            <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Pricing & currencies</h4>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
-                <Label>Default currency</Label>
-                <Select value={t.defaultCurrency} onValueChange={(v) => set("defaultCurrency", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {productCurrencies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5 md:col-span-3">
-                <Label>Allowed currencies</Label>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {productCurrencies.map((c) => {
-                    const active = t.allowedCurrencies.includes(c);
-                    return (
-                      <button type="button" key={c} onClick={() => toggleArr("allowedCurrencies", c)}
-                        className={`px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-colors ${
-                          active ? "bg-accent text-accent-foreground border-accent"
-                          : "bg-card text-foreground border-border hover:border-accent hover:text-accent"
-                        }`}>
-                        {c}
-                      </button>
-                    );
-                  })}
+          {/* Pricing & currencies + Permissions */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <section className="space-y-3 rounded-lg border border-border bg-card p-5 lg:col-span-2">
+              <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Pricing & currencies</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Default currency</Label>
+                  <Select value={t.defaultCurrency} onValueChange={(v) => set("defaultCurrency", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {productCurrencies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
+                <div className="space-y-1.5">
+                  <Label>Allowed currencies</Label>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {productCurrencies.map((c) => {
+                      const active = t.allowedCurrencies.includes(c);
+                      return (
+                        <button type="button" key={c} onClick={() => toggleArr("allowedCurrencies", c)}
+                          className={`px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-colors ${
+                            active ? "bg-accent text-accent-foreground border-accent"
+                            : "bg-card text-foreground border-border hover:border-accent hover:text-accent"
+                          }`}>
+                          {c}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              <div className="space-y-1.5 md:col-span-2">
-                <Label>Premium override type</Label>
-                <Select value={t.premiumOverrideType} onValueChange={(v) => set("premiumOverrideType", v as PremiumOverrideType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {OVERRIDES.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              {showValue ? (
+                <div className="space-y-1.5">
+                  <Label>Premium override type</Label>
+                  <Select value={t.premiumOverrideType} onValueChange={(v) => set("premiumOverrideType", v as PremiumOverrideType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {OVERRIDES.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {showValue ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ovv">{valueLabel}</Label>
+                    <Input id="ovv" type="number" step="0.01" value={t.premiumOverrideValue ?? 0}
+                      onChange={(e) => set("premiumOverrideValue", +e.target.value)} className="font-mono" />
+                  </div>
+                ) : <div className="hidden md:block" />}
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="agent-comm">Agent Commission</Label>
+                  <div className="relative">
+                    <Input id="agent-comm" type="number" step="0.01" min="0" max="100"
+                      value={parseFloat((t.agentCommission * 100).toFixed(6)).toString()}
+                      onChange={(e) => set("agentCommission", (+e.target.value || 0) / 100)}
+                      className="pr-7 font-mono" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="bank-comm">Bank Commission</Label>
+                  <div className="relative">
+                    <Input id="bank-comm" type="number" step="0.01" min="0" max="100"
+                      value={parseFloat((t.bankCommission * 100).toFixed(6)).toString()}
+                      onChange={(e) => set("bankCommission", (+e.target.value || 0) / 100)}
+                      className="pr-7 font-mono" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
                 <div className="space-y-1.5 md:col-span-2">
-                  <Label htmlFor="ovv">{valueLabel}</Label>
-                  <Input id="ovv" type="number" step="0.01" value={t.premiumOverrideValue ?? 0}
-                    onChange={(e) => set("premiumOverrideValue", +e.target.value)} className="font-mono" />
+                  <Label className="block">Status</Label>
+                  <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                    <span className="text-sm">{t.isActive ? "Active" : "Inactive"}</span>
+                    <Switch checked={t.isActive} onCheckedChange={(v) => set("isActive", v)} />
+                  </label>
                 </div>
-              ) : <div className="hidden md:block md:col-span-2" />}
+              </div>
+            </section>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="agent-comm">Agent Commission</Label>
-                <div className="relative">
-                  <Input id="agent-comm" type="number" step="0.01" min="0" max="100"
-                    value={parseFloat((t.agentCommission * 100).toFixed(6)).toString()}
-                    onChange={(e) => set("agentCommission", (+e.target.value || 0) / 100)}
-                    className="pr-7 font-mono" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                </div>
+            {/* Permissions / Who can sell */}
+            <section className="space-y-3 rounded-lg border border-border bg-card p-5 lg:col-span-1 flex flex-col">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Permissions</h4>
+                <Badge variant="secondary" className="text-[10px]">{selectedSellers.length}</Badge>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="bank-comm">Bank Commission</Label>
-                <div className="relative">
-                  <Input id="bank-comm" type="number" step="0.01" min="0" max="100"
-                    value={parseFloat((t.bankCommission * 100).toFixed(6)).toString()}
-                    onChange={(e) => set("bankCommission", (+e.target.value || 0) / 100)}
-                    className="pr-7 font-mono" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                </div>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Agents, banks or branches allowed to sell this package.
+              </p>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={sellerQuery}
+                  onChange={(e) => setSellerQuery(e.target.value)}
+                  placeholder="Search agent or bank…"
+                  className="pl-8 h-9 text-sm"
+                />
+                {sellerQuery && sellerResults.length > 0 && (
+                  <div className="absolute z-10 left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-lg max-h-56 overflow-y-auto">
+                    {sellerResults.map((s) => {
+                      const Icon = sellerIcon(s.type);
+                      return (
+                        <button
+                          type="button"
+                          key={s.id}
+                          onClick={() => { toggleArr("allowedSellerIds", s.id); setSellerQuery(""); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent-soft/40 transition-colors"
+                        >
+                          <Icon className="h-4 w-4 text-accent shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{s.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">{s.code} · {s.type}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {sellerQuery && sellerResults.length === 0 && (
+                  <div className="absolute z-10 left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-lg p-3 text-xs text-muted-foreground">
+                    No matches.
+                  </div>
+                )}
               </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label className="block">Status</Label>
-                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
-                  <span className="text-sm">{t.isActive ? "Active" : "Inactive"}</span>
-                  <Switch checked={t.isActive} onCheckedChange={(v) => set("isActive", v)} />
-                </label>
+
+              <div className="space-y-1.5 flex-1 overflow-y-auto max-h-72 pr-1">
+                {selectedSellers.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic py-4 text-center">
+                    No entities added — package is not assigned to any seller.
+                  </p>
+                )}
+                {selectedSellers.map((s) => {
+                  const Icon = sellerIcon(s.type);
+                  return (
+                    <div key={s.id} className="flex items-center gap-2 p-2 rounded-md border border-border bg-background">
+                      <Icon className="h-4 w-4 text-accent shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{s.name}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">{s.code} · {s.type}</div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => toggleArr("allowedSellerIds", s.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
 
           {/* Classification */}
           <section className="space-y-3 rounded-lg border border-border bg-card p-5">
