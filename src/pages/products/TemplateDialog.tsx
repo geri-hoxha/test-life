@@ -136,113 +136,99 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
+        <div className="space-y-8 py-4">
           {/* Identity */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="tname">Template Name *</Label>
-              <Input id="tname" value={t.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Standard, Premium, Bank Loan Protection" />
+          <section>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5 md:col-span-1">
+                <Label htmlFor="tname" className="text-xs uppercase tracking-wide text-muted-foreground">Template Name *</Label>
+                <Input id="tname" value={t.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Standard, Premium" />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="tdesc" className="text-xs uppercase tracking-wide text-muted-foreground">Description</Label>
+                <Input id="tdesc" value={t.description ?? ""} onChange={(e) => set("description", e.target.value)} placeholder="Short marketing description for the package" />
+              </div>
             </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="tdesc">Description</Label>
-              <Textarea id="tdesc" rows={2} value={t.description ?? ""} onChange={(e) => set("description", e.target.value)} placeholder="Short marketing description for the package" />
-            </div>
-          </div>
+          </section>
 
           {/* Coverages */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-md border border-border p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Shield className="h-4 w-4 text-accent" />
-                <h4 className="text-sm font-semibold">Included coverages</h4>
-              </div>
-              {mandatory.length === 0 && <p className="text-xs text-muted-foreground">No mandatory coverages on this version.</p>}
-              <div className="space-y-2">
-                {mandatory.map((c) => (
-                  <label key={c.id} className="flex items-start gap-2 p-2 rounded hover:bg-accent-soft/40 cursor-pointer">
-                    <Checkbox
-                      checked={t.includedCoverageIds.includes(c.id)}
-                      onCheckedChange={() => toggleArr("includedCoverageIds", c.id)}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <div className="text-sm font-medium">{c.name}</div>
-                      <div className="text-[11px] font-mono text-accent">{c.code}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-md border border-border p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <ShieldPlus className="h-4 w-4 text-accent" />
-                <h4 className="text-sm font-semibold">Optional riders</h4>
-              </div>
-              {riders.length === 0 && <p className="text-xs text-muted-foreground">No riders on this version.</p>}
-              <div className="space-y-2">
-                {riders.map((c) => (
-                  <label key={c.id} className="flex items-start gap-2 p-2 rounded hover:bg-accent-soft/40 cursor-pointer">
-                    <Checkbox
-                      checked={t.optionalRiderIds.includes(c.id)}
-                      onCheckedChange={() => toggleArr("optionalRiderIds", c.id)}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <div className="text-sm font-medium">{c.name}</div>
-                      <div className="text-[11px] font-mono text-accent">{c.code}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Currencies */}
-          <div className="rounded-md border border-border p-4">
-            <h4 className="text-sm font-semibold mb-3">Currencies</h4>
+          <section className="space-y-3">
+            <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Coverages</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-border bg-card/40 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="h-4 w-4 text-accent" />
+                  <h5 className="text-sm font-semibold">Included coverages</h5>
+                  <Badge variant="secondary" className="ml-auto text-[10px]">{t.includedCoverageIds.length}</Badge>
+                </div>
+                {mandatory.length === 0 && <p className="text-xs text-muted-foreground">No mandatory coverages on this version.</p>}
+                <div className="space-y-1">
+                  {mandatory.map((c) => (
+                    <label key={c.id} className="flex items-center gap-3 p-2 rounded hover:bg-accent-soft/40 cursor-pointer">
+                      <Checkbox checked={t.includedCoverageIds.includes(c.id)} onCheckedChange={() => toggleArr("includedCoverageIds", c.id)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{c.name}</div>
+                      </div>
+                      <span className="text-[11px] font-mono text-accent shrink-0">{c.code}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card/40 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldPlus className="h-4 w-4 text-accent" />
+                  <h5 className="text-sm font-semibold">Optional riders</h5>
+                  <Badge variant="secondary" className="ml-auto text-[10px]">{t.optionalRiderIds.length}</Badge>
+                </div>
+                {riders.length === 0 && <p className="text-xs text-muted-foreground">No riders on this version.</p>}
+                <div className="space-y-1">
+                  {riders.map((c) => (
+                    <label key={c.id} className="flex items-center gap-3 p-2 rounded hover:bg-accent-soft/40 cursor-pointer">
+                      <Checkbox checked={t.optionalRiderIds.includes(c.id)} onCheckedChange={() => toggleArr("optionalRiderIds", c.id)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{c.name}</div>
+                      </div>
+                      <span className="text-[11px] font-mono text-accent shrink-0">{c.code}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Pricing & currencies */}
+          <section className="space-y-3">
+            <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Pricing & currencies</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <Label>Default currency</Label>
                 <Select value={t.defaultCurrency} onValueChange={(v) => set("defaultCurrency", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {productCurrencies.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
+                    {productCurrencies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-3">
                 <Label>Allowed currencies</Label>
                 <div className="flex flex-wrap gap-2 pt-1">
                   {productCurrencies.map((c) => {
                     const active = t.allowedCurrencies.includes(c);
                     return (
-                      <button
-                        type="button"
-                        key={c}
-                        onClick={() => toggleArr("allowedCurrencies", c)}
+                      <button type="button" key={c} onClick={() => toggleArr("allowedCurrencies", c)}
                         className={`px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-colors ${
-                          active
-                            ? "bg-accent text-accent-foreground border-accent"
-                            : "bg-card text-foreground border-border hover:border-accent hover:text-accent"
-                        }`}
-                      >
+                          active ? "bg-accent text-accent-foreground border-accent"
+                          : "bg-card text-foreground border-border hover:border-accent hover:text-accent"
+                        }`}>
                         {c}
                       </button>
                     );
                   })}
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Premium override */}
-          <div className="rounded-md border border-border p-4">
-            <h4 className="text-sm font-semibold mb-3">Premium override</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Premium override type</Label>
                 <Select value={t.premiumOverrideType} onValueChange={(v) => set("premiumOverrideType", v as PremiumOverrideType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -251,22 +237,16 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label className="block">Status</Label>
-                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
-                  <span className="text-sm">{t.isActive ? "Active" : "Inactive"}</span>
-                  <Switch checked={t.isActive} onCheckedChange={(v) => set("isActive", v)} />
-                </label>
-              </div>
-              {showValue && (
+              {showValue ? (
                 <div className="space-y-1.5 md:col-span-2">
                   <Label htmlFor="ovv">{valueLabel}</Label>
                   <Input id="ovv" type="number" step="0.01" value={t.premiumOverrideValue ?? 0}
-                    onChange={(e) => set("premiumOverrideValue", +e.target.value)} />
+                    onChange={(e) => set("premiumOverrideValue", +e.target.value)} className="font-mono" />
                 </div>
-              )}
+              ) : <div className="hidden md:block md:col-span-2" />}
+
               <div className="space-y-1.5">
-                <Label htmlFor="agent-comm">Agent Commission (%)</Label>
+                <Label htmlFor="agent-comm">Agent Commission</Label>
                 <div className="relative">
                   <Input id="agent-comm" type="number" step="0.01" min="0" max="100"
                     value={parseFloat((t.agentCommission * 100).toFixed(6)).toString()}
@@ -276,7 +256,7 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="bank-comm">Bank Commission (%)</Label>
+                <Label htmlFor="bank-comm">Bank Commission</Label>
                 <div className="relative">
                   <Input id="bank-comm" type="number" step="0.01" min="0" max="100"
                     value={parseFloat((t.bankCommission * 100).toFixed(6)).toString()}
@@ -285,58 +265,63 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                 </div>
               </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="block">Status</Label>
+                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                  <span className="text-sm">{t.isActive ? "Active" : "Inactive"}</span>
+                  <Switch checked={t.isActive} onCheckedChange={(v) => set("isActive", v)} />
+                </label>
+              </div>
             </div>
-          </div>
+          </section>
 
-          {/* Classification & policy attributes */}
-          <div className="rounded-md border border-border p-4">
-            <h4 className="text-sm font-semibold mb-3">Classification & policy attributes</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Classification */}
+          <section className="space-y-3">
+            <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Classification & policy attributes</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <Label>Type</Label>
                 <Select value={t.typeCode} onValueChange={(v) => set("typeCode", v as TemplateTypeCode)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TYPE_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{TYPE_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-3">
                 <Label>Policy type (Tip Police)</Label>
                 <Select value={t.policyType} onValueChange={(v) => set("policyType", v as PolicyTypeCode)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {POLICY_TYPES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{POLICY_TYPES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Payment type</Label>
                 <Select value={t.paymentType} onValueChange={(v) => set("paymentType", v as PaymentType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_TYPES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{PAYMENT_TYPES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Renewal type</Label>
                 <Select value={t.renewalType} onValueChange={(v) => set("renewalType", v as RenewalType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {RENEWAL_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{RENEWAL_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Loan type</Label>
                 <Select value={t.loanType} onValueChange={(v) => set("loanType", v as LoanType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {LOAN_TYPES.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{LOAN_TYPES.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="block">Cancelled (Anulluar)</Label>
+                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                  <span className="text-sm">{t.cancelled ? "Yes" : "No"}</span>
+                  <Switch checked={t.cancelled} onCheckedChange={(v) => set("cancelled", v)} />
+                </label>
+              </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="qty">Quantity (Sasia)</Label>
                 <Input id="qty" type="number" min="0" value={t.quantity}
@@ -347,20 +332,13 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                 <Input id="maxmonths" type="number" min="0" value={t.maxMonths}
                   onChange={(e) => set("maxMonths", +e.target.value || 0)} className="font-mono" />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label htmlFor="printtype">Print type (Tip Printimi)</Label>
                 <Input id="printtype" value={t.printType}
                   onChange={(e) => set("printType", e.target.value)} className="font-mono" />
               </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label className="block">Cancelled (Anulluar)</Label>
-                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
-                  <span className="text-sm">{t.cancelled ? "Yes" : "No"}</span>
-                  <Switch checked={t.cancelled} onCheckedChange={(v) => set("cancelled", v)} />
-                </label>
-              </div>
             </div>
-          </div>
+          </section>
         </div>
 
         <DialogFooter>
