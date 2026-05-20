@@ -13,6 +13,8 @@ export type Grant = {
   templateId: string;
   subjectType: GrantSubjectType;
   subjectId: string; // bankBranchId or agentId
+  canSell: boolean;
+  commissionPct: number; // 0–100
   createdAt: string;
   createdBy: string;
 };
@@ -127,6 +129,8 @@ let grants: Grant[] = (() => {
           templateId: t.id,
           subjectType: "BANK_BRANCH",
           subjectId: br.id,
+          canSell: rand() > 0.25,
+          commissionPct: Math.round((2 + rand() * 13) * 10) / 10,
           createdAt: todayIso,
           createdBy: "system.seed",
         });
@@ -140,6 +144,8 @@ let grants: Grant[] = (() => {
           templateId: t.id,
           subjectType: "AGENT",
           subjectId: a.id,
+          canSell: rand() > 0.3,
+          commissionPct: Math.round((5 + rand() * 15) * 10) / 10,
           createdAt: todayIso,
           createdBy: "system.seed",
         });
@@ -165,6 +171,8 @@ export type GrantRow = {
   agencyName?: string;
   agentId?: string;
   agentName?: string;
+  canSell: boolean;
+  commissionPct: number;
   createdAt: string;
 };
 
@@ -186,6 +194,8 @@ export const listGrantRows = (): GrantRow[] =>
       templateId: g.templateId,
       templateName: tpl?.name ?? "",
       templateType: tpl?.type ?? "",
+      canSell: g.canSell,
+      commissionPct: g.commissionPct,
       createdAt: g.createdAt,
     };
     if (g.subjectType === "BANK_BRANCH") {
@@ -232,4 +242,8 @@ export const addGrant = (input: Omit<Grant, "id" | "createdAt" | "createdBy">) =
 
 export const removeGrant = (id: string) => {
   grants = grants.filter((g) => g.id !== id);
+};
+
+export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "commissionPct">>) => {
+  grants = grants.map((g) => (g.id === id ? { ...g, ...patch } : g));
 };
