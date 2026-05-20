@@ -15,9 +15,10 @@ import {
 import {
   Template, PremiumOverrideType, PaymentType, RenewalType,
   TemplateTypeCode, LoanType, PolicyTypeCode, newTemplateId,
+  SELLER_DIRECTORY, SellerType,
 } from "@/data/templates";
 import { listCoverages } from "@/data/coverages";
-import { Shield, ShieldPlus } from "lucide-react";
+import { Shield, ShieldPlus, Search, X, UserCircle2, Building2, Store } from "lucide-react";
 
 type Props = {
   open: boolean;
