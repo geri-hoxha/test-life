@@ -58,8 +58,8 @@ const PermissionMatrix = () => {
       if (fProduct !== ALL && r.productId !== fProduct) return false;
       if (fTemplate !== ALL && r.templateId !== fTemplate) return false;
       if (fBank !== ALL && r.bankId !== fBank) return false;
-      if (fBranch !== ALL && r.bankBranchId !== fBranch) return false;
-      if (fAgency !== ALL && r.agencyId !== fAgency) return false;
+      if (fBranches.length > 0 && (!r.bankBranchId || !fBranches.includes(r.bankBranchId))) return false;
+      if (fAgencies.length > 0 && (!r.agencyId || !fAgencies.includes(r.agencyId))) return false;
       if (fAgent !== ALL && r.agentId !== fAgent) return false;
       if (q) {
         const hay = [
@@ -69,7 +69,7 @@ const PermissionMatrix = () => {
       }
       return true;
     });
-  }, [version, fProduct, fTemplate, fBank, fBranch, fAgency, fAgent, search]);
+  }, [version, fProduct, fTemplate, fBank, fBranches, fAgencies, fAgent, search]);
 
   const templatesForFilter = useMemo(
     () => matrixTemplates.filter((t) => fProduct === ALL || t.productId === fProduct),
@@ -80,18 +80,18 @@ const PermissionMatrix = () => {
     [fBank]
   );
   const agentsForFilter = useMemo(
-    () => matrixAgents.filter((a) => fAgency === ALL || a.agencyId === fAgency),
-    [fAgency]
+    () => matrixAgents.filter((a) => fAgencies.length === 0 || fAgencies.includes(a.agencyId)),
+    [fAgencies]
   );
 
   const clearFilters = () => {
-    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFBranch(ALL);
-    setFAgency(ALL); setFAgent(ALL); setSearch("");
+    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFBranches([]);
+    setFAgencies([]); setFAgent(ALL); setSearch("");
   };
 
   const activeFilters =
     (fProduct !== ALL ? 1 : 0) + (fTemplate !== ALL ? 1 : 0) + (fBank !== ALL ? 1 : 0) +
-    (fBranch !== ALL ? 1 : 0) + (fAgency !== ALL ? 1 : 0) + (fAgent !== ALL ? 1 : 0) +
+    (fBranches.length > 0 ? 1 : 0) + (fAgencies.length > 0 ? 1 : 0) + (fAgent !== ALL ? 1 : 0) +
     (search ? 1 : 0);
 
   const handleExport = () => {
