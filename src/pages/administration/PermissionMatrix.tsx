@@ -132,18 +132,18 @@ const PermissionMatrix = () => {
                   </th>
                   <th className="p-2 border-b border-border font-semibold min-w-[180px]">
                     <HeaderFilter
-                      label="Bank"
-                      value={fBank}
-                      onChange={(v) => { setFBank(v); if (v !== ALL) setFAgency(ALL); }}
-                      options={matrixBanks.map((b) => ({ value: b.id, label: b.name }))}
+                      label="Agency"
+                      value={fAgency}
+                      onChange={(v) => { setFAgency(v); setFAgent(ALL); }}
+                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
                     />
                   </th>
                   <th className="p-2 border-b border-border font-semibold min-w-[180px]">
                     <HeaderFilter
-                      label="Agency"
-                      value={fAgency}
-                      onChange={(v) => { setFAgency(v); if (v !== ALL) setFBank(ALL); }}
-                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
+                      label="Agent"
+                      value={fAgent}
+                      onChange={setFAgent}
+                      options={agentsForFilter.map((a) => ({ value: a.id, label: a.name }))}
                     />
                   </th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[110px]">Can Sell</th>
@@ -171,21 +171,18 @@ const PermissionMatrix = () => {
                       </div>
                     </td>
                     <td className="p-3 border-b border-border">
-                      {r.bankName ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-blue-500" />
-                          {r.bankName}
-                        </span>
-                      ) : <span className="text-muted-foreground/50">—</span>}
+                      <span className="inline-flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                        {r.agencyName}
+                      </span>
                     </td>
                     <td className="p-3 border-b border-border">
-                      {r.agencyName ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <UserCircle2 className="h-3.5 w-3.5 text-purple-500" />
-                          {r.agencyName}
-                        </span>
-                      ) : <span className="text-muted-foreground/50">—</span>}
+                      <span className="inline-flex items-center gap-1.5">
+                        <UserCircle2 className="h-3.5 w-3.5 text-purple-500" />
+                        {r.agentName}
+                      </span>
                     </td>
+
                     <td className="p-3 border-b border-border text-center">
                       <Switch
                         checked={r.canSell}
