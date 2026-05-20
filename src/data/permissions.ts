@@ -5,18 +5,15 @@ export type BankBranch = { id: string; bankId: string; name: string; region: str
 export type Agency = { id: string; name: string; code: string; region: string };
 export type Agent = { id: string; agencyId: string; name: string; code: string; tier: "Junior" | "Senior" | "Lead" };
 
-export type GrantSubjectType = "BANK_BRANCH" | "AGENT";
+export type GrantSubjectType = "BANK" | "AGENCY";
 
 export type Grant = {
-  id: string;
   productId: string;
   templateId: string;
   subjectType: GrantSubjectType;
-  subjectId: string; // bankBranchId or agentId
+  subjectId: string; // bankId or agencyId
   canSell: boolean;
   commissionPct: number; // 0–100
-  createdAt: string;
-  createdBy: string;
 };
 
 export type MatrixProduct = { id: string; name: string; code: string };
@@ -116,134 +113,101 @@ const rand = () => {
   return (seedN & 0xffffffff) / 0x100000000;
 };
 
-const todayIso = "2026-05-18T10:24:00Z";
-let grants: Grant[] = (() => {
-  const out: Grant[] = [];
-  let pid = 1;
+const grantKey = (productId: string, templateId: string, subjectType: GrantSubjectType, subjectId: string) =>
+  `${productId}|${templateId}|${subjectType}|${subjectId}`;
+
+const grants = new Map<string, Grant>();
+
+(function seed() {
   for (const t of matrixTemplates) {
-    for (const br of matrixBankBranches) {
-      if (rand() > 0.78) {
-        out.push({
-          id: `GRT-${pid++}`,
-          productId: t.productId,
-          templateId: t.id,
-          subjectType: "BANK_BRANCH",
-          subjectId: br.id,
-          canSell: rand() > 0.25,
-          commissionPct: Math.round((2 + rand() * 13) * 10) / 10,
-          createdAt: todayIso,
-          createdBy: "system.seed",
-        });
-      }
+    for (const b of matrixBanks) {
+      const canSell = rand() > 0.35;
+      const commissionPct = Math.round((2 + rand() * 13) * 10) / 10;
+      const g: Grant = { productId: t.productId, templateId: t.id, subjectType: "BANK", subjectId: b.id, canSell, commissionPct };
+      grants.set(grantKey(g.productId, g.templateId, g.subjectType, g.subjectId), g);
     }
-    for (const a of matrixAgents) {
-      if (rand() > 0.85) {
-        out.push({
-          id: `GRT-${pid++}`,
-          productId: t.productId,
-          templateId: t.id,
-          subjectType: "AGENT",
-          subjectId: a.id,
-          canSell: rand() > 0.3,
-          commissionPct: Math.round((5 + rand() * 15) * 10) / 10,
-          createdAt: todayIso,
-          createdBy: "system.seed",
-        });
-      }
+    for (const a of matrixAgencies) {
+      const canSell = rand() > 0.4;
+      const commissionPct = Math.round((5 + rand() * 15) * 10) / 10;
+      const g: Grant = { productId: t.productId, templateId: t.id, subjectType: "AGENCY", subjectId: a.id, canSell, commissionPct };
+      grants.set(grantKey(g.productId, g.templateId, g.subjectType, g.subjectId), g);
     }
   }
-  return out;
 })();
 
 // ---------- Public API ----------
 export type GrantRow = {
-  id: string;
+  id: string; // composite key
   productId: string;
   productName: string;
   templateId: string;
   templateName: string;
   templateType: string;
+  subjectType: GrantSubjectType;
   bankId?: string;
   bankName?: string;
-  bankBranchId?: string;
-  bankBranchName?: string;
   agencyId?: string;
   agencyName?: string;
-  agentId?: string;
-  agentName?: string;
   canSell: boolean;
   commissionPct: number;
-  createdAt: string;
 };
 
-const productMap = new Map(matrixProducts.map((p) => [p.id, p]));
-const templateMap = new Map(matrixTemplates.map((t) => [t.id, t]));
-const bankMap = new Map(matrixBanks.map((b) => [b.id, b]));
-const branchMap = new Map(matrixBankBranches.map((b) => [b.id, b]));
-const agencyMap = new Map(matrixAgencies.map((a) => [a.id, a]));
-const agentMap = new Map(matrixAgents.map((a) => [a.id, a]));
-
-export const listGrantRows = (): GrantRow[] =>
-  grants.map((g) => {
-    const product = productMap.get(g.productId);
-    const tpl = templateMap.get(g.templateId);
-    const base = {
-      id: g.id,
-      productId: g.productId,
-      productName: product?.name ?? "",
-      templateId: g.templateId,
-      templateName: tpl?.name ?? "",
-      templateType: tpl?.type ?? "",
-      canSell: g.canSell,
-      commissionPct: g.commissionPct,
-      createdAt: g.createdAt,
-    };
-    if (g.subjectType === "BANK_BRANCH") {
-      const br = branchMap.get(g.subjectId);
-      const bk = br ? bankMap.get(br.bankId) : undefined;
-      return {
-        ...base,
-        bankId: bk?.id,
-        bankName: bk?.name,
-        bankBranchId: br?.id,
-        bankBranchName: br ? `${br.name} (${br.region})` : undefined,
-      };
+export const listGrantRows = (): GrantRow[] => {
+  const out: GrantRow[] = [];
+  for (const t of matrixTemplates) {
+    const product = matrixProducts.find((p) => p.id === t.productId);
+    for (const b of matrixBanks) {
+      const k = grantKey(t.productId, t.id, "BANK", b.id);
+      const g = grants.get(k);
+      out.push({
+        id: k,
+        productId: t.productId,
+        productName: product?.name ?? "",
+        templateId: t.id,
+        templateName: t.name,
+        templateType: t.type,
+        subjectType: "BANK",
+        bankId: b.id,
+        bankName: b.name,
+        canSell: g?.canSell ?? false,
+        commissionPct: g?.commissionPct ?? 0,
+      });
     }
-    const ag = agentMap.get(g.subjectId);
-    const agy = ag ? agencyMap.get(ag.agencyId) : undefined;
-    return {
-      ...base,
-      agencyId: agy?.id,
-      agencyName: agy?.name,
-      agentId: ag?.id,
-      agentName: ag?.name,
-    };
-  });
-
-export const addGrant = (input: Omit<Grant, "id" | "createdAt" | "createdBy">) => {
-  // dedupe
-  const exists = grants.find(
-    (g) =>
-      g.productId === input.productId &&
-      g.templateId === input.templateId &&
-      g.subjectType === input.subjectType &&
-      g.subjectId === input.subjectId
-  );
-  if (exists) return exists;
-  const g: Grant = {
-    ...input,
-    id: `GRT-${grants.length + 1}-${Date.now()}`,
-    createdAt: new Date().toISOString(),
-    createdBy: "Erin Hoxha",
-  };
-  grants = [g, ...grants];
-  return g;
-};
-
-export const removeGrant = (id: string) => {
-  grants = grants.filter((g) => g.id !== id);
+    for (const a of matrixAgencies) {
+      const k = grantKey(t.productId, t.id, "AGENCY", a.id);
+      const g = grants.get(k);
+      out.push({
+        id: k,
+        productId: t.productId,
+        productName: product?.name ?? "",
+        templateId: t.id,
+        templateName: t.name,
+        templateType: t.type,
+        subjectType: "AGENCY",
+        agencyId: a.id,
+        agencyName: a.name,
+        canSell: g?.canSell ?? false,
+        commissionPct: g?.commissionPct ?? 0,
+      });
+    }
+  }
+  return out;
 };
 
 export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "commissionPct">>) => {
-  grants = grants.map((g) => (g.id === id ? { ...g, ...patch } : g));
+  const existing = grants.get(id);
+  if (existing) {
+    grants.set(id, { ...existing, ...patch });
+    return;
+  }
+  const [productId, templateId, subjectType, subjectId] = id.split("|") as [string, string, GrantSubjectType, string];
+  grants.set(id, {
+    productId,
+    templateId,
+    subjectType,
+    subjectId,
+    canSell: false,
+    commissionPct: 0,
+    ...patch,
+  });
 };
