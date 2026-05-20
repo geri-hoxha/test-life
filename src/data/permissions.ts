@@ -243,3 +243,7 @@ export const addGrant = (input: Omit<Grant, "id" | "createdAt" | "createdBy">) =
 export const removeGrant = (id: string) => {
   grants = grants.filter((g) => g.id !== id);
 };
+
+export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "commissionPct">>) => {
+  grants = grants.map((g) => (g.id === id ? { ...g, ...patch } : g));
+};
