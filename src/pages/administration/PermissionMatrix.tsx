@@ -363,6 +363,95 @@ const HeaderFilter = ({
   );
 };
 
+const MultiPicker = ({
+  label, icon: Icon, accent, tint, items, selected, onChange,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  tint: string;
+  items: { id: string; name: string; meta?: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  const selectedItems = selected
+    .map((id) => items.find((i) => i.id === id))
+    .filter((x): x is { id: string; name: string; meta?: string } => !!x);
+
+  return (
+    <div className={`rounded-lg border ${tint} p-3`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${accent}`} />
+          <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
+          <Badge variant="secondary" className="text-[10px] h-5">{selected.length}</Badge>
+        </div>
+        <div className="flex items-center gap-1">
+          {selected.length > 0 && (
+            <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground hover:text-destructive" onClick={() => onChange([])}>
+              Clear
+            </Button>
+          )}
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="outline" className="h-7 text-xs">
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <Command>
+                <CommandInput placeholder={`Search ${label.toLowerCase()}…`} />
+                <CommandList>
+                  <CommandEmpty>No results found.</CommandEmpty>
+                  <CommandGroup>
+                    {items.map((it) => {
+                      const isSel = selected.includes(it.id);
+                      return (
+                        <CommandItem key={it.id} value={`${it.name} ${it.meta ?? ""}`} onSelect={() => toggle(it.id)}>
+                          <div className={`mr-2 h-4 w-4 rounded border flex items-center justify-center ${isSel ? "bg-accent border-accent text-accent-foreground" : "border-input"}`}>
+                            {isSel && <Check className="h-3 w-3" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{it.name}</div>
+                            {it.meta && <div className="text-[10px] text-muted-foreground font-mono truncate">{it.meta}</div>}
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {selectedItems.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground italic">None selected — showing all.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedItems.map((it) => (
+            <button
+              key={it.id}
+              onClick={() => toggle(it.id)}
+              className="group inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-destructive/40"
+              title="Click to remove"
+            >
+              <Icon className={`h-3 w-3 ${accent}`} />
+              <span className="font-medium">{it.name}</span>
+              <XIcon className="h-3 w-3 text-muted-foreground group-hover:text-destructive" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ---------------- Add dialog ---------------- */
 
 const AddPermissionDialog = ({
