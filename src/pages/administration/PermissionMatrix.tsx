@@ -238,6 +238,8 @@ const PermissionMatrix = () => {
                       options={agentsForFilter.map((a) => ({ value: a.id, label: a.name }))}
                     />
                   </th>
+                  <th className="p-3 border-b border-border font-semibold text-center min-w-[110px]">Can Sell</th>
+                  <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">Commission %</th>
                   <th className="p-3 border-b border-border font-semibold w-12" />
                 </tr>
               </thead>
@@ -245,7 +247,7 @@ const PermissionMatrix = () => {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center">
+                    <td colSpan={9} className="p-12 text-center">
                       <p className="text-sm font-medium">No permissions match the current filters.</p>
                       <p className="text-xs text-muted-foreground mt-1">Try clearing the filters or add a new permission.</p>
                     </td>
@@ -282,6 +284,32 @@ const PermissionMatrix = () => {
                           {r.agentName}
                         </span>
                       ) : <span className="text-muted-foreground/50">—</span>}
+                    </td>
+                    <td className="p-3 border-b border-border text-center">
+                      <Switch
+                        checked={r.canSell}
+                        onCheckedChange={(v) => { updateGrant(r.id, { canSell: v }); refresh(); }}
+                      />
+                    </td>
+                    <td className="p-2 border-b border-border text-center">
+                      <div className="relative inline-flex items-center w-24">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          value={r.commissionPct}
+                          disabled={!r.canSell}
+                          onChange={(e) => {
+                            const raw = parseFloat(e.target.value);
+                            const next = isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
+                            updateGrant(r.id, { commissionPct: next });
+                            refresh();
+                          }}
+                          className="h-8 text-sm pr-7 text-right tabular-nums"
+                        />
+                        <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
+                      </div>
                     </td>
                     <td className="p-3 border-b border-border text-right">
                       <Button
