@@ -374,6 +374,7 @@ const EmptyState = () => (
 
 const MatrixTable = ({
   templates, banks, agents, subjectTab, permIndex, onToggle, onOpenTemplate, askBulk, onClone,
+  bankSearch, setBankSearch, agentSearch, setAgentSearch,
 }: {
   templates: MatrixTemplate[];
   banks: typeof matrixBanks;
@@ -384,19 +385,68 @@ const MatrixTable = ({
   onOpenTemplate: (id: string) => void;
   askBulk: (title: string, description: string, run: () => void) => void;
   onClone: (tpl: MatrixTemplate) => void;
+  bankSearch: string;
+  setBankSearch: (s: string) => void;
+  agentSearch: string;
+  setAgentSearch: (s: string) => void;
 }) => {
   const showBanks = subjectTab !== "AGENT";
   const showAgents = subjectTab !== "BANK";
+  const banksEmpty = banks.length === 0;
+  const agentsEmpty = agents.length === 0;
+  const banksColSpan = Math.max(banks.length, 1);
+  const agentsColSpan = Math.max(agents.length, 1);
 
   return (
     <div className="relative w-full overflow-auto max-h-[calc(100vh-380px)] border-t border-border">
       <table className="w-full text-xs border-collapse">
         <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur">
+          {/* Row 1: search inputs above each column group */}
+          <tr>
+            <th className="sticky left-0 z-40 bg-muted/95 backdrop-blur text-left p-2 border-b border-r border-border min-w-[280px]" />
+            {showBanks && (
+              <th colSpan={banksColSpan} className="p-2 border-b border-border bg-blue-500/5">
+                <div className="relative max-w-xs mx-auto">
+                  <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-blue-500" />
+                  <Input
+                    value={bankSearch}
+                    onChange={(e) => setBankSearch(e.target.value)}
+                    placeholder="Search bank by name, code or region…"
+                    className="pl-8 h-8 text-xs bg-background"
+                  />
+                </div>
+              </th>
+            )}
+            {showBanks && showAgents && (
+              <th className="border-b border-l-2 border-border bg-muted/80 min-w-[12px]" />
+            )}
+            {showAgents && (
+              <th colSpan={agentsColSpan} className="p-2 border-b border-border bg-purple-500/5">
+                <div className="relative max-w-xs mx-auto">
+                  <UserCircle2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-purple-500" />
+                  <Input
+                    value={agentSearch}
+                    onChange={(e) => setAgentSearch(e.target.value)}
+                    placeholder="Search agent by name, code or tier…"
+                    className="pl-8 h-8 text-xs bg-background"
+                  />
+                </div>
+              </th>
+            )}
+            <th className="sticky right-0 z-40 bg-muted/95 backdrop-blur border-b border-l border-border p-2 w-12" />
+          </tr>
+
+          {/* Row 2: column labels */}
           <tr>
             <th className="sticky left-0 z-40 bg-muted/95 backdrop-blur text-left p-3 border-b border-r border-border min-w-[280px] font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">
               Template
             </th>
-            {showBanks && banks.map((b) => (
+            {showBanks && banksEmpty && (
+              <th className="p-3 border-b border-border text-center text-[10px] text-muted-foreground italic min-w-[260px]">
+                No banks selected — search above to add columns
+              </th>
+            )}
+            {showBanks && !banksEmpty && banks.map((b) => (
               <th key={b.id} className="p-2 border-b border-border min-w-[80px] max-w-[80px] align-bottom">
                 <div className="flex flex-col items-center gap-1">
                   <Building2 className="h-3 w-3 text-blue-500" />
@@ -407,7 +457,12 @@ const MatrixTable = ({
             {showBanks && showAgents && (
               <th className="p-2 border-b border-l-2 border-border bg-muted/80 min-w-[12px]" />
             )}
-            {showAgents && agents.map((a) => (
+            {showAgents && agentsEmpty && (
+              <th className="p-3 border-b border-border text-center text-[10px] text-muted-foreground italic min-w-[260px]">
+                No agents selected — search above to add columns
+              </th>
+            )}
+            {showAgents && !agentsEmpty && agents.map((a) => (
               <th key={a.id} className="p-2 border-b border-border min-w-[70px] max-w-[70px] align-bottom">
                 <div className="flex flex-col items-center gap-1">
                   <UserCircle2 className="h-3 w-3 text-purple-500" />
@@ -418,6 +473,7 @@ const MatrixTable = ({
             <th className="sticky right-0 z-40 bg-muted/95 backdrop-blur border-b border-l border-border p-2 w-12" />
           </tr>
         </thead>
+
         <tbody>
           {templates.map((t) => {
             const s = templateStats(t.id);
