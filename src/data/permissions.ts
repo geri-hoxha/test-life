@@ -5,7 +5,7 @@ export type BankBranch = { id: string; bankId: string; name: string; region: str
 export type Agency = { id: string; name: string; code: string; region: string };
 export type Agent = { id: string; agencyId: string; name: string; code: string; tier: "Junior" | "Senior" | "Lead" };
 
-export type GrantSubjectType = "BANK" | "AGENCY";
+export type GrantSubjectType = "AGENT";
 
 export type Grant = {
   productId: string;
