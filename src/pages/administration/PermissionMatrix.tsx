@@ -484,6 +484,8 @@ const AddPermissionDialog = ({
       templateId,
       subjectType,
       subjectId: subjectType === "BANK_BRANCH" ? branchId : agentId,
+      canSell: true,
+      commissionPct: subjectType === "AGENT" ? 10 : 5,
     });
     toast.success("Permission added");
     reset();
