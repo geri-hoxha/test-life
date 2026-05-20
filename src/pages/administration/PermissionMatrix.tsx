@@ -15,7 +15,7 @@ import {
   type GrantRow,
 } from "@/data/permissions";
 import { Switch } from "@/components/ui/switch";
-import { Building2, UserCircle2, Download, Filter, X as XIcon } from "lucide-react";
+import { Building2, UserCircle2, Download, Filter, X as XIcon, Save } from "lucide-react";
 import { toast } from "sonner";
 
 const ALL = "ALL";
