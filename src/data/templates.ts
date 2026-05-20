@@ -107,6 +107,7 @@ const seed: Template[] = [
     printType: "9",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["AGT-001", "AGT-002", "BNK-001"],
   },
   {
     id: "TPL-3002", productId: "PRD-001", versionId: "VRS-1001",
@@ -129,6 +130,7 @@ const seed: Template[] = [
     printType: "9",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["AGT-001", "AGT-003", "BNK-003", "BNK-004"],
   },
   {
     id: "TPL-3003", productId: "PRD-001", versionId: "VRS-1001",
@@ -152,6 +154,7 @@ const seed: Template[] = [
     printType: "9",
     cancelled: false,
     isActive: true,
+    allowedSellerIds: ["AGT-001", "AGT-002", "AGT-003", "AGT-004", "BNK-001", "BNK-002"],
   },
   {
     id: "TPL-3010", productId: "PRD-002", versionId: "VRS-1010",
