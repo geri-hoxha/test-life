@@ -198,7 +198,7 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
           </section>
 
           {/* Pricing & currencies */}
-          <section className="space-y-3">
+          <section className="space-y-3 rounded-lg border border-border bg-card p-5">
             <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Pricing & currencies</h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
@@ -276,7 +276,7 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
           </section>
 
           {/* Classification */}
-          <section className="space-y-3">
+          <section className="space-y-3 rounded-lg border border-border bg-card p-5">
             <h4 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Classification & policy attributes</h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
