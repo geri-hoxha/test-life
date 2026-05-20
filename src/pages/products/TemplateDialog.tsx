@@ -98,6 +98,7 @@ const POLICY_TYPES: PolicyTypeCode[] = [
 
 const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurrencies, initial, onSave }: Props) => {
   const [t, setT] = useState<Template>(initial ?? blank(productId, versionId, productCurrencies));
+  const [sellerQuery, setSellerQuery] = useState("");
 
   useEffect(() => {
     setT(initial ?? blank(productId, versionId, productCurrencies));
