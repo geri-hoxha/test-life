@@ -199,8 +199,8 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
           {/* Premium override */}
           <div className="rounded-md border border-border p-4">
             <h4 className="text-sm font-semibold mb-3">Premium override</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1.5 md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
                 <Label>Premium override type</Label>
                 <Select value={t.premiumOverrideType} onValueChange={(v) => set("premiumOverrideType", v as PremiumOverrideType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -209,8 +209,15 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label className="block">Status</Label>
+                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                  <span className="text-sm">{t.isActive ? "Active" : "Inactive"}</span>
+                  <Switch checked={t.isActive} onCheckedChange={(v) => set("isActive", v)} />
+                </label>
+              </div>
               {showValue && (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 md:col-span-2">
                   <Label htmlFor="ovv">{valueLabel}</Label>
                   <Input id="ovv" type="number" step="0.01" value={t.premiumOverrideValue ?? 0}
                     onChange={(e) => set("premiumOverrideValue", +e.target.value)} />
@@ -235,13 +242,6 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                     className="pr-7 font-mono" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                 </div>
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label className="block">Status</Label>
-                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
-                  <span className="text-sm">{t.isActive ? "Active" : "Inactive"}</span>
-                  <Switch checked={t.isActive} onCheckedChange={(v) => set("isActive", v)} />
-                </label>
               </div>
             </div>
           </div>
