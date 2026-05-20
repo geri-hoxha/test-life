@@ -176,7 +176,7 @@ const PermissionMatrix = () => {
                       label="Agent"
                       value={fAgent}
                       onChange={setFAgent}
-                      options={agentsForFilter.map((a) => ({ value: a.id, label: a.name }))}
+                      options={matrixAgents.map((a) => ({ value: a.id, label: a.name }))}
                     />
                   </th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[110px]">Can Sell</th>
