@@ -227,7 +227,7 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                 <Label htmlFor="agent-comm">Agent Commission (%)</Label>
                 <div className="relative">
                   <Input id="agent-comm" type="number" step="0.01" min="0" max="100"
-                    value={(t.agentCommission * 100).toString()}
+                    value={parseFloat((t.agentCommission * 100).toFixed(6)).toString()}
                     onChange={(e) => set("agentCommission", (+e.target.value || 0) / 100)}
                     className="pr-7 font-mono" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
@@ -237,7 +237,7 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                 <Label htmlFor="bank-comm">Bank Commission (%)</Label>
                 <div className="relative">
                   <Input id="bank-comm" type="number" step="0.01" min="0" max="100"
-                    value={(t.bankCommission * 100).toString()}
+                    value={parseFloat((t.bankCommission * 100).toFixed(6)).toString()}
                     onChange={(e) => set("bankCommission", (+e.target.value || 0) / 100)}
                     className="pr-7 font-mono" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
