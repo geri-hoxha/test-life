@@ -120,16 +120,10 @@ const grants = new Map<string, Grant>();
 
 (function seed() {
   for (const t of matrixTemplates) {
-    for (const b of matrixBanks) {
-      const canSell = rand() > 0.35;
-      const commissionPct = Math.round((2 + rand() * 13) * 10) / 10;
-      const g: Grant = { productId: t.productId, templateId: t.id, subjectType: "BANK", subjectId: b.id, canSell, commissionPct };
-      grants.set(grantKey(g.productId, g.templateId, g.subjectType, g.subjectId), g);
-    }
-    for (const a of matrixAgencies) {
+    for (const ag of matrixAgents) {
       const canSell = rand() > 0.4;
       const commissionPct = Math.round((5 + rand() * 15) * 10) / 10;
-      const g: Grant = { productId: t.productId, templateId: t.id, subjectType: "AGENCY", subjectId: a.id, canSell, commissionPct };
+      const g: Grant = { productId: t.productId, templateId: t.id, subjectType: "AGENT", subjectId: ag.id, canSell, commissionPct };
       grants.set(grantKey(g.productId, g.templateId, g.subjectType, g.subjectId), g);
     }
   }
@@ -144,10 +138,10 @@ export type GrantRow = {
   templateName: string;
   templateType: string;
   subjectType: GrantSubjectType;
-  bankId?: string;
-  bankName?: string;
-  agencyId?: string;
-  agencyName?: string;
+  agencyId: string;
+  agencyName: string;
+  agentId: string;
+  agentName: string;
   canSell: boolean;
   commissionPct: number;
 };
@@ -156,8 +150,9 @@ export const listGrantRows = (): GrantRow[] => {
   const out: GrantRow[] = [];
   for (const t of matrixTemplates) {
     const product = matrixProducts.find((p) => p.id === t.productId);
-    for (const b of matrixBanks) {
-      const k = grantKey(t.productId, t.id, "BANK", b.id);
+    for (const ag of matrixAgents) {
+      const agy = matrixAgencies.find((a) => a.id === ag.agencyId);
+      const k = grantKey(t.productId, t.id, "AGENT", ag.id);
       const g = grants.get(k);
       out.push({
         id: k,
@@ -166,26 +161,11 @@ export const listGrantRows = (): GrantRow[] => {
         templateId: t.id,
         templateName: t.name,
         templateType: t.type,
-        subjectType: "BANK",
-        bankId: b.id,
-        bankName: b.name,
-        canSell: g?.canSell ?? false,
-        commissionPct: g?.commissionPct ?? 0,
-      });
-    }
-    for (const a of matrixAgencies) {
-      const k = grantKey(t.productId, t.id, "AGENCY", a.id);
-      const g = grants.get(k);
-      out.push({
-        id: k,
-        productId: t.productId,
-        productName: product?.name ?? "",
-        templateId: t.id,
-        templateName: t.name,
-        templateType: t.type,
-        subjectType: "AGENCY",
-        agencyId: a.id,
-        agencyName: a.name,
+        subjectType: "AGENT",
+        agencyId: agy?.id ?? "",
+        agencyName: agy?.name ?? "",
+        agentId: ag.id,
+        agentName: ag.name,
         canSell: g?.canSell ?? false,
         commissionPct: g?.commissionPct ?? 0,
       });
