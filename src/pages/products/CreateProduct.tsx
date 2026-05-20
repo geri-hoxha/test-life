@@ -69,6 +69,8 @@ const CreateProduct = () => {
     const created = addProduct({
       name, code, description, type, status,
       currencies, requiredDocuments: docs, flags,
+      agentCommission: (parseFloat(agentCommissionPct) || 0) / 100,
+      bankCommission: (parseFloat(bankCommissionPct) || 0) / 100,
     });
     toast.success(`Product ${created.code} created`);
     navigate(`/products/${created.id}`);
