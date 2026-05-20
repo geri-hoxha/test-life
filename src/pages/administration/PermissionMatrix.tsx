@@ -16,6 +16,10 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
 import {
   matrixProducts, matrixTemplates, matrixBanks, matrixBankBranches,
@@ -24,7 +28,7 @@ import {
   type GrantRow,
 } from "@/data/permissions";
 import {
-  Search, Building2, UserCircle2, Download, Plus, Trash2, Filter, X as XIcon,
+  Search, Building2, UserCircle2, Download, Plus, Trash2, Filter, X as XIcon, Check, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,8 +42,8 @@ const PermissionMatrix = () => {
   const [fProduct, setFProduct] = useState<string>(ALL);
   const [fTemplate, setFTemplate] = useState<string>(ALL);
   const [fBank, setFBank] = useState<string>(ALL);
-  const [fBranch, setFBranch] = useState<string>(ALL);
-  const [fAgency, setFAgency] = useState<string>(ALL);
+  const [fBranches, setFBranches] = useState<string[]>([]);
+  const [fAgencies, setFAgencies] = useState<string[]>([]);
   const [fAgent, setFAgent] = useState<string>(ALL);
   const [search, setSearch] = useState("");
 
@@ -54,8 +58,8 @@ const PermissionMatrix = () => {
       if (fProduct !== ALL && r.productId !== fProduct) return false;
       if (fTemplate !== ALL && r.templateId !== fTemplate) return false;
       if (fBank !== ALL && r.bankId !== fBank) return false;
-      if (fBranch !== ALL && r.bankBranchId !== fBranch) return false;
-      if (fAgency !== ALL && r.agencyId !== fAgency) return false;
+      if (fBranches.length > 0 && (!r.bankBranchId || !fBranches.includes(r.bankBranchId))) return false;
+      if (fAgencies.length > 0 && (!r.agencyId || !fAgencies.includes(r.agencyId))) return false;
       if (fAgent !== ALL && r.agentId !== fAgent) return false;
       if (q) {
         const hay = [
@@ -65,7 +69,7 @@ const PermissionMatrix = () => {
       }
       return true;
     });
-  }, [version, fProduct, fTemplate, fBank, fBranch, fAgency, fAgent, search]);
+  }, [version, fProduct, fTemplate, fBank, fBranches, fAgencies, fAgent, search]);
 
   const templatesForFilter = useMemo(
     () => matrixTemplates.filter((t) => fProduct === ALL || t.productId === fProduct),
@@ -76,18 +80,18 @@ const PermissionMatrix = () => {
     [fBank]
   );
   const agentsForFilter = useMemo(
-    () => matrixAgents.filter((a) => fAgency === ALL || a.agencyId === fAgency),
-    [fAgency]
+    () => matrixAgents.filter((a) => fAgencies.length === 0 || fAgencies.includes(a.agencyId)),
+    [fAgencies]
   );
 
   const clearFilters = () => {
-    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFBranch(ALL);
-    setFAgency(ALL); setFAgent(ALL); setSearch("");
+    setFProduct(ALL); setFTemplate(ALL); setFBank(ALL); setFBranches([]);
+    setFAgencies([]); setFAgent(ALL); setSearch("");
   };
 
   const activeFilters =
     (fProduct !== ALL ? 1 : 0) + (fTemplate !== ALL ? 1 : 0) + (fBank !== ALL ? 1 : 0) +
-    (fBranch !== ALL ? 1 : 0) + (fAgency !== ALL ? 1 : 0) + (fAgent !== ALL ? 1 : 0) +
+    (fBranches.length > 0 ? 1 : 0) + (fAgencies.length > 0 ? 1 : 0) + (fAgent !== ALL ? 1 : 0) +
     (search ? 1 : 0);
 
   const handleExport = () => {
@@ -158,6 +162,33 @@ const PermissionMatrix = () => {
         </CardContent>
       </Card>
 
+      {/* Branch / Agency multi-select pickers */}
+      <Card className="mt-4">
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <MultiPicker
+            label="Bank branches"
+            icon={Building2}
+            accent="text-blue-500"
+            tint="bg-blue-500/5 border-blue-500/20"
+            selected={fBranches}
+            onChange={setFBranches}
+            items={matrixBankBranches.map((b) => {
+              const bk = matrixBanks.find((x) => x.id === b.bankId);
+              return { id: b.id, name: `${b.name} (${b.region})`, meta: bk?.name ?? "" };
+            })}
+          />
+          <MultiPicker
+            label="Agency branches"
+            icon={UserCircle2}
+            accent="text-purple-500"
+            tint="bg-purple-500/5 border-purple-500/20"
+            selected={fAgencies}
+            onChange={setFAgencies}
+            items={matrixAgencies.map((a) => ({ id: a.id, name: a.name, meta: `${a.code} · ${a.region}` }))}
+          />
+        </CardContent>
+      </Card>
+
       {/* Table */}
       <Card className="mt-4 overflow-hidden">
         <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
@@ -169,7 +200,7 @@ const PermissionMatrix = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-340px)] border-t border-border">
+          <div className="overflow-auto max-h-[calc(100vh-460px)] border-t border-border">
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
                 <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -189,30 +220,16 @@ const PermissionMatrix = () => {
                       options={templatesForFilter.map((t) => ({ value: t.id, label: t.name }))}
                     />
                   </th>
-                  <th className="p-2 border-b border-border font-semibold min-w-[180px]">
-                    <HeaderFilter
-                      label="Bank Branch"
-                      value={fBranch}
-                      onChange={setFBranch}
-                      options={branchesForFilter.map((b) => ({ value: b.id, label: `${b.name} (${b.region})` }))}
-                    />
-                  </th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[180px]">Bank Branch</th>
                   <th className="p-2 border-b border-border font-semibold min-w-[160px]">
                     <HeaderFilter
                       label="Bank"
                       value={fBank}
-                      onChange={(v) => { setFBank(v); setFBranch(ALL); }}
+                      onChange={(v) => { setFBank(v); setFBranches([]); }}
                       options={matrixBanks.map((b) => ({ value: b.id, label: b.name }))}
                     />
                   </th>
-                  <th className="p-2 border-b border-border font-semibold min-w-[160px]">
-                    <HeaderFilter
-                      label="Agency Branch"
-                      value={fAgency}
-                      onChange={(v) => { setFAgency(v); setFAgent(ALL); }}
-                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
-                    />
-                  </th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[160px]">Agency Branch</th>
                   <th className="p-2 border-b border-border font-semibold min-w-[180px]">
                     <HeaderFilter
                       label="Agent"
@@ -342,6 +359,95 @@ const HeaderFilter = ({
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+};
+
+const MultiPicker = ({
+  label, icon: Icon, accent, tint, items, selected, onChange,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  tint: string;
+  items: { id: string; name: string; meta?: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  const selectedItems = selected
+    .map((id) => items.find((i) => i.id === id))
+    .filter((x): x is { id: string; name: string; meta?: string } => !!x);
+
+  return (
+    <div className={`rounded-lg border ${tint} p-3`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${accent}`} />
+          <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
+          <Badge variant="secondary" className="text-[10px] h-5">{selected.length}</Badge>
+        </div>
+        <div className="flex items-center gap-1">
+          {selected.length > 0 && (
+            <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground hover:text-destructive" onClick={() => onChange([])}>
+              Clear
+            </Button>
+          )}
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="outline" className="h-7 text-xs">
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <Command>
+                <CommandInput placeholder={`Search ${label.toLowerCase()}…`} />
+                <CommandList>
+                  <CommandEmpty>No results found.</CommandEmpty>
+                  <CommandGroup>
+                    {items.map((it) => {
+                      const isSel = selected.includes(it.id);
+                      return (
+                        <CommandItem key={it.id} value={`${it.name} ${it.meta ?? ""}`} onSelect={() => toggle(it.id)}>
+                          <div className={`mr-2 h-4 w-4 rounded border flex items-center justify-center ${isSel ? "bg-accent border-accent text-accent-foreground" : "border-input"}`}>
+                            {isSel && <Check className="h-3 w-3" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{it.name}</div>
+                            {it.meta && <div className="text-[10px] text-muted-foreground font-mono truncate">{it.meta}</div>}
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {selectedItems.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground italic">None selected — showing all.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedItems.map((it) => (
+            <button
+              key={it.id}
+              onClick={() => toggle(it.id)}
+              className="group inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-destructive/40"
+              title="Click to remove"
+            >
+              <Icon className={`h-3 w-3 ${accent}`} />
+              <span className="font-medium">{it.name}</span>
+              <XIcon className="h-3 w-3 text-muted-foreground group-hover:text-destructive" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
