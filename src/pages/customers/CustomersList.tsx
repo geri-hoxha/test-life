@@ -154,7 +154,7 @@ const CustomersList = () => {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            );})}
           </TableBody>
         </Table>
       </Card>
