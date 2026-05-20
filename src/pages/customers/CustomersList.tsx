@@ -79,7 +79,8 @@ const CustomersList = () => {
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Full Name</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Personal ID</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Type</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Personal ID / NIPT</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Date of Birth</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Gender</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Phone</TableHead>
@@ -90,13 +91,18 @@ const CustomersList = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customers.map((c) => (
+            {customers.map((c) => {
+              const isCompany = c.customerType === "Company";
+              const avatarInitials = isCompany
+                ? (c.companyName ?? "C").slice(0, 2).toUpperCase()
+                : initials(c.firstName, c.lastName);
+              return (
               <TableRow key={c.id} className="hover:bg-accent-soft/40 cursor-pointer" onClick={() => navigate(`/customers/${c.id}`)}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-accent-soft text-accent text-xs font-semibold">
-                        {initials(c.firstName, c.lastName)}
+                        {avatarInitials}
                       </AvatarFallback>
                     </Avatar>
                     <div>
@@ -105,9 +111,14 @@ const CustomersList = () => {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="font-mono text-xs">{c.personalId}</TableCell>
-                <TableCell className="text-muted-foreground">{c.dateOfBirth ? format(parseISO(c.dateOfBirth), "MMM dd, yyyy") : "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{c.gender}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={isCompany ? "border-accent/40 text-accent" : "border-border text-muted-foreground"}>
+                    {isCompany ? "Company" : "Individual"}
+                  </Badge>
+                </TableCell>
+                <TableCell className="font-mono text-xs">{isCompany ? (c.nipt ?? "—") : c.personalId}</TableCell>
+                <TableCell className="text-muted-foreground">{!isCompany && c.dateOfBirth ? format(parseISO(c.dateOfBirth), "MMM dd, yyyy") : "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{isCompany ? "—" : c.gender}</TableCell>
                 <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground truncate max-w-[200px]">{c.email ?? "—"}</TableCell>
                 <TableCell>
