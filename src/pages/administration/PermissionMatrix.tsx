@@ -104,6 +104,8 @@ const PermissionMatrix = () => {
       "Bank Branch": r.bankBranchName ?? "",
       Agency: r.agencyName ?? "",
       Agent: r.agentName ?? "",
+      "Can Sell": r.canSell ? "Yes" : "No",
+      "Commission %": r.commissionPct,
       "Granted At": new Date(r.createdAt).toLocaleString(),
     }));
     const ws = XLSX.utils.json_to_sheet(data);
