@@ -317,6 +317,35 @@ const FilterField = ({ label, children }: { label: string; children: React.React
   </div>
 );
 
+const HeaderFilter = ({
+  label, value, onChange, options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) => {
+  const active = value !== ALL;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{label}</span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger
+          className={`h-8 text-xs font-normal normal-case tracking-normal bg-background ${active ? "border-accent text-foreground" : "text-muted-foreground"}`}
+        >
+          <SelectValue placeholder="All" />
+        </SelectTrigger>
+        <SelectContent className="max-h-72">
+          <SelectItem value={ALL}>All</SelectItem>
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+};
+
 /* ---------------- Add dialog ---------------- */
 
 const AddPermissionDialog = ({
