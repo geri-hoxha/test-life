@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, MoreHorizontal, Pencil, Trash2, Eye, Layers, Shield, ShieldPlus } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Eye, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { listVersions } from "@/data/productVersions";
 import { listCoverages } from "@/data/coverages";
