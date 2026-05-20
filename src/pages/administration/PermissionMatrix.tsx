@@ -24,9 +24,10 @@ import { Label } from "@/components/ui/label";
 import {
   matrixProducts, matrixTemplates, matrixBanks, matrixBankBranches,
   matrixAgencies, matrixAgents,
-  listGrantRows, addGrant, removeGrant,
+  listGrantRows, addGrant, removeGrant, updateGrant,
   type GrantRow,
 } from "@/data/permissions";
+import { Switch } from "@/components/ui/switch";
 import {
   Search, Building2, UserCircle2, Download, Plus, Trash2, Filter, X as XIcon, Check, ChevronDown,
 } from "lucide-react";
