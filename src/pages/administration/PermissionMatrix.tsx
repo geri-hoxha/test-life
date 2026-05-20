@@ -23,6 +23,7 @@ const ALL = "ALL";
 const PermissionMatrix = () => {
   const [version, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
+  const [pending, setPending] = useState<Record<string, number>>({});
 
   // Filters
   const [fProduct, setFProduct] = useState<string>(ALL);
