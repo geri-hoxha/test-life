@@ -129,6 +129,8 @@ let grants: Grant[] = (() => {
           templateId: t.id,
           subjectType: "BANK_BRANCH",
           subjectId: br.id,
+          canSell: rand() > 0.25,
+          commissionPct: Math.round((2 + rand() * 13) * 10) / 10,
           createdAt: todayIso,
           createdBy: "system.seed",
         });
@@ -142,6 +144,8 @@ let grants: Grant[] = (() => {
           templateId: t.id,
           subjectType: "AGENT",
           subjectId: a.id,
+          canSell: rand() > 0.3,
+          commissionPct: Math.round((5 + rand() * 15) * 10) / 10,
           createdAt: todayIso,
           createdBy: "system.seed",
         });
