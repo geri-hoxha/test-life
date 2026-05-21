@@ -146,6 +146,7 @@ export type GrantRow = {
   agentName: string;
   canSell: boolean;
   commissionPct: number;
+  renewalCommissionPct: number;
 };
 
 export const listGrantRows = (): GrantRow[] => {
