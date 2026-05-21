@@ -157,7 +157,7 @@ const PermissionMatrix = () => {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-12 text-center">
+                    <td colSpan={7} className="p-12 text-center">
                       <p className="text-sm font-medium">No permissions match the current filters.</p>
                       <p className="text-xs text-muted-foreground mt-1">Try clearing the filters.</p>
                     </td>
