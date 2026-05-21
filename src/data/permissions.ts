@@ -176,7 +176,7 @@ export const listGrantRows = (): GrantRow[] => {
   return out;
 };
 
-export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "commissionPct">>) => {
+export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "commissionPct" | "renewalCommissionPct">>) => {
   const existing = grants.get(id);
   if (existing) {
     grants.set(id, { ...existing, ...patch });
@@ -190,6 +190,7 @@ export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "
     subjectId,
     canSell: false,
     commissionPct: 0,
+    renewalCommissionPct: 0,
     ...patch,
   });
 };
