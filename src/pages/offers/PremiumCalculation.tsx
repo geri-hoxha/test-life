@@ -266,35 +266,93 @@ const PremiumCalculation = ({
   // ---- Multi-year schedule ----
   const schedule: ScheduleRow[] = [];
   const start = startDate ? new Date(startDate) : new Date();
-  for (let y = 1; y <= Math.max(1, termYears); y++) {
+  const currentYearNum = new Date().getFullYear();
+  const termN = Math.max(1, termYears);
+
+  // Pre-compute amortization schedule for loan balance (standard annuity)
+  const amort: number[] = [];
+  if (loan && loan.outstandingBalance > 0) {
+    const remTerm = Math.max(1, loan.remainingYears ?? loan.loanTermYears ?? termN);
+    const r = (loan.interestRate ?? 0) / 100;
+    let bal = loan.outstandingBalance;
+    // annual payment via annuity formula
+    const annualPay = r > 0
+      ? (bal * r) / (1 - Math.pow(1 + r, -remTerm))
+      : bal / remTerm;
+    for (let i = 0; i < termN; i++) {
+      amort.push(Math.max(0, bal));
+      const interest = bal * r;
+      const principal = Math.max(0, annualPay - interest);
+      bal = Math.max(0, bal - principal);
+    }
+  }
+
+  // Mode-aware premium for each year
+  const premiumForYear = (i: number): { net: number; note?: string } => {
+    switch (paymentMode) {
+      case "Pagese per gjithe periudhen (Upfront)":
+        return i === 0
+          ? { net: netPremium * termN, note: `Upfront × ${termN} yrs` }
+          : { net: 0, note: "Covered by upfront payment" };
+      case "Pagesa me tarife te vetme për të gjithë periudhën":
+        return i === 0
+          ? { net: netPremium, note: "Single fee for entire period" }
+          : { net: 0, note: "No further charges" };
+      case "Pagesa me prim fiks mujor": {
+        // 12 fixed monthly installments per year, derived from annual net
+        const monthly = netPremium / 12;
+        return { net: monthly * 12, note: `12 × ${fmt(monthly, currency)}/mo` };
+      }
+      case "Pagesa me prim fiks vjetor":
+        return { net: netPremium, note: "Fixed annual premium" };
+      case "Pagesa me prim te paracaktuar, kjo eshte e velfshme per sigurimin e jetes se kombinuar Protect, Sigurimi i jetes se kombinuar ISP": {
+        // Predetermined: higher in early years, tapers off
+        const factor = 1.25 - (0.5 * i) / Math.max(1, termN - 1);
+        return { net: netPremium * factor, note: `Predetermined factor ×${factor.toFixed(2)}` };
+      }
+      case "Pagesa me prim te rregullt":
+      default: {
+        // Regular premium — if loan-protection, follows declining balance
+        if (loan && loan.outstandingBalance > 0 && amort.length > 0) {
+          const factor = amort[i] / loan.outstandingBalance;
+          return {
+            net: netPremium * factor,
+            note: `Tracks loan balance (${(factor * 100).toFixed(0)}%)`,
+          };
+        }
+        return { net: netPremium, note: "Regular annual premium" };
+      }
+    }
+  };
+
+  for (let y = 1; y <= termN; y++) {
     const ys = new Date(start);
     ys.setFullYear(start.getFullYear() + (y - 1));
     const ye = new Date(start);
     ye.setFullYear(start.getFullYear() + y);
 
-    let estLoanBal: number | undefined;
-    if (loan) {
-      const r = (loan.interestRate ?? 0) / 100;
-      const remaining = Math.max(0, (loan.remainingYears ?? loan.loanTermYears) - (y - 1));
-      // Simple amortisation approximation: linear reduction toward 0 by remaining term
-      estLoanBal = Math.max(
-        0,
-        loan.outstandingBalance * Math.max(0, (remaining - 1) / Math.max(1, loan.remainingYears ?? loan.loanTermYears))
-      );
-      // Add interest accrual factor for realism
-      estLoanBal = estLoanBal * (1 + r * 0.1);
-    }
+    const { net: yearNet, note } = premiumForYear(y - 1);
+    const yearTax = yearNet * TAX_RATE;
+    const yearGross = yearNet + yearTax;
+    const yearComm = (yearNet * effectiveCommissionPct) / 100;
+
+    const yLabel = ys.getFullYear();
+    let status: ScheduleRow["status"] = "Not Due";
+    if (yearGross === 0) status = "Not Billed";
+    else if (yLabel === currentYearNum) status = "Current Year";
+    else if (yLabel < currentYearNum) status = "Past";
 
     schedule.push({
       year: y,
       startDate: ys.toISOString().slice(0, 10),
       endDate: ye.toISOString().slice(0, 10),
-      estimatedLoanBalance: estLoanBal,
-      premium: netPremium,
-      tax,
-      commission,
-      gross: grossPremium,
-      status: y === 1 ? "Current Year" : "Not Due",
+      estimatedLoanBalance: loan ? amort[y - 1] ?? 0 : undefined,
+      premium: yearNet,
+      tax: yearTax,
+      commission: yearComm,
+      gross: yearGross,
+      status,
+      note,
     });
   }
 
