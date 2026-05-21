@@ -250,9 +250,8 @@ const OfferDetail = () => {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid grid-cols-3 md:grid-cols-7 w-full md:w-auto">
+        <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full md:w-auto">
           <TabsTrigger value="summary" className="gap-1.5"><Package className="h-3.5 w-3.5" />Summary</TabsTrigger>
-          <TabsTrigger value="premium" className="gap-1.5"><Calculator className="h-3.5 w-3.5" />Premium</TabsTrigger>
           <TabsTrigger value="schedule" className="gap-1.5"><Calendar className="h-3.5 w-3.5" />Schedule</TabsTrigger>
           <TabsTrigger value="people" className="gap-1.5"><Users className="h-3.5 w-3.5" />People</TabsTrigger>
           <TabsTrigger value="documents" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Documents</TabsTrigger>
@@ -337,21 +336,6 @@ const OfferDetail = () => {
 
         </TabsContent>
 
-        {/* PREMIUM */}
-        <TabsContent value="premium" className="mt-4">
-          <PremiumCalculation
-            productId={offer.productId}
-            versionId={offer.versionId}
-            templateId={offer.templateId}
-            currency={offer.currency}
-            insuredAge={insuredAge}
-            insuredGender={insuredGender}
-            startDate={offer.startDate}
-            termYears={offer.termYears}
-            loan={offer.loan}
-            onResultChange={setPremiumResult}
-          />
-        </TabsContent>
 
         {/* SCHEDULE */}
         <TabsContent value="schedule" className="mt-4">
