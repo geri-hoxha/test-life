@@ -334,10 +334,15 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                 <Input id="maxmonths" type="number" min="0" value={t.maxMonths}
                   onChange={(e) => set("maxMonths", +e.target.value || 0)} className="font-mono" />
               </div>
-              <div className="space-y-1.5 md:col-span-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="printtype">Print type (Tip Printimi)</Label>
                 <Input id="printtype" value={t.printType}
                   onChange={(e) => set("printType", e.target.value)} className="font-mono" />
+              </<div>
+              <div className="space-y-1.5">
+                <Label htmlFor="accountcode">Account code</Label>
+                <Input id="accountcode" value={t.accountCode}
+                  onChange={(e) => set("accountCode", e.target.value)} className="font-mono" />
               </div>
             </div>
           </section>
