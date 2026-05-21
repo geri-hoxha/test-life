@@ -66,7 +66,8 @@ const PermissionMatrix = () => {
       Agency: r.agencyName,
       Agent: r.agentName,
       "Can Sell": r.canSell ? "Yes" : "No",
-      "Commission %": r.commissionPct,
+      "First Sale KMS": r.commissionPct,
+      "Renewal KMS": r.renewalCommissionPct,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
