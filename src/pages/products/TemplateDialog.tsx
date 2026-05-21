@@ -338,7 +338,7 @@ const TemplateDialog = ({ open, onOpenChange, productId, versionId, productCurre
                 <Label htmlFor="printtype">Print type (Tip Printimi)</Label>
                 <Input id="printtype" value={t.printType}
                   onChange={(e) => set("printType", e.target.value)} className="font-mono" />
-              </<div>
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="accountcode">Account code</Label>
                 <Input id="accountcode" value={t.accountCode}
