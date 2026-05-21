@@ -40,7 +40,7 @@ const CreateProduct = () => {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState("Life Insurance");
+  const type = "Life Insurance";
   const [status, setStatus] = useState<ProductStatus>("Draft");
   const [currencies, setCurrencies] = useState<string[]>(["EUR"]);
   const [docs, setDocs] = useState<string[]>(["ID document"]);
