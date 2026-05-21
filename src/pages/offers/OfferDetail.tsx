@@ -354,25 +354,6 @@ const OfferDetail = () => {
             </CardContent>
           </Card>
 
-          <PremiumBreakdownPanel
-            data={{
-              productName: product?.name ?? offer.productId,
-              templateName: template?.name,
-              currency: offer.currency,
-              insuredAge,
-              termYears: offer.termYears,
-              paymentMode: offer.paymentMode,
-              netPremium: premiumResult?.netPremium,
-              tax: premiumResult?.tax,
-              taxRate: premiumResult?.taxRate,
-              commission: premiumResult?.commission,
-              grossPremium: premiumResult?.grossPremium ?? offer.premium,
-              loanAdjustment: offer.loan ? 0 : undefined,
-              fxRate: premiumResult?.fxRate,
-              fxSource: premiumResult?.fxSource,
-              reportingCurrency: "EUR",
-            }}
-          />
         </TabsContent>
 
         {/* PREMIUM */}
