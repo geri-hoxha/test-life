@@ -53,6 +53,7 @@ const blank = (productId: string, versionId: string, currencies: string[]): Temp
   cancelled: false,
   isActive: true,
   allowedSellerIds: [],
+  accountCode: "5100",
 });
 
 const OVERRIDES: PremiumOverrideType[] = [
