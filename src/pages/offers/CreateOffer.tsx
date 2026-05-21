@@ -100,7 +100,11 @@ const CreateOffer = () => {
 
   // Step 3
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [termYears, setTermYears] = useState(20);
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 20);
+    return d.toISOString().slice(0, 10);
+  });
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("Annual payment schedule");
   const [hasLoan, setHasLoan] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
