@@ -40,7 +40,7 @@ const CreateProduct = () => {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState("Life Insurance");
+  const type = "Life Insurance";
   const [status, setStatus] = useState<ProductStatus>("Draft");
   const [currencies, setCurrencies] = useState<string[]>(["EUR"]);
   const [docs, setDocs] = useState<string[]>(["ID document"]);
@@ -106,18 +106,6 @@ const CreateProduct = () => {
               <div className="space-y-1.5">
                 <Label htmlFor="code">Product Code *</Label>
                 <Input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="e.g. TL-PLUS-20" className="font-mono" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="type">Product Type</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger id="type"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Life Insurance">Life Insurance</SelectItem>
-                    <SelectItem value="Health Insurance">Health Insurance</SelectItem>
-                    <SelectItem value="Endowment">Endowment</SelectItem>
-                    <SelectItem value="Annuity">Annuity</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="status">Status</Label>
