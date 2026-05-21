@@ -631,6 +631,7 @@ const CreateOffer = () => {
             insuredGender={insuredGender}
             startDate={startDate}
             termYears={termYears}
+            paymentMode={paymentMode}
             loan={
               hasLoan
                 ? {
