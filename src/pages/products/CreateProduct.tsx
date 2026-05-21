@@ -119,17 +119,6 @@ const CreateProduct = () => {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(v) => setStatus(v as ProductStatus)}>
-                  <SelectTrigger id="status"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label htmlFor="agent-comm">Agent Commission (%)</Label>
                 <div className="relative">
                   <Input id="agent-comm" type="number" min="0" max="100" step="0.01" value={agentCommissionPct} onChange={(e) => setAgentCommissionPct(e.target.value)} className="pr-7 font-mono" />
