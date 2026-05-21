@@ -153,8 +153,38 @@ const CustomersList = () => {
                 <TableCell>
                   <Badge className={`border-0 ${pepClass[c.pepStatus]}`}>{c.pepStatus}</Badge>
                 </TableCell>
-                <TableCell className="text-right font-medium">
-                  {c.totalExposure > 0 ? fmtMoney(c.totalExposure) : <span className="text-muted-foreground">—</span>}
+                <TableCell className="text-right font-medium" onClick={(e) => e.stopPropagation()}>
+                  {c.totalExposure > 0 ? (
+                    <div className="flex flex-col items-end leading-tight">
+                      <span>{fmtMoney(c.totalExposure)}</span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-[11px] font-normal text-accent hover:underline">
+                            Breakdown
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-3">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                            Exposure by Product
+                          </div>
+                          <div className="space-y-1.5">
+                            {exposureBreakdown(c.id, c.totalExposure).map((r) => (
+                              <div key={r.product} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="truncate text-foreground">{r.product}</span>
+                                <span className="font-medium tabular-nums">{fmtMoney(r.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between gap-3 pt-2 mt-2 border-t border-border text-sm">
+                            <span className="font-semibold">Total</span>
+                            <span className="font-semibold tabular-nums">{fmtMoney(c.totalExposure)}</span>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-1">
