@@ -46,6 +46,7 @@ export type Customer = {
   lastName: string;
   fatherName?: string;
   personalId: string; // SSN / National ID (Individual)
+  ssnIssuingCountry?: string; // country that issued the SSN
   dateOfBirth: string; // ISO
   gender: Gender;
   nationality?: string;
@@ -107,6 +108,21 @@ export const customerSchema = z.object({
     if (!c.nipt?.trim()) ctx.addIssue({ code: "custom", message: "NIPT is required", path: ["nipt"] });
   }
 });
+
+export const SSN_ISSUING_COUNTRIES = [
+  "Albania",
+  "Kosovo",
+  "North Macedonia",
+  "Montenegro",
+  "Greece",
+  "Italy",
+  "Germany",
+  "France",
+  "United Kingdom",
+  "United States",
+  "Turkey",
+  "Other",
+];
 
 const seed: Customer[] = [
   { id: "CUS-0001", customerType: "Individual", firstName: "Arben", lastName: "Hoxha", fatherName: "Petrit", personalId: "AL-TR-J70412900A",

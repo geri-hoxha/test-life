@@ -19,12 +19,14 @@ import { toast } from "sonner";
 import {
   Customer, customerSchema, getCustomer, newCustomerId, upsertCustomer,
   Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPES, F5_LOCATIONS,
+  SSN_ISSUING_COUNTRIES,
 } from "@/data/customers";
 
 const blank = (): Customer => ({
   id: newCustomerId(),
   customerType: "Individual",
   firstName: "", lastName: "", fatherName: "", personalId: "",
+  ssnIssuingCountry: "Albania",
   dateOfBirth: "", gender: "Male",
   nationality: "Albanian", placeOfBirth: "",
   companyName: "", nipt: "", companyType: "Sh.p.k.",
@@ -198,9 +200,20 @@ const CustomerForm = () => {
               <h3 className="text-sm font-semibold text-foreground mb-1">Identity</h3>
               <p className="text-xs text-muted-foreground mb-5">Personal identification details for KYC.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5 md:col-span-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="pid">SSN / Personal ID *</Label>
                   <Input id="pid" className="font-mono" value={c.personalId} maxLength={40} onChange={(e) => set("personalId", e.target.value)} placeholder="AL-TR-J70412900A" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Issuing Country</Label>
+                  <Select value={c.ssnIssuingCountry ?? ""} onValueChange={(v) => set("ssnIssuingCountry", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SSN_ISSUING_COUNTRIES.map((country) => (
+                        <SelectItem key={country} value={country}>{country}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="fn">First Name *</Label>
