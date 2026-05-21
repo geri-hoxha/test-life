@@ -1,9 +1,12 @@
 export type OfferStatus = "Draft" | "Quoted" | "Pending Review" | "Approved" | "Issued" | "Rejected";
 
 export type PaymentMode =
-  | "Pay all years upfront"
-  | "Pay first year only"
-  | "Annual payment schedule";
+  | "Pagesa me prim te rregullt"
+  | "Pagese per gjithe periudhen (Upfront)"
+  | "Pagesa me tarife te vetme për të gjithë periudhën"
+  | "Pagesa me prim fiks mujor"
+  | "Pagesa me prim fiks vjetor"
+  | "Pagesa me prim te paracaktuar, kjo eshte e velfshme per sigurimin e jetes se kombinuar Protect, Sigurimi i jetes se kombinuar ISP";
 
 export type Beneficiary = {
   id: string;
