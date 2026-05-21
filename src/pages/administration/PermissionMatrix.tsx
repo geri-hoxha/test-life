@@ -149,7 +149,8 @@ const PermissionMatrix = () => {
                     />
                   </th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[110px]">Can Sell</th>
-                  <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">Commission %</th>
+                  <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">First Sale KMS</th>
+                  <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">Renewal KMS</th>
                 </tr>
               </thead>
 
