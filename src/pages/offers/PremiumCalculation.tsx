@@ -40,6 +40,7 @@ import { listCoverages, Coverage } from "@/data/coverages";
 import { getPremiumRule, calculatePremium, Gender } from "@/data/premiumRules";
 import { listTemplates, Template } from "@/data/templates";
 import { getRatesForPair, convert } from "@/data/fxRates";
+import type { PaymentMode } from "@/data/offers";
 
 export type PremiumResult = {
   netPremium: number;
@@ -62,7 +63,8 @@ export type ScheduleRow = {
   tax: number;
   commission: number;
   gross: number;
-  status: "Not Due" | "Current Year";
+  status: "Not Due" | "Current Year" | "Past" | "Not Billed";
+  note?: string;
 };
 
 type Props = {
@@ -74,6 +76,7 @@ type Props = {
   insuredGender: Gender;
   startDate: string;
   termYears: number;
+  paymentMode?: PaymentMode;
   loan?: {
     amount: number;
     interestRate: number;
