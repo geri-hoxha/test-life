@@ -523,24 +523,15 @@ const CreateOffer = () => {
               <CardTitle className="text-base">Policy Dates & Payment</CardTitle>
               <CardDescription>Set the cover period and payment schedule.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-4">
+            <CardContent className="grid gap-4 md:grid-cols-3">
               <div>
                 <Label>Start Date</Label>
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div>
-                <Label>Term (Years)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={termYears}
-                  onChange={(e) => setTermYears(Number(e.target.value) || 1)}
-                />
-              </div>
-              <div>
                 <Label>End Date</Label>
-                <Input value={endDate} readOnly className="bg-muted/40" />
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                <div className="text-[11px] text-muted-foreground mt-1">Term: {termYears} years</div>
               </div>
               <div>
                 <Label>Payment Mode</Label>
