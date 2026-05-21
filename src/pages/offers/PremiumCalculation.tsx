@@ -127,6 +127,7 @@ const PremiumCalculation = ({
   insuredGender,
   startDate,
   termYears,
+  paymentMode = "Pagesa me prim te rregullt",
   loan,
   onResultChange,
 }: Props) => {
