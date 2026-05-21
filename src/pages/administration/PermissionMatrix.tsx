@@ -23,6 +23,7 @@ const PermissionMatrix = () => {
   const [version, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
   const [pending, setPending] = useState<Record<string, number>>({});
+  const [pendingRenewal, setPendingRenewal] = useState<Record<string, number>>({});
 
   // Filters
   const [fProduct, setFProduct] = useState<string>(ALL);
@@ -66,7 +67,8 @@ const PermissionMatrix = () => {
       Agency: r.agencyName,
       Agent: r.agentName,
       "Can Sell": r.canSell ? "Yes" : "No",
-      "Commission %": r.commissionPct,
+      "First Sale KMS": r.commissionPct,
+      "Renewal KMS": r.renewalCommissionPct,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -147,14 +149,15 @@ const PermissionMatrix = () => {
                     />
                   </th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[110px]">Can Sell</th>
-                  <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">Commission %</th>
+                  <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">First Sale KMS</th>
+                  <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">Renewal KMS</th>
                 </tr>
               </thead>
 
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-12 text-center">
+                    <td colSpan={7} className="p-12 text-center">
                       <p className="text-sm font-medium">No permissions match the current filters.</p>
                       <p className="text-xs text-muted-foreground mt-1">Try clearing the filters.</p>
                     </td>
@@ -219,10 +222,10 @@ const PermissionMatrix = () => {
                                     updateGrant(r.id, { commissionPct: draft });
                                     setPending((p) => { const n = { ...p }; delete n[r.id]; return n; });
                                     refresh();
-                                    toast.success("Commission saved");
+                                    toast.success("First sale KMS saved");
                                   }}
                                   className="inline-flex items-center justify-center h-5 w-5 rounded bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-30"
-                                  title="Save commission"
+                                  title="Save first sale KMS"
                                 >
                                   <Save className="h-3 w-3" />
                                 </button>
@@ -234,7 +237,50 @@ const PermissionMatrix = () => {
                         );
                       })()}
                     </td>
-
+                    <td className="p-2 border-b border-border text-center">
+                      {(() => {
+                        const draft = pendingRenewal[r.id] ?? r.renewalCommissionPct;
+                        const dirty = pendingRenewal[r.id] !== undefined && pendingRenewal[r.id] !== r.renewalCommissionPct;
+                        return (
+                          <div className="relative inline-flex items-center w-36">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={draft}
+                              disabled={!r.canSell}
+                              onChange={(e) => {
+                                const raw = parseFloat(e.target.value);
+                                const next = isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
+                                setPendingRenewal((p) => ({ ...p, [r.id]: next }));
+                              }}
+                              className="h-8 text-sm pr-14 text-right tabular-nums"
+                            />
+                            <div className="absolute right-1.5 flex items-center gap-0.5">
+                              {dirty ? (
+                                <button
+                                  type="button"
+                                  disabled={!r.canSell}
+                                  onClick={() => {
+                                    updateGrant(r.id, { renewalCommissionPct: draft });
+                                    setPendingRenewal((p) => { const n = { ...p }; delete n[r.id]; return n; });
+                                    refresh();
+                                    toast.success("Renewal KMS saved");
+                                  }}
+                                  className="inline-flex items-center justify-center h-5 w-5 rounded bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-30"
+                                  title="Save renewal KMS"
+                                >
+                                  <Save className="h-3 w-3" />
+                                </button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground pointer-events-none">%</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>

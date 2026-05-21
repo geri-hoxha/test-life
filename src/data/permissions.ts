@@ -13,7 +13,8 @@ export type Grant = {
   subjectType: GrantSubjectType;
   subjectId: string; // bankId or agencyId
   canSell: boolean;
-  commissionPct: number; // 0–100
+  commissionPct: number; // 0–100 first-sale
+  renewalCommissionPct: number; // 0–100 renewal
 };
 
 export type MatrixProduct = { id: string; name: string; code: string };
@@ -123,7 +124,8 @@ const grants = new Map<string, Grant>();
     for (const ag of matrixAgents) {
       const canSell = rand() > 0.4;
       const commissionPct = Math.round((5 + rand() * 15) * 10) / 10;
-      const g: Grant = { productId: t.productId, templateId: t.id, subjectType: "AGENT", subjectId: ag.id, canSell, commissionPct };
+      const renewalCommissionPct = Math.round((commissionPct * (0.4 + rand() * 1.0)) * 10) / 10;
+      const g: Grant = { productId: t.productId, templateId: t.id, subjectType: "AGENT", subjectId: ag.id, canSell, commissionPct, renewalCommissionPct };
       grants.set(grantKey(g.productId, g.templateId, g.subjectType, g.subjectId), g);
     }
   }
@@ -144,6 +146,7 @@ export type GrantRow = {
   agentName: string;
   canSell: boolean;
   commissionPct: number;
+  renewalCommissionPct: number;
 };
 
 export const listGrantRows = (): GrantRow[] => {
@@ -168,13 +171,14 @@ export const listGrantRows = (): GrantRow[] => {
         agentName: ag.name,
         canSell: g?.canSell ?? false,
         commissionPct: g?.commissionPct ?? 0,
+        renewalCommissionPct: g?.renewalCommissionPct ?? 5,
       });
     }
   }
   return out;
 };
 
-export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "commissionPct">>) => {
+export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "commissionPct" | "renewalCommissionPct">>) => {
   const existing = grants.get(id);
   if (existing) {
     grants.set(id, { ...existing, ...patch });
@@ -188,6 +192,7 @@ export const updateGrant = (id: string, patch: Partial<Pick<Grant, "canSell" | "
     subjectId,
     canSell: false,
     commissionPct: 0,
+    renewalCommissionPct: 0,
     ...patch,
   });
 };
