@@ -39,7 +39,7 @@ const Index = () => {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <KpiCard label="Active Products" value="14" delta="+2" trend="up" hint="vs last month" icon={Package} />
+        <KpiCard label="Sellable Products / Templates" value={`${seedProducts.length} / ${matrixTemplates.length}`} icon={Package} />
         <KpiCard label="Draft Offers" value="38" delta="+12%" trend="up" hint="this week" icon={FileText} />
         <KpiCard label="Issued Policies" value="1,284" delta="+46" trend="up" hint="MTD" icon={ShieldCheck} />
         <KpiCard label="Pending Verification" value="12" delta="-3" trend="down" hint="vs yesterday" icon={AlertCircle} />
