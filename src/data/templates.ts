@@ -82,6 +82,7 @@ export type Template = {
   cancelled: boolean;      // Anulluar
   isActive: boolean;
   allowedSellerIds: string[]; // who can sell this package
+  accountCode: string;      // General ledger account code
 };
 
 const seed: Template[] = [
