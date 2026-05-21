@@ -108,14 +108,13 @@ const CreateProduct = () => {
                 <Input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="e.g. TL-PLUS-20" className="font-mono" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="type">Product Type</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger id="type"><SelectValue /></SelectTrigger>
+                <Label htmlFor="status">Status</Label>
+                <Select value={status} onValueChange={(v) => setStatus(v as ProductStatus)}>
+                  <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Life Insurance">Life Insurance</SelectItem>
-                    <SelectItem value="Health Insurance">Health Insurance</SelectItem>
-                    <SelectItem value="Endowment">Endowment</SelectItem>
-                    <SelectItem value="Annuity">Annuity</SelectItem>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
