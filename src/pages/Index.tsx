@@ -6,6 +6,8 @@ import QuickStart from "@/components/dashboard/QuickStart";
 import { Package, FileText, ShieldCheck, AlertCircle, Euro } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Download, Calendar } from "lucide-react";
+import { seedProducts } from "@/data/products";
+import { matrixTemplates } from "@/data/permissions";
 
 const Index = () => {
   return (
