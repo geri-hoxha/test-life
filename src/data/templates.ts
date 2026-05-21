@@ -182,6 +182,7 @@ const seed: Template[] = [
     cancelled: false,
     isActive: true,
     allowedSellerIds: ["BNK-001", "BNK-003", "BNK-005", "BNK-007"],
+    accountCode: "5200",
   },
 ];
 
