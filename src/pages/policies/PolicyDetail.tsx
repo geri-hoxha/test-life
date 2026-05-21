@@ -63,9 +63,9 @@ const PolicyDetail = () => {
   const startYear = new Date(policy.startDate).getFullYear();
   const schedule = Array.from({ length: policy.termYears }, (_, i) => {
     const y = startYear + i;
-    const due = policy.paymentMode === "Pay all years upfront"
+    const due = policy.paymentMode === "Pagese per gjithe periudhen (Upfront)"
       ? (i === 0 ? policy.premium * policy.termYears : 0)
-      : policy.paymentMode === "Pay first year only"
+      : policy.paymentMode === "Pagesa me tarife te vetme për të gjithë periudhën"
         ? (i === 0 ? policy.premium : 0)
         : policy.premium;
     return {

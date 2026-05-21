@@ -39,8 +39,8 @@ export const recordPayment = (p: Omit<PaymentRecord, "id">) => {
 };
 
 const yearlyDue = (policy: Policy, yearIdx: number) => {
-  if (policy.paymentMode === "Pay all years upfront") return yearIdx === 0 ? policy.premium * policy.termYears : 0;
-  if (policy.paymentMode === "Pay first year only") return yearIdx === 0 ? policy.premium : 0;
+  if (policy.paymentMode === "Pagese per gjithe periudhen (Upfront)") return yearIdx === 0 ? policy.premium * policy.termYears : 0;
+  if (policy.paymentMode === "Pagesa me tarife te vetme për të gjithë periudhën") return yearIdx === 0 ? policy.premium : 0;
   return policy.premium;
 };
 

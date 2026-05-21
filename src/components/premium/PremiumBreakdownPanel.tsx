@@ -44,23 +44,22 @@ const Row = ({ label, value, hint, accent }: { label: string; value: React.React
 
 const explainPaymentMode = (mode: PaymentMode, gross: number, term: number, ccy: string) => {
   switch (mode) {
-    case "Pay all years upfront":
+    case "Pagese per gjithe periudhen (Upfront)":
       return {
-        label: "Single upfront payment",
-        detail: `Customer pays the full ${term}-year premium today: ${fmt(gross * term, ccy)} once.`,
+        label: mode,
+        detail: `Klienti paguan primin e plotë për ${term} vjet sot: ${fmt(gross * term, ccy)} një herë.`,
         firstInstallment: gross * term,
       };
-    case "Pay first year only":
+    case "Pagesa me tarife te vetme për të gjithë periudhën":
       return {
-        label: "First year only",
-        detail: `Only the first annual premium of ${fmt(gross, ccy)} is paid now. Future years are not billed.`,
+        label: mode,
+        detail: `Tarife e vetme e përcaktuar për të gjithë periudhën: ${fmt(gross, ccy)} një herë.`,
         firstInstallment: gross,
       };
-    case "Annual payment schedule":
     default:
       return {
-        label: "Annual installments",
-        detail: `Customer pays ${fmt(gross, ccy)} every year for ${term} years.`,
+        label: mode,
+        detail: `Klienti paguan ${fmt(gross, ccy)} çdo vit për ${term} vjet.`,
         firstInstallment: gross,
       };
   }
