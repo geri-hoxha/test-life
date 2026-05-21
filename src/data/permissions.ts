@@ -13,7 +13,8 @@ export type Grant = {
   subjectType: GrantSubjectType;
   subjectId: string; // bankId or agencyId
   canSell: boolean;
-  commissionPct: number; // 0–100
+  commissionPct: number; // 0–100 first-sale
+  renewalCommissionPct: number; // 0–100 renewal
 };
 
 export type MatrixProduct = { id: string; name: string; code: string };
