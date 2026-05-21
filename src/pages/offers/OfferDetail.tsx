@@ -58,7 +58,7 @@ import { seedProducts } from "@/data/products";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates, overrideSummary } from "@/data/templates";
 import { getCustomer, fullName, ageFromDob } from "@/data/customers";
-import PremiumBreakdownPanel from "@/components/premium/PremiumBreakdownPanel";
+
 import { listCoverages } from "@/data/coverages";
 import { listDocuments } from "@/data/documents";
 import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
@@ -354,25 +354,6 @@ const OfferDetail = () => {
             </CardContent>
           </Card>
 
-          <PremiumBreakdownPanel
-            data={{
-              productName: product?.name ?? offer.productId,
-              templateName: template?.name,
-              currency: offer.currency,
-              insuredAge,
-              termYears: offer.termYears,
-              paymentMode: offer.paymentMode,
-              netPremium: premiumResult?.netPremium,
-              tax: premiumResult?.tax,
-              taxRate: premiumResult?.taxRate,
-              commission: premiumResult?.commission,
-              grossPremium: premiumResult?.grossPremium ?? offer.premium,
-              loanAdjustment: offer.loan ? 0 : undefined,
-              fxRate: premiumResult?.fxRate,
-              fxSource: premiumResult?.fxSource,
-              reportingCurrency: "EUR",
-            }}
-          />
         </TabsContent>
 
         {/* PREMIUM */}
@@ -397,57 +378,120 @@ const OfferDetail = () => {
             <CardHeader>
               <CardTitle className="text-base">Yearly Schedule</CardTitle>
               <CardDescription>
-                Premium and (where applicable) loan balance projections across the policy term.
+                Premium installments {offer.loan ? "and projected loan balance " : ""}across the {offer.termYears}-year policy term.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!premiumResult ? (
-                <div className="text-sm text-muted-foreground py-6 text-center">
-                  Open the Premium tab once to compute the schedule.
-                </div>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[60px]">Year</TableHead>
-                        <TableHead>Start</TableHead>
-                        <TableHead>End</TableHead>
-                        {offer.loan && <TableHead className="text-right">Est. Loan Balance</TableHead>}
-                        <TableHead className="text-right">Net Premium</TableHead>
-                        <TableHead className="text-right">Tax (10%)</TableHead>
-                        <TableHead className="text-right">Gross</TableHead>
-                        <TableHead className="text-right">Agent Commission</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {premiumResult.schedule.map((s) => (
-                        <TableRow key={s.year}>
-                          <TableCell className="font-mono">{s.year}</TableCell>
-                          <TableCell className="font-mono text-xs">{s.startDate}</TableCell>
-                          <TableCell className="font-mono text-xs">{s.endDate}</TableCell>
-                          {offer.loan && (
-                            <TableCell className="text-right font-mono text-sm">
-                              {s.estimatedLoanBalance !== undefined ? fmtMoney(s.estimatedLoanBalance, offer.currency) : "—"}
-                            </TableCell>
-                          )}
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(s.premium, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(s.tax, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm font-semibold">{fmtMoney(s.gross, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(s.commission, offer.currency)}</TableCell>
-                          <TableCell>
-                            <Badge variant={s.status === "Current Year" ? "default" : "secondary"}>{s.status}</Badge>
-                          </TableCell>
+              {(() => {
+                const taxRate = 0.10;
+                const annualGross = offer.premium;
+                const bankPct = template?.bankCommission ?? product?.bankCommission ?? 0;
+                const agentPct = template?.agentCommission ?? product?.agentCommission ?? 0;
+                const startY = new Date(offer.startDate).getFullYear();
+                const mmdd = offer.startDate.slice(5);
+                const currentYear = new Date().getFullYear();
+
+                // payment-mode-aware gross for the year
+                const grossForYear = (i: number) => {
+                  switch (offer.paymentMode) {
+                    case "Pagese per gjithe periudhen (Upfront)":
+                      return i === 0 ? annualGross * offer.termYears : 0;
+                    case "Pagesa me tarife te vetme për të gjithë periudhën":
+                      return i === 0 ? annualGross : 0;
+                    default:
+                      return annualGross;
+                  }
+                };
+
+                // loan amortization (very simple linear decline)
+                const loanBalance = (i: number) => {
+                  if (!offer.loan) return undefined;
+                  const remaining = Math.max(0, offer.loan.outstandingBalance * (1 - i / offer.termYears));
+                  return remaining;
+                };
+
+                const rows = Array.from({ length: offer.termYears }, (_, i) => {
+                  const yearLabel = startY + i;
+                  const gross = grossForYear(i);
+                  const tax = +(gross * taxRate / (1 + taxRate)).toFixed(2);
+                  const net = +(gross - tax).toFixed(2);
+                  const bankComm = +(net * bankPct).toFixed(2);
+                  const agentComm = +(net * agentPct).toFixed(2);
+                  let status: "Current Year" | "Future" | "Past" | "Not Billed" = "Future";
+                  if (gross === 0) status = "Not Billed";
+                  else if (yearLabel === currentYear) status = "Current Year";
+                  else if (yearLabel < currentYear) status = "Past";
+                  return {
+                    year: i + 1,
+                    startDate: `${yearLabel}-${mmdd}`,
+                    endDate: `${yearLabel + 1}-${mmdd}`,
+                    gross, tax, net, bankComm, agentComm,
+                    estLoan: loanBalance(i),
+                    status,
+                  };
+                });
+
+                const totals = rows.reduce((acc, r) => ({
+                  gross: acc.gross + r.gross, tax: acc.tax + r.tax, net: acc.net + r.net,
+                  bank: acc.bank + r.bankComm, agent: acc.agent + r.agentComm,
+                }), { gross: 0, tax: 0, net: 0, bank: 0, agent: 0 });
+
+                return (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[60px]">Year</TableHead>
+                          <TableHead>Start</TableHead>
+                          <TableHead>End</TableHead>
+                          {offer.loan && <TableHead className="text-right">Est. Loan Balance</TableHead>}
+                          <TableHead className="text-right">Gross</TableHead>
+                          <TableHead className="text-right">Tax (10%)</TableHead>
+                          <TableHead className="text-right">Net</TableHead>
+                          <TableHead className="text-right">Bank Comm. ({(bankPct * 100).toFixed(0)}%)</TableHead>
+                          <TableHead className="text-right">Agent Comm. ({(agentPct * 100).toFixed(0)}%)</TableHead>
+                          <TableHead>Status</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((r) => (
+                          <TableRow key={r.year}>
+                            <TableCell className="font-mono">{r.year}</TableCell>
+                            <TableCell className="font-mono text-xs">{r.startDate}</TableCell>
+                            <TableCell className="font-mono text-xs">{r.endDate}</TableCell>
+                            {offer.loan && (
+                              <TableCell className="text-right font-mono text-sm">
+                                {r.estLoan !== undefined ? fmtMoney(r.estLoan, offer.currency) : "—"}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right font-mono text-sm font-semibold">{fmtMoney(r.gross, offer.currency)}</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(r.tax, offer.currency)}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{fmtMoney(r.net, offer.currency)}</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(r.bankComm, offer.currency)}</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(r.agentComm, offer.currency)}</TableCell>
+                            <TableCell>
+                              <Badge variant={r.status === "Current Year" ? "default" : "secondary"}>{r.status}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/40 font-medium">
+                          <TableCell colSpan={offer.loan ? 4 : 3} className="text-sm">Total over {offer.termYears} years</TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold text-primary">{fmtMoney(totals.gross, offer.currency)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.tax, offer.currency)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.net, offer.currency)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.bank, offer.currency)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.agent, offer.currency)}</TableCell>
+                          <TableCell />
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
+
 
         {/* PEOPLE */}
         <TabsContent value="people" className="mt-4 space-y-4">
