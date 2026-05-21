@@ -115,21 +115,55 @@ export const seedProducts: Product[] = [
   },
 ];
 
-// In-memory store (demo only)
-let products: Product[] = [...seedProducts];
+// In-memory store backed by localStorage (demo persistence)
+const STORAGE_KEY = "esiglife.products.v1";
+
+const loadProducts = (): Product[] => {
+  if (typeof window === "undefined") return [...seedProducts];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [...seedProducts];
+    const parsed = JSON.parse(raw) as Product[];
+    return Array.isArray(parsed) && parsed.length ? parsed : [...seedProducts];
+  } catch {
+    return [...seedProducts];
+  }
+};
+
+let products: Product[] = loadProducts();
+
+const persist = () => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+  } catch {
+    // ignore quota errors in demo
+  }
+};
+
+export const resetProducts = () => {
+  products = [...seedProducts];
+  persist();
+};
 
 export const listProducts = () => products;
 export const getProduct = (id: string) => products.find((p) => p.id === id);
 export const updateProductFlags = (id: string, flags: Product["flags"]) => {
   products = products.map((p) => (p.id === id ? { ...p, flags } : p));
+  persist();
   return products.find((p) => p.id === id);
 };
 export const updateProduct = (id: string, patch: Partial<Omit<Product, "id">>) => {
   products = products.map((p) => (p.id === id ? { ...p, ...patch } : p));
+  persist();
   return products.find((p) => p.id === id);
 };
 export const addProduct = (p: Omit<Product, "id" | "activeVersion" | "createdDate">) => {
-  const id = `PRD-${String(products.length + 1).padStart(3, "0")}`;
+  const maxNum = products.reduce((m, x) => {
+    const n = parseInt(x.id.replace(/\D/g, ""), 10);
+    return Number.isFinite(n) && n > m ? n : m;
+  }, 0);
+  const id = `PRD-${String(maxNum + 1).padStart(3, "0")}`;
   const created: Product = {
     ...p,
     id,
@@ -137,5 +171,7 @@ export const addProduct = (p: Omit<Product, "id" | "activeVersion" | "createdDat
     createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
   };
   products = [created, ...products];
+  persist();
   return created;
 };
+
