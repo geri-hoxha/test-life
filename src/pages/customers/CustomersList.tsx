@@ -31,6 +31,33 @@ const initials = (first: string, last: string) =>
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
 
+// Deterministic pseudo-random exposure breakdown by product, derived from customer id.
+const exposureBreakdown = (customerId: string, total: number) => {
+  if (total <= 0) return [] as { product: string; amount: number }[];
+  let seed = 0;
+  for (let i = 0; i < customerId.length; i++) seed = (seed * 31 + customerId.charCodeAt(i)) >>> 0;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0xffffffff;
+  };
+  const count = 2 + Math.floor(rand() * Math.min(3, seedProducts.length - 1));
+  const picks: typeof seedProducts = [];
+  const pool = [...seedProducts];
+  for (let i = 0; i < count && pool.length; i++) {
+    picks.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
+  }
+  const weights = picks.map(() => 0.3 + rand());
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const rows = picks.map((p, i) => ({
+    product: p.name,
+    amount: Math.round((weights[i] / sum) * total),
+  }));
+  // fix rounding drift
+  const drift = total - rows.reduce((a, r) => a + r.amount, 0);
+  if (rows.length) rows[0].amount += drift;
+  return rows;
+};
+
 const CustomersList = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
