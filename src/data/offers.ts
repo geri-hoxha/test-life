@@ -55,7 +55,7 @@ const seed: Offer[] = [
       { id: "b1", customerId: "CUS-0001", relationship: "Father", percentage: 100 },
     ],
     startDate: "2026-06-01", endDate: "2056-06-01", termYears: 30,
-    paymentMode: "Annual payment schedule",
+    paymentMode: "Pagesa me prim te rregullt",
     premium: 1180, status: "Draft", createdDate: "2026-04-26",
   },
   // 2) Pending Review — PEP-flagged client (Elira Dervishi)
