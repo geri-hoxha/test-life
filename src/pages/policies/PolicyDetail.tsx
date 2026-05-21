@@ -59,23 +59,6 @@ const PolicyDetail = () => {
   const insured = getCustomer(policy.insuredId);
   const payer = getCustomer(policy.payerId);
 
-  // Premium schedule
-  const startYear = new Date(policy.startDate).getFullYear();
-  const schedule = Array.from({ length: policy.termYears }, (_, i) => {
-    const y = startYear + i;
-    const due = policy.paymentMode === "Pagese per gjithe periudhen (Upfront)"
-      ? (i === 0 ? policy.premium * policy.termYears : 0)
-      : policy.paymentMode === "Pagesa me tarife te vetme për të gjithë periudhën"
-        ? (i === 0 ? policy.premium : 0)
-        : policy.premium;
-    return {
-      year: i + 1,
-      startDate: `${y}-${policy.startDate.slice(5)}`,
-      endDate: `${y + 1}-${policy.startDate.slice(5)}`,
-      premium: due,
-      status: i === 0 && policy.status === "Active" ? "Paid" : "Not Due",
-    };
-  });
 
   // Mock payments — first year recorded if Active
   const payments = policy.status === "Active" ? [
@@ -132,9 +115,8 @@ const PolicyDetail = () => {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
           <TabsTrigger value="summary"><FileText className="h-3.5 w-3.5 mr-1.5" />Summary</TabsTrigger>
-          <TabsTrigger value="schedule"><Calendar className="h-3.5 w-3.5 mr-1.5" />Schedule</TabsTrigger>
           <TabsTrigger value="payments"><CreditCard className="h-3.5 w-3.5 mr-1.5" />Payments</TabsTrigger>
           <TabsTrigger value="documents"><Files className="h-3.5 w-3.5 mr-1.5" />Documents</TabsTrigger>
           <TabsTrigger value="beneficiaries"><Users className="h-3.5 w-3.5 mr-1.5" />Beneficiaries</TabsTrigger>
@@ -181,40 +163,6 @@ const PolicyDetail = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="schedule" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Premium Schedule</CardTitle>
-              <CardDescription>Projected premium installments over the policy term.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Year</TableHead>
-                      <TableHead>Period Start</TableHead>
-                      <TableHead>Period End</TableHead>
-                      <TableHead className="text-right">Premium Due</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {schedule.map((r) => (
-                      <TableRow key={r.year}>
-                        <TableCell className="font-mono text-xs">{r.year}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{r.startDate}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{r.endDate}</TableCell>
-                        <TableCell className="text-right font-mono">{fmtMoney(r.premium, policy.currency)}</TableCell>
-                        <TableCell><Badge variant="outline">{r.status}</Badge></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="payments" className="mt-4">
           <Card>

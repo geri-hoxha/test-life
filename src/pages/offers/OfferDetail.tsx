@@ -334,25 +334,6 @@ const OfferDetail = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Premium Summary</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <Field label="Net Premium" value={fmtMoney(premiumResult?.netPremium ?? offer.premium, offer.currency)} />
-              <Field label="Tax (10%)" value={fmtMoney(premiumResult?.tax ?? 0, offer.currency)} />
-              <Field
-                label="Gross Premium"
-                value={<span className="text-primary">{fmtMoney(premiumResult?.grossPremium ?? offer.premium, offer.currency)}</span>}
-              />
-              <Field
-                label="Agent Commission"
-                value={<span>{fmtMoney(premiumResult?.commission ?? 0, offer.currency)} <span className="text-[11px] text-muted-foreground">(on net)</span></span>}
-              />
-              <Field
-                label="FX Rate"
-                value={offer.currency === "EUR" ? "n/a" : <span className="font-mono">{premiumResult?.fxRate?.toFixed(4) ?? "—"} <span className="text-[11px] text-muted-foreground">({premiumResult?.fxSource ?? "—"})</span></span>}
-              />
-            </CardContent>
-          </Card>
 
         </TabsContent>
 
