@@ -31,7 +31,7 @@ const seed: Policy[] = [
     policyHolderId: "CUS-0001", payerId: "CUS-0001", insuredId: "CUS-0001",
     beneficiaries: [{ id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 100 }],
     startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
-    paymentMode: "Annual payment schedule",
+    paymentMode: "Pagesa me prim te rregullt",
     premium: 615, status: "Active",
     issueDate: "2026-04-01", issuedBy: "Erin Hoxha",
   },

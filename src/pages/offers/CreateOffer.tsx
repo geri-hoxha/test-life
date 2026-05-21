@@ -47,9 +47,12 @@ import { toast } from "sonner";
 
 
 const PAYMENT_MODES: PaymentMode[] = [
-  "Pay all years upfront",
-  "Pay first year only",
-  "Annual payment schedule",
+  "Pagesa me prim te rregullt",
+  "Pagese per gjithe periudhen (Upfront)",
+  "Pagesa me tarife te vetme për të gjithë periudhën",
+  "Pagesa me prim fiks mujor",
+  "Pagesa me prim fiks vjetor",
+  "Pagesa me prim te paracaktuar, kjo eshte e velfshme per sigurimin e jetes se kombinuar Protect, Sigurimi i jetes se kombinuar ISP",
 ];
 
 const RELATIONSHIPS = ["Spouse", "Child", "Parent", "Sibling", "Partner", "Bank", "Other"];
@@ -105,7 +108,7 @@ const CreateOffer = () => {
     d.setFullYear(d.getFullYear() + 20);
     return d.toISOString().slice(0, 10);
   });
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("Annual payment schedule");
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("Pagesa me prim te rregullt");
   const [hasLoan, setHasLoan] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");

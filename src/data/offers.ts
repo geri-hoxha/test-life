@@ -67,7 +67,7 @@ const seed: Offer[] = [
       { id: "b1", customerId: "CUS-0004", relationship: "Sister", percentage: 100 },
     ],
     startDate: "2026-05-01", endDate: "2036-05-01", termYears: 10,
-    paymentMode: "Annual payment schedule",
+    paymentMode: "Pagesa me prim te rregullt",
     premium: 720, status: "Pending Review", createdDate: "2026-04-22",
   },
   // 3) Approved — Standard Life Insurance for Dritan Kola, ALL currency
@@ -80,7 +80,7 @@ const seed: Offer[] = [
       { id: "b2", customerId: "CUS-0001", relationship: "Brother", percentage: 40 },
     ],
     startDate: "2026-05-15", endDate: "2036-05-15", termYears: 10,
-    paymentMode: "Annual payment schedule",
+    paymentMode: "Pagesa me prim te rregullt",
     premium: 84000, status: "Approved", createdDate: "2026-04-18",
   },
   // 4) Issued — Bank Loan Life Protection for Arben Hoxha (linked to policy below)
@@ -92,7 +92,7 @@ const seed: Offer[] = [
       { id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 100 },
     ],
     startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
-    paymentMode: "Annual payment schedule",
+    paymentMode: "Pagesa me prim te rregullt",
     loan: { amount: 145000, interestRate: 4.5, loanTermYears: 20, remainingYears: 20, outstandingBalance: 145000 },
     premium: 615, status: "Issued", createdDate: "2026-03-22",
   },
