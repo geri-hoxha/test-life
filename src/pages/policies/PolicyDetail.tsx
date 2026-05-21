@@ -170,13 +170,11 @@ const PolicyDetail = () => {
           <div className="mt-4">
             <PremiumBreakdownPanel
               data={{
-                productName: product?.name ?? policy.productId,
-                templateName: template?.name,
                 currency: policy.currency,
-                insuredAge: insured ? ageFromDob(insured.dateOfBirth) : undefined,
-                termYears: policy.termYears,
-                paymentMode: policy.paymentMode,
                 grossPremium: policy.premium,
+                taxRate: 0.10,
+                bankCommissionPct: template?.bankCommission ?? product?.bankCommission ?? 0,
+                agentCommissionPct: template?.agentCommission ?? product?.agentCommission ?? 0,
                 reportingCurrency: "EUR",
               }}
             />

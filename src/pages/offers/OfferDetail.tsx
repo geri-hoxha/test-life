@@ -58,7 +58,7 @@ import { seedProducts } from "@/data/products";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates, overrideSummary } from "@/data/templates";
 import { getCustomer, fullName, ageFromDob } from "@/data/customers";
-import PremiumBreakdownPanel from "@/components/premium/PremiumBreakdownPanel";
+
 import { listCoverages } from "@/data/coverages";
 import { listDocuments } from "@/data/documents";
 import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
