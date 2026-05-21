@@ -100,7 +100,11 @@ const CreateOffer = () => {
 
   // Step 3
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [termYears, setTermYears] = useState(20);
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 20);
+    return d.toISOString().slice(0, 10);
+  });
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("Annual payment schedule");
   const [hasLoan, setHasLoan] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
@@ -180,12 +184,14 @@ const CreateOffer = () => {
   const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
   const insuredGender: RuleGender = insured?.gender === "Female" ? "Female" : insured?.gender === "Male" ? "Male" : "Any";
 
-  const endDate = useMemo(() => {
-    if (!startDate) return "";
-    const d = new Date(startDate);
-    d.setFullYear(d.getFullYear() + termYears);
-    return d.toISOString().slice(0, 10);
-  }, [startDate, termYears]);
+  const termYears = useMemo(() => {
+    if (!startDate || !endDate) return 20;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffMs = end.getTime() - start.getTime();
+    const diffYears = Math.round(diffMs / (365.25 * 24 * 60 * 60 * 1000));
+    return Math.max(1, diffYears);
+  }, [startDate, endDate]);
 
   const beneficiaryTotal = beneficiaries.reduce((s, b) => s + (Number(b.percentage) || 0), 0);
   const beneficiariesValid = beneficiaries.length === 0 || beneficiaryTotal === 100;
@@ -517,24 +523,15 @@ const CreateOffer = () => {
               <CardTitle className="text-base">Policy Dates & Payment</CardTitle>
               <CardDescription>Set the cover period and payment schedule.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-4">
+            <CardContent className="grid gap-4 md:grid-cols-3">
               <div>
                 <Label>Start Date</Label>
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div>
-                <Label>Term (Years)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={termYears}
-                  onChange={(e) => setTermYears(Number(e.target.value) || 1)}
-                />
-              </div>
-              <div>
                 <Label>End Date</Label>
-                <Input value={endDate} readOnly className="bg-muted/40" />
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                <div className="text-[11px] text-muted-foreground mt-1">Term: {termYears} years</div>
               </div>
               <div>
                 <Label>Payment Mode</Label>
