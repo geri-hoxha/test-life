@@ -604,10 +604,13 @@ const PremiumCalculation = ({
             <ArrowRight className="h-4 w-4" /> Multi-Year Schedule
           </CardTitle>
           <CardDescription>
-            Estimated premium and (if applicable) loan balance for each policy year.
+            Estimated premium for each policy year — driven by the selected payment mode{loan ? " and projected loan balance" : ""}.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <div className="text-xs text-muted-foreground bg-muted/40 rounded px-3 py-2">
+            Payment mode: <strong className="text-foreground">{paymentMode}</strong>
+          </div>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
@@ -620,7 +623,8 @@ const PremiumCalculation = ({
                   <TableHead className="text-right">Tax (10%)</TableHead>
                   <TableHead className="text-right">Gross Premium</TableHead>
                   <TableHead className="text-right">Agent Commission</TableHead>
-                  <TableHead>Payment Status</TableHead>
+                  <TableHead>Basis</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -638,11 +642,41 @@ const PremiumCalculation = ({
                     <TableCell className="text-right font-mono text-sm">{fmt(s.tax, currency)}</TableCell>
                     <TableCell className="text-right font-mono text-sm font-semibold">{fmt(s.gross, currency)}</TableCell>
                     <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmt(s.commission, currency)}</TableCell>
+                    <TableCell className="text-[11px] text-muted-foreground">{s.note ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={s.status === "Current Year" ? "default" : "secondary"}>{s.status}</Badge>
+                      <Badge
+                        variant={
+                          s.status === "Current Year" ? "default"
+                          : s.status === "Not Billed" ? "outline"
+                          : "secondary"
+                        }
+                      >
+                        {s.status}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
+                {(() => {
+                  const totals = schedule.reduce(
+                    (a, r) => ({
+                      premium: a.premium + r.premium,
+                      tax: a.tax + r.tax,
+                      gross: a.gross + r.gross,
+                      commission: a.commission + r.commission,
+                    }),
+                    { premium: 0, tax: 0, gross: 0, commission: 0 }
+                  );
+                  return (
+                    <TableRow className="bg-muted/40 font-semibold">
+                      <TableCell colSpan={loan ? 4 : 3}>Totals</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmt(totals.premium, currency)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmt(totals.tax, currency)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmt(totals.gross, currency)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmt(totals.commission, currency)}</TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  );
+                })()}
               </TableBody>
             </Table>
           </div>
