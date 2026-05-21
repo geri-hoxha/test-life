@@ -133,6 +133,7 @@ const seed: Template[] = [
     cancelled: false,
     isActive: true,
     allowedSellerIds: ["AGT-001", "AGT-003", "BNK-003", "BNK-004"],
+    accountCode: "5102",
   },
   {
     id: "TPL-3003", productId: "PRD-001", versionId: "VRS-1001",
