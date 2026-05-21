@@ -7,9 +7,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { seedProducts } from "@/data/products";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -28,6 +30,33 @@ const initials = (first: string, last: string) =>
 
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+
+// Deterministic pseudo-random exposure breakdown by product, derived from customer id.
+const exposureBreakdown = (customerId: string, total: number) => {
+  if (total <= 0) return [] as { product: string; amount: number }[];
+  let seed = 0;
+  for (let i = 0; i < customerId.length; i++) seed = (seed * 31 + customerId.charCodeAt(i)) >>> 0;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0xffffffff;
+  };
+  const count = 2 + Math.floor(rand() * Math.min(3, seedProducts.length - 1));
+  const picks: typeof seedProducts = [];
+  const pool = [...seedProducts];
+  for (let i = 0; i < count && pool.length; i++) {
+    picks.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
+  }
+  const weights = picks.map(() => 0.3 + rand());
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const rows = picks.map((p, i) => ({
+    product: p.name,
+    amount: Math.round((weights[i] / sum) * total),
+  }));
+  // fix rounding drift
+  const drift = total - rows.reduce((a, r) => a + r.amount, 0);
+  if (rows.length) rows[0].amount += drift;
+  return rows;
+};
 
 const CustomersList = () => {
   const navigate = useNavigate();
@@ -124,8 +153,38 @@ const CustomersList = () => {
                 <TableCell>
                   <Badge className={`border-0 ${pepClass[c.pepStatus]}`}>{c.pepStatus}</Badge>
                 </TableCell>
-                <TableCell className="text-right font-medium">
-                  {c.totalExposure > 0 ? fmtMoney(c.totalExposure) : <span className="text-muted-foreground">—</span>}
+                <TableCell className="text-right font-medium" onClick={(e) => e.stopPropagation()}>
+                  {c.totalExposure > 0 ? (
+                    <div className="flex flex-col items-end leading-tight">
+                      <span>{fmtMoney(c.totalExposure)}</span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-[11px] font-normal text-accent hover:underline">
+                            Breakdown
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-3">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                            Exposure by Product
+                          </div>
+                          <div className="space-y-1.5">
+                            {exposureBreakdown(c.id, c.totalExposure).map((r) => (
+                              <div key={r.product} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="truncate text-foreground">{r.product}</span>
+                                <span className="font-medium tabular-nums">{fmtMoney(r.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between gap-3 pt-2 mt-2 border-t border-border text-sm">
+                            <span className="font-semibold">Total</span>
+                            <span className="font-semibold tabular-nums">{fmtMoney(c.totalExposure)}</span>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-1">
