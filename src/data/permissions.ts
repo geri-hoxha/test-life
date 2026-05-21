@@ -171,6 +171,7 @@ export const listGrantRows = (): GrantRow[] => {
         agentName: ag.name,
         canSell: g?.canSell ?? false,
         commissionPct: g?.commissionPct ?? 0,
+        renewalCommissionPct: g?.renewalCommissionPct ?? 5,
       });
     }
   }
