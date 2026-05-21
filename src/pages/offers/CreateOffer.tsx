@@ -184,12 +184,14 @@ const CreateOffer = () => {
   const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
   const insuredGender: RuleGender = insured?.gender === "Female" ? "Female" : insured?.gender === "Male" ? "Male" : "Any";
 
-  const endDate = useMemo(() => {
-    if (!startDate) return "";
-    const d = new Date(startDate);
-    d.setFullYear(d.getFullYear() + termYears);
-    return d.toISOString().slice(0, 10);
-  }, [startDate, termYears]);
+  const termYears = useMemo(() => {
+    if (!startDate || !endDate) return 20;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffMs = end.getTime() - start.getTime();
+    const diffYears = Math.round(diffMs / (365.25 * 24 * 60 * 60 * 1000));
+    return Math.max(1, diffYears);
+  }, [startDate, endDate]);
 
   const beneficiaryTotal = beneficiaries.reduce((s, b) => s + (Number(b.percentage) || 0), 0);
   const beneficiariesValid = beneficiaries.length === 0 || beneficiaryTotal === 100;
