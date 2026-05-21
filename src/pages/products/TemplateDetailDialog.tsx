@@ -157,6 +157,12 @@ const TemplateDetailDialog = ({ open, onOpenChange, template }: Props) => {
                   <div className="text-sm font-medium font-mono mt-0.5">{template.printType}</div>
                 </div>
                 <div>
+                  <div className="text-xs text-muted-foreground">Account code</div>
+                  <div className="text-sm font-medium font-mono mt-1 bg-accent-soft text-accent-soft-foreground inline-block px-2 py-0.5 rounded">
+                    {template.accountCode}
+                  </div>
+                </div>
+                <div>
                   <div className="text-xs text-muted-foreground">Cancelled</div>
                   <Badge className={`mt-1 border-0 ${template.cancelled ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"}`}>
                     {template.cancelled ? "Yes" : "No"}
