@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreHorizontal, Settings2, Filter, Package, Calendar, GitBranch } from "lucide-react";
-import { listProducts, ProductStatus } from "@/data/products";
+import { Plus, Search, MoreHorizontal, Settings2, Filter, Package, Calendar, GitBranch, Layers, Shield, Receipt } from "lucide-react";
+import { listProducts, ProductStatus, PRODUCT_GROUPS, listTariffs, listProductCoverages, PAYMENT_MODELS } from "@/data/products";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -100,31 +100,59 @@ const ProductsList = () => {
             </CardHeader>
 
             <CardContent className="flex-1 space-y-4">
-              <CardDescription className="line-clamp-2 min-h-[2.5rem]">
-                {p.description}
-              </CardDescription>
+              {(() => {
+                const fam = PRODUCT_GROUPS.find((g) => g.value === p.productGroup);
+                const pm = PAYMENT_MODELS.find((m) => m.value === p.paymentModel);
+                const tariffCount = listTariffs(p.id).length;
+                const coverageCount = listProductCoverages(p.id).length;
+                return (
+                  <>
+                    <CardDescription className="line-clamp-2 min-h-[2.5rem]">{p.description}</CardDescription>
 
-              <div className="flex items-center gap-2">
-                <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
-                <Badge variant="outline" className="text-[10px] gap-1">
-                  <GitBranch className="h-3 w-3" /> {p.activeVersion}
-                </Badge>
-              </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
+                      <Badge variant="outline" className="text-[10px] gap-1"><GitBranch className="h-3 w-3" />{p.activeVersion}</Badge>
+                      {pm && <Badge variant="outline" className="text-[10px]">{pm.label}</Badge>}
+                    </div>
 
-              <div className="space-y-2 pt-1">
-                <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Currencies</div>
-                <div className="flex flex-wrap gap-1">
-                  {p.currencies.map((c) => (
-                    <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
-                  ))}
-                </div>
-              </div>
+                    {fam && (
+                      <div className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{fam.english}</span> · {fam.label}
+                      </div>
+                    )}
 
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
-                <Calendar className="h-3.5 w-3.5" />
-                Created {p.createdDate}
-              </div>
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      <div className="rounded-md border border-border p-2">
+                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Layers className="h-3 w-3" /> Tariffs</div>
+                        <div className="text-sm font-semibold mt-0.5">{tariffCount}</div>
+                      </div>
+                      <div className="rounded-md border border-border p-2">
+                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3" /> Coverages</div>
+                        <div className="text-sm font-semibold mt-0.5">{coverageCount}</div>
+                      </div>
+                      <div className="rounded-md border border-border p-2">
+                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Receipt className="h-3 w-3" /> Models</div>
+                        <div className="text-sm font-semibold mt-0.5">{p.paymentModel ? 1 : 0}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 pt-1">
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Currencies</div>
+                      <div className="flex flex-wrap gap-1">
+                        {p.currencies.map((c) => (
+                          <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
+                      <Calendar className="h-3.5 w-3.5" /> Created {p.createdDate}
+                    </div>
+                  </>
+                );
+              })()}
             </CardContent>
+
 
           </Card>
         ))}
