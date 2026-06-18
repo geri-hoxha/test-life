@@ -31,33 +31,6 @@ const seed: Coverage[] = [
     basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
     commissionPct: 12, isActive: true,
   },
-  {
-    id: "COV-2002", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Total & Permanent Disability", code: "TPD",
-    description: "Payout if the insured becomes totally and permanently disabled.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 25000, minSumInsured: 5000, maxSumInsured: 250000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.18,
-    commissionPct: 10, isActive: true,
-  },
-  {
-    id: "COV-2003", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Critical Illness", code: "CI",
-    description: "Lump-sum payout on diagnosis of a covered critical illness.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 20000, minSumInsured: 5000, maxSumInsured: 150000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.32,
-    commissionPct: 10, isActive: true,
-  },
-  {
-    id: "COV-2004", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Accidental Death Benefit", code: "ADB",
-    description: "Additional payout if death occurs due to an accident.",
-    coverageType: "Optional Rider", sumInsuredType: "Fixed",
-    defaultSumInsured: 10000, minSumInsured: 5000, maxSumInsured: 50000,
-    basePremiumType: "Fixed amount", basePremiumValue: 24,
-    commissionPct: 8, isActive: false,
-  },
   // PRD-001 / VRS-1003 draft has none yet
   // PRD-003 / VRS-1020 WholeLife
   {
