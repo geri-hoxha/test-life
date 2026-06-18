@@ -2,8 +2,12 @@ export type ProductStatus = "Draft" | "Active" | "Inactive";
 
 // === Enums mirroring the C# domain ===
 export const PRODUCT_GROUPS = [
-  { value: "GroupLife", label: "Sigurim i Jetes i Kombinuar" },
-  { value: "CreditLifeRegular", label: "Jete e Debitorit Regular" },
+  { value: "GroupLife", code: "05", label: "Sigurim i Jetes i Kombinuar", english: "Group Life" },
+  { value: "CreditLifeRegular", code: "07", label: "Jete e Debitorit Regular", english: "Credit Life Regular" },
+  { value: "CreditLifeSingle", code: "08", label: "Jete e Debitorit Single", english: "Credit Life Single" },
+  { value: "Protect", code: "09", label: "Sigurimi i Jetes i Kombinuar", english: "Protect" },
+  { value: "OnVita", code: "10", label: "Sigurimi i Jetës i Kombinuar", english: "On-Vita" },
+  { value: "Endowment", code: "SJ", label: "Sigurim i Jetes me Kursim", english: "Endowment" },
 ] as const;
 export type ProductGroup = typeof PRODUCT_GROUPS[number]["value"];
 
@@ -85,22 +89,147 @@ export const ACTUARIAL_CODES = [
 
 export const BANK_PARTNERS = ["BKT", "OTP", "RBA", "ISP", "ABI", "TEB"] as const;
 
-// === Premium tables registry (in-memory) ===
+// === Payment behavior models ===
+export type PaymentModel =
+  | "Standard"
+  | "StandardWithScheduleTable"
+  | "Upfront"
+  | "PpiSinglePremium"
+  | "FixedMonthlyPremium"
+  | "FixedAnnualPremium";
+
+export const PAYMENT_MODELS: {
+  value: PaymentModel;
+  label: string;
+  description: string;
+  defaults: {
+    policyType: string;
+    insuranceAmountType: string;
+    premiumPaymentType: string;
+    packetPaymentType: string;
+    renewalType: string;
+    packetLoanType: string;
+    loanProductType: string;
+  };
+}[] = [
+  {
+    value: "Standard",
+    label: "Standard",
+    description: "Multi-year, only current year priced. Renewed manually each year.",
+    defaults: {
+      policyType: "WithTable",
+      insuranceAmountType: "RemainingPrincipalCurrentYearOnly",
+      premiumPaymentType: "CurrentInsuranceYearPremium",
+      packetPaymentType: "RegularPremiumPayment",
+      renewalType: "AccordingToBankInformation",
+      packetLoanType: "Loan",
+      loanProductType: "Mortgage",
+    },
+  },
+  {
+    value: "StandardWithScheduleTable",
+    label: "Standard with Schedule Table",
+    description: "Multi-year, full schedule generated, annual payments, manual renewal.",
+    defaults: {
+      policyType: "WithTable",
+      insuranceAmountType: "RemainingPrincipalEachYearWithAmortizationTable",
+      premiumPaymentType: "CurrentInsuranceYearPremium",
+      packetPaymentType: "RegularPremiumPayment",
+      renewalType: "AccordingToTable",
+      packetLoanType: "Loan",
+      loanProductType: "Mortgage",
+    },
+  },
+  {
+    value: "Upfront",
+    label: "Upfront",
+    description: "Multi-year, full schedule paid upfront. No renewal.",
+    defaults: {
+      policyType: "WithTable",
+      insuranceAmountType: "RemainingPrincipalEachYearWithAmortizationTable",
+      premiumPaymentType: "UpfrontPremium",
+      packetPaymentType: "PaymentForEntirePeriod",
+      renewalType: "NotRenewable",
+      packetLoanType: "Loan",
+      loanProductType: "Mortgage",
+    },
+  },
+  {
+    value: "PpiSinglePremium",
+    label: "PPI / Single Premium",
+    description: "Always 1 installment, 1 policy, no renewal.",
+    defaults: {
+      policyType: "UpToOneYear",
+      insuranceAmountType: "InitialLoanAmount",
+      premiumPaymentType: "SinglePremiumForEntirePeriod",
+      packetPaymentType: "SinglePremiumForEntirePeriod",
+      renewalType: "NotRenewable",
+      packetLoanType: "Loan",
+      loanProductType: "Personal",
+    },
+  },
+  {
+    value: "FixedMonthlyPremium",
+    label: "Standard with Schedule — Fixed Monthly Premium",
+    description: "Multi-year, equal monthly premiums (annual / 12).",
+    defaults: {
+      policyType: "WithTable",
+      insuranceAmountType: "TotalAmount",
+      premiumPaymentType: "FixedMonthlyPremium",
+      packetPaymentType: "FixedMonthlyPremiumPayment",
+      renewalType: "AccordingToTable",
+      packetLoanType: "NotApplicable",
+      loanProductType: "NotApplicable",
+    },
+  },
+  {
+    value: "FixedAnnualPremium",
+    label: "Standard with Schedule — Fixed Annual Premium",
+    description: "Multi-year, equal annual premiums (average across term).",
+    defaults: {
+      policyType: "WithTable",
+      insuranceAmountType: "TotalAmount",
+      premiumPaymentType: "FixedAnnualPremium",
+      packetPaymentType: "FixedAnnualPremiumPayment",
+      renewalType: "AccordingToTable",
+      packetLoanType: "NotApplicable",
+      loanProductType: "NotApplicable",
+    },
+  },
+];
+
+// === Premium tables ===
+export type PremiumTableItem = {
+  id: string;
+  gender: "Male" | "Female" | "Any";
+  minAge: number;
+  maxAge: number;
+  coefficient: number;
+};
 export type PremiumTable = {
   id: string;
   name: string;
   legacyId: number;
+  items: PremiumTableItem[];
 };
 
+const seedItems = (base: number): PremiumTableItem[] => [
+  { id: "row-1", gender: "Any", minAge: 18, maxAge: 30, coefficient: +(base).toFixed(4) },
+  { id: "row-2", gender: "Any", minAge: 31, maxAge: 45, coefficient: +(base * 1.4).toFixed(4) },
+  { id: "row-3", gender: "Any", minAge: 46, maxAge: 60, coefficient: +(base * 2.1).toFixed(4) },
+  { id: "row-4", gender: "Any", minAge: 61, maxAge: 75, coefficient: +(base * 3.6).toFixed(4) },
+];
+
 export const seedPremiumTables: PremiumTable[] = [
-  { id: "PT-001", name: "Standard Mortality 2020", legacyId: 1001 },
-  { id: "PT-002", name: "Credit Life — Regular", legacyId: 1002 },
-  { id: "PT-003", name: "Single Premium PPI", legacyId: 1003 },
-  { id: "PT-004", name: "Micro Loan Table", legacyId: 1004 },
+  { id: "PT-001", name: "Standard Mortality 2020", legacyId: 1001, items: seedItems(0.0012) },
+  { id: "PT-002", name: "Credit Life — Regular", legacyId: 1002, items: seedItems(0.0018) },
+  { id: "PT-003", name: "Single Premium PPI", legacyId: 1003, items: seedItems(0.0025) },
+  { id: "PT-004", name: "Micro Loan Table", legacyId: 1004, items: seedItems(0.0032) },
 ];
 let premiumTables: PremiumTable[] = [...seedPremiumTables];
 export const listPremiumTables = () => premiumTables;
-export const addPremiumTable = (name: string): PremiumTable => {
+export const getPremiumTable = (id?: string) => premiumTables.find((t) => t.id === id);
+export const addPremiumTable = (name: string, legacyId?: number, items?: PremiumTableItem[]): PremiumTable => {
   const maxNum = premiumTables.reduce((m, t) => {
     const n = parseInt(t.id.replace(/\D/g, ""), 10);
     return Number.isFinite(n) && n > m ? n : m;
@@ -108,10 +237,67 @@ export const addPremiumTable = (name: string): PremiumTable => {
   const t: PremiumTable = {
     id: `PT-${String(maxNum + 1).padStart(3, "0")}`,
     name,
-    legacyId: 1000 + maxNum + 1,
+    legacyId: legacyId ?? 1000 + maxNum + 1,
+    items: items ?? seedItems(0.0015),
   };
   premiumTables = [...premiumTables, t];
   return t;
+};
+
+// === Tariffs ===
+export type Tariff = {
+  id: string;
+  productId: string;
+  name: string;
+  legacyTariffId: number;
+  tariffType: string;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo: string;
+  isActive: boolean;
+  minPremium: number;
+  maxPremium: number;
+  fixedPremium: number;
+  fixedMonthlyPremium: number;
+  fixedAnnualPremium: number;
+  formula: string;
+  notes: string;
+};
+
+let tariffs: Tariff[] = [];
+export const listTariffs = (productId?: string) =>
+  productId ? tariffs.filter((t) => t.productId === productId) : tariffs;
+export const addTariff = (t: Omit<Tariff, "id">): Tariff => {
+  const created: Tariff = { ...t, id: `TRF-${Date.now().toString(36)}` };
+  tariffs = [...tariffs, created];
+  return created;
+};
+export const updateTariff = (id: string, patch: Partial<Tariff>) => {
+  tariffs = tariffs.map((t) => (t.id === id ? { ...t, ...patch } : t));
+};
+export const removeTariff = (id: string) => {
+  tariffs = tariffs.filter((t) => t.id !== id);
+};
+
+// === Coverages ===
+export type ProductCoverage = {
+  id: string;
+  productId: string;
+  name: string;
+  description: string;
+  legacyCoverageId: number;
+  isMandatory: boolean;
+};
+let productCoverages: ProductCoverage[] = [];
+export const listProductCoverages = (productId?: string) =>
+  productId ? productCoverages.filter((c) => c.productId === productId) : productCoverages;
+export const addProductCoverage = (c: Omit<ProductCoverage, "id">): ProductCoverage => {
+  const created: ProductCoverage = { ...c, id: `COV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}` };
+  productCoverages = [...productCoverages, created];
+  return created;
+};
+export const removeProductCoverage = (id: string) => {
+  productCoverages = productCoverages.filter((c) => c.id !== id);
 };
 
 // === Detail groupings ===
@@ -164,9 +350,10 @@ export type Product = {
     manualUnderwriting: boolean;
     compliance: boolean;
   };
-  agentCommission: number; // stored as decimal, e.g. 0.05 = 5%
-  bankCommission: number;  // stored as decimal
+  agentCommission: number;
+  bankCommission: number;
   productGroup?: ProductGroup;
+  paymentModel?: PaymentModel;
   premiumTableId?: string;
   setupDetails?: ProductSetupDetails;
   paymentDetails?: ProductPaymentDetails;
@@ -175,101 +362,201 @@ export type Product = {
   externalDetails?: ProductExternalDetails;
 };
 
+const baseSetup = (overrides: Partial<ProductSetupDetails> = {}): ProductSetupDetails => ({
+  legacyPacketId: 0,
+  bankPartnerCode: "ISP",
+  policyType: "WithTable",
+  insuranceAmountType: "TotalAmount",
+  legacyTariffId: 0,
+  maxTenorMonths: 240,
+  isObsolete: false,
+  apiSubject: false,
+  apiStraight: false,
+  ...overrides,
+});
+
 export const seedProducts: Product[] = [
+  // === The 6 product families ===
   {
-    id: "PRD-001",
-    name: "Sigurim i Jetes i Kombinuar",
-    code: "05",
-    status: "Active",
-    currencies: ["EUR", "ALL", "USD"],
-    activeVersion: "v3.2",
-    createdDate: "Jan 12, 2025",
+    id: "PRD-001", name: "Sigurim i Jetes i Kombinuar", code: "05", status: "Active",
+    currencies: ["EUR", "ALL", "USD"], activeVersion: "v3.2", createdDate: "Jan 12, 2025",
     type: "Life Insurance",
     description: "Sigurim jete me mbulim baze Death dhe mbulime shtese opsionale (aksident, paaftesi, semundje kritike).",
     requiredDocuments: ["ID document", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
-    agentCommission: 0.1,
-    bankCommission: 0.02,
+    agentCommission: 0.1, bankCommission: 0.02, productGroup: "GroupLife", premiumTableId: "PT-001",
   },
   {
-    id: "PRD-002",
-    name: "Jete e Debitorit Regular",
-    code: "07",
-    status: "Active",
-    currencies: ["EUR", "ALL"],
-    activeVersion: "v2.4",
-    createdDate: "Mar 04, 2025",
+    id: "PRD-002", name: "Jete e Debitorit Regular", code: "07", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v2.4", createdDate: "Mar 04, 2025",
     type: "Life Insurance",
     description: "Sigurim jete per debitorin me pagese primi te rregullt — mbulim baze Death, distribuim nepermjet bankave partnere.",
     requiredDocuments: ["ID document", "Loan agreement", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
-    agentCommission: 0.08,
-    bankCommission: 0.05,
+    agentCommission: 0.08, bankCommission: 0.05, productGroup: "CreditLifeRegular", premiumTableId: "PT-002",
   },
   {
-    id: "PRD-003",
-    name: "Jete e Debitorit Single",
-    code: "08",
-    status: "Active",
-    currencies: ["EUR", "ALL"],
-    activeVersion: "v2.1",
-    createdDate: "Apr 18, 2025",
+    id: "PRD-003", name: "Jete e Debitorit Single", code: "08", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v2.1", createdDate: "Apr 18, 2025",
     type: "Life Insurance",
     description: "Sigurim jete per debitorin me pagese te vetme upfront per gjithe periudhen — mbulim baze Death.",
     requiredDocuments: ["ID document", "Loan agreement", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
-    agentCommission: 0.12,
-    bankCommission: 0.04,
+    agentCommission: 0.12, bankCommission: 0.04, productGroup: "CreditLifeSingle", premiumTableId: "PT-003",
   },
   {
-    id: "PRD-004",
-    name: "Sigurimi i Jetes i Kombinuar 09",
-    code: "09",
-    status: "Active",
-    currencies: ["EUR", "ALL"],
-    activeVersion: "v1.6",
-    createdDate: "Jun 21, 2025",
+    id: "PRD-004", name: "Sigurimi i Jetes i Kombinuar 09", code: "09", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v1.6", createdDate: "Jun 21, 2025",
     type: "Life Insurance",
     description: "Variant i kombinuar i sigurimit te jetes me mbulim baze Death dhe rider opsionale per aksident dhe paaftesi.",
     requiredDocuments: ["ID document", "Medical questionnaire"],
     flags: { pep: true, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: false },
-    agentCommission: 0.09,
-    bankCommission: 0.03,
+    agentCommission: 0.09, bankCommission: 0.03, productGroup: "Protect", premiumTableId: "PT-001",
   },
   {
-    id: "PRD-005",
-    name: "Sigurimi i Jetes i Kombinuar 10",
-    code: "10",
-    status: "Active",
-    currencies: ["EUR", "ALL", "USD"],
-    activeVersion: "v1.3",
-    createdDate: "Aug 09, 2025",
+    id: "PRD-005", name: "Sigurimi i Jetes i Kombinuar 10", code: "10", status: "Active",
+    currencies: ["EUR", "ALL", "USD"], activeVersion: "v1.3", createdDate: "Aug 09, 2025",
     type: "Life Insurance",
     description: "Variant i zgjeruar i sigurimit te jetes te kombinuar — mbulim baze Death plus pakete e plote rider-ash opsionale.",
     requiredDocuments: ["ID document", "Medical report"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: true, compliance: true },
-    agentCommission: 0.11,
-    bankCommission: 0.04,
+    agentCommission: 0.11, bankCommission: 0.04, productGroup: "OnVita", premiumTableId: "PT-001",
   },
   {
-    id: "PRD-006",
-    name: "Sigurim i Jetes me Kursim",
-    code: "SJ",
-    status: "Active",
-    currencies: ["EUR", "ALL"],
-    activeVersion: "v1.0",
-    createdDate: "Oct 02, 2025",
+    id: "PRD-006", name: "Sigurim i Jetes me Kursim", code: "SJ", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v1.0", createdDate: "Oct 02, 2025",
     type: "Life Insurance",
     description: "Sigurim jete me komponent kursimi — mbulim baze Death me akumulim kapitali ne maturim dhe rider opsionale.",
     requiredDocuments: ["ID document", "Medical questionnaire", "Proof of income"],
     flags: { pep: true, highInsuredAmount: true, totalExposure: false, manualUnderwriting: true, compliance: true },
-    agentCommission: 0.15,
-    bankCommission: 0.06,
+    agentCommission: 0.15, bankCommission: 0.06, productGroup: "Endowment", premiumTableId: "PT-001",
+  },
+
+  // === Legacy ISP / bank-partner configurations ===
+  {
+    id: "PRD-069", name: "ISP A_Mortgage Standard 07", code: "69", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v1.0", createdDate: "Feb 10, 2024",
+    type: "Life Insurance",
+    description: "Mortgage life — multi-year, only current year priced; manual renewal per year.",
+    requiredDocuments: ["ID document", "Loan agreement"],
+    flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.06, bankCommission: 0.04,
+    productGroup: "CreditLifeRegular", paymentModel: "Standard", premiumTableId: "PT-002",
+    setupDetails: baseSetup({ legacyPacketId: 69, legacyTariffId: 690, bankPartnerCode: "ISP", policyType: "WithTable", insuranceAmountType: "RemainingPrincipalCurrentYearOnly", maxTenorMonths: 360 }),
+    paymentDetails: { premiumPaymentType: "CurrentInsuranceYearPremium", packetPaymentType: "RegularPremiumPayment", renewalType: "AccordingToBankInformation" },
+    loanDetails: { packetLoanType: "Loan", loanProductType: "Mortgage" },
+    externalDetails: { sapProductCode: "SAP-69", sapChannelCode: "ISP-RT", f5ProductCode: "F5-69", actuarialProductCode: "RegularTerm" },
+    internalDetails: { coveragePrintableText: "Death cover, current year remaining principal.", packetFinType: 1 },
+  },
+  {
+    id: "PRD-070", name: "ISP A_Mortgage Upfront 07", code: "70", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v1.0", createdDate: "Feb 10, 2024",
+    type: "Life Insurance",
+    description: "Mortgage life — full schedule paid upfront, no renewal.",
+    requiredDocuments: ["ID document", "Loan agreement"],
+    flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.06, bankCommission: 0.05,
+    productGroup: "CreditLifeRegular", paymentModel: "Upfront", premiumTableId: "PT-002",
+    setupDetails: baseSetup({ legacyPacketId: 70, legacyTariffId: 700, bankPartnerCode: "ISP", policyType: "WithTable", insuranceAmountType: "RemainingPrincipalEachYearWithAmortizationTable", maxTenorMonths: 360 }),
+    paymentDetails: { premiumPaymentType: "UpfrontPremium", packetPaymentType: "PaymentForEntirePeriod", renewalType: "NotRenewable" },
+    loanDetails: { packetLoanType: "Loan", loanProductType: "Mortgage" },
+    externalDetails: { sapProductCode: "SAP-70", sapChannelCode: "ISP-UF", f5ProductCode: "F5-70", actuarialProductCode: "SingleTermMortgageUpfront" },
+    internalDetails: { coveragePrintableText: "Death cover, upfront premium for entire mortgage term.", packetFinType: 2 },
+  },
+  {
+    id: "PRD-071", name: "ISP PPI Konsumatore 08", code: "71", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v1.0", createdDate: "Feb 10, 2024",
+    type: "Life Insurance",
+    description: "PPI consumer loan — 1 installment, 1 policy, no renewal. Reference premium 20 EUR / 2 000 ALL.",
+    requiredDocuments: ["ID document", "Loan agreement"],
+    flags: { pep: false, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.1, bankCommission: 0.06,
+    productGroup: "CreditLifeSingle", paymentModel: "PpiSinglePremium", premiumTableId: "PT-003",
+    setupDetails: baseSetup({ legacyPacketId: 71, legacyTariffId: 710, bankPartnerCode: "ISP", policyType: "UpToOneYear", insuranceAmountType: "InitialLoanAmount", maxTenorMonths: 60 }),
+    paymentDetails: { premiumPaymentType: "SinglePremiumForEntirePeriod", packetPaymentType: "SinglePremiumForEntirePeriod", renewalType: "NotRenewable" },
+    loanDetails: { packetLoanType: "Loan", loanProductType: "Personal" },
+    externalDetails: { sapProductCode: "SAP-71", sapChannelCode: "ISP-PPI-KO", f5ProductCode: "F5-71", actuarialProductCode: "SingleTermPpiStandard" },
+    internalDetails: { coveragePrintableText: "PPI single premium, consumer loan.", packetFinType: 3 },
+  },
+  {
+    id: "PRD-072", name: "ISP PPI Karta e Kreditit 08", code: "72", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v1.0", createdDate: "Feb 10, 2024",
+    type: "Life Insurance",
+    description: "PPI credit card — 1 installment, 1 policy. Reference premium 15 EUR / 1 500 ALL.",
+    requiredDocuments: ["ID document"],
+    flags: { pep: false, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.1, bankCommission: 0.06,
+    productGroup: "CreditLifeSingle", paymentModel: "PpiSinglePremium", premiumTableId: "PT-003",
+    setupDetails: baseSetup({ legacyPacketId: 72, legacyTariffId: 720, bankPartnerCode: "ISP", policyType: "UpToOneYear", insuranceAmountType: "InitialLoanAmount", maxTenorMonths: 12 }),
+    paymentDetails: { premiumPaymentType: "SinglePremiumForEntirePeriod", packetPaymentType: "SinglePremiumForEntirePeriod", renewalType: "NotRenewable" },
+    loanDetails: { packetLoanType: "Loan", loanProductType: "CreditCard" },
+    externalDetails: { sapProductCode: "SAP-72", sapChannelCode: "ISP-PPI-CC", f5ProductCode: "F5-72", actuarialProductCode: "SingleTermPpiStandard" },
+    internalDetails: { coveragePrintableText: "PPI single premium, credit card.", packetFinType: 4 },
+  },
+  {
+    id: "PRD-073", name: "ISP PPI Overdraft 08", code: "73", status: "Active",
+    currencies: ["EUR", "ALL"], activeVersion: "v1.0", createdDate: "Feb 10, 2024",
+    type: "Life Insurance",
+    description: "PPI overdraft — 1 installment, 1 policy. Reference premium 15 EUR / 1 500 ALL.",
+    requiredDocuments: ["ID document"],
+    flags: { pep: false, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.1, bankCommission: 0.06,
+    productGroup: "CreditLifeSingle", paymentModel: "PpiSinglePremium", premiumTableId: "PT-003",
+    setupDetails: baseSetup({ legacyPacketId: 73, legacyTariffId: 730, bankPartnerCode: "ISP", policyType: "UpToOneYear", insuranceAmountType: "InitialLoanAmount", maxTenorMonths: 12 }),
+    paymentDetails: { premiumPaymentType: "SinglePremiumForEntirePeriod", packetPaymentType: "SinglePremiumForEntirePeriod", renewalType: "NotRenewable" },
+    loanDetails: { packetLoanType: "Loan", loanProductType: "Overdraft" },
+    externalDetails: { sapProductCode: "SAP-73", sapChannelCode: "ISP-PPI-OD", f5ProductCode: "F5-73", actuarialProductCode: "SingleTermPpiStandard" },
+    internalDetails: { coveragePrintableText: "PPI single premium, overdraft.", packetFinType: 5 },
+  },
+  {
+    id: "PRD-074", name: "ISP Sigurimi i Jetes i Kombinuar 10", code: "74", status: "Active",
+    currencies: ["EUR", "ALL", "USD"], activeVersion: "v1.0", createdDate: "Feb 10, 2024",
+    type: "Life Insurance",
+    description: "Combined life — single installment, distributed through ISP.",
+    requiredDocuments: ["ID document", "Medical questionnaire"],
+    flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
+    agentCommission: 0.11, bankCommission: 0.04,
+    productGroup: "OnVita", paymentModel: "PpiSinglePremium", premiumTableId: "PT-001",
+    setupDetails: baseSetup({ legacyPacketId: 74, legacyTariffId: 740, bankPartnerCode: "ISP", policyType: "UpToOneYear", insuranceAmountType: "TotalAmount", maxTenorMonths: 12 }),
+    paymentDetails: { premiumPaymentType: "SinglePremiumForEntirePeriod", packetPaymentType: "SinglePremiumForEntirePeriod", renewalType: "NotRenewable" },
+    loanDetails: { packetLoanType: "NotApplicable", loanProductType: "NotApplicable" },
+    externalDetails: { sapProductCode: "SAP-74", sapChannelCode: "ISP-OV", f5ProductCode: "F5-74", actuarialProductCode: "SingleTerm" },
+    internalDetails: { coveragePrintableText: "Combined life, single installment.", packetFinType: 6 },
   },
 ];
 
+// Seed initial tariffs and coverages for legacy products
+const seedAuxiliary = () => {
+  if (tariffs.length || productCoverages.length) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const future = "2030-12-31";
+  const seedT = (productId: string, name: string, legacyId: number, currency: string, extra: Partial<Tariff> = {}) =>
+    addTariff({
+      productId, name, legacyTariffId: legacyId, tariffType: "Standard", currency,
+      effectiveFrom: today, effectiveTo: future, isActive: true,
+      minPremium: 0, maxPremium: 0, fixedPremium: 0, fixedMonthlyPremium: 0, fixedAnnualPremium: 0,
+      formula: "premium = coefficient × sum_insured", notes: "", ...extra,
+    });
+  seedT("PRD-069", "ISP Mortgage Standard EUR", 690, "EUR");
+  seedT("PRD-070", "ISP Mortgage Upfront EUR", 700, "EUR");
+  seedT("PRD-071", "ISP PPI Konsumatore EUR", 711, "EUR", { fixedPremium: 20 });
+  seedT("PRD-071", "ISP PPI Konsumatore ALL", 712, "ALL", { fixedPremium: 2000 });
+  seedT("PRD-072", "ISP PPI Karte Krediti EUR", 721, "EUR", { fixedPremium: 15 });
+  seedT("PRD-072", "ISP PPI Karte Krediti ALL", 722, "ALL", { fixedPremium: 1500 });
+  seedT("PRD-073", "ISP PPI Overdraft EUR", 731, "EUR", { fixedPremium: 15 });
+  seedT("PRD-073", "ISP PPI Overdraft ALL", 732, "ALL", { fixedPremium: 1500 });
+  seedT("PRD-074", "ISP On-Vita EUR", 740, "EUR");
+
+  const seedC = (productId: string, name: string, mandatory = true, desc = "Death benefit cover.") =>
+    addProductCoverage({ productId, name, description: desc, legacyCoverageId: Math.floor(Math.random() * 9000 + 1000), isMandatory: mandatory });
+  ["PRD-069", "PRD-070", "PRD-071", "PRD-072", "PRD-073", "PRD-074"].forEach((id) => seedC(id, "Death"));
+  seedC("PRD-070", "Permanent Disability", false, "Optional permanent disability rider.");
+  seedC("PRD-074", "Accident", false, "Accidental death rider.");
+};
+seedAuxiliary();
+
 // In-memory store backed by localStorage (demo persistence)
-const STORAGE_KEY = "esiglife.products.v1";
+const STORAGE_KEY = "esiglife.products.v2";
 
 const loadProducts = (): Product[] => {
   if (typeof window === "undefined") return [...seedProducts];
@@ -287,18 +574,10 @@ let products: Product[] = loadProducts();
 
 const persist = () => {
   if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-  } catch {
-    // ignore quota errors in demo
-  }
+  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); } catch { /* ignore */ }
 };
 
-export const resetProducts = () => {
-  products = [...seedProducts];
-  persist();
-};
-
+export const resetProducts = () => { products = [...seedProducts]; persist(); };
 export const listProducts = () => products;
 export const getProduct = (id: string) => products.find((p) => p.id === id);
 export const updateProductFlags = (id: string, flags: Product["flags"]) => {
@@ -318,8 +597,7 @@ export const addProduct = (p: Omit<Product, "id" | "activeVersion" | "createdDat
   }, 0);
   const id = `PRD-${String(maxNum + 1).padStart(3, "0")}`;
   const created: Product = {
-    ...p,
-    id,
+    ...p, id,
     activeVersion: "v0.1",
     createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
   };
@@ -327,4 +605,3 @@ export const addProduct = (p: Omit<Product, "id" | "activeVersion" | "createdDat
   persist();
   return created;
 };
-

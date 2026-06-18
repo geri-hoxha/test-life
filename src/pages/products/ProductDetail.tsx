@@ -13,7 +13,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getProduct, updateProductFlags, updateProduct, ProductStatus, Product } from "@/data/products";
+import {
+  getProduct, updateProductFlags, updateProduct, ProductStatus, Product,
+  PRODUCT_GROUPS, POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
+  PREMIUM_PAYMENT_TYPES, PACKET_PAYMENT_TYPES, PACKET_RENEWAL_TYPES,
+  PACKET_LOAN_TYPES, LOAN_PRODUCT_TYPES, ACTUARIAL_CODES,
+  PAYMENT_MODELS, listTariffs, listProductCoverages, getPremiumTable,
+} from "@/data/products";
 import { Check, AlertCircle, ScrollText, Save, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
@@ -190,12 +196,18 @@ const ProductDetail = () => {
       <Tabs defaultValue="overview" className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          {/* <TabsTrigger value="versions">Versions</TabsTrigger> */}
+          <TabsTrigger value="setup">Setup</TabsTrigger>
+          <TabsTrigger value="payment">Payment</TabsTrigger>
+          <TabsTrigger value="loan">Loan</TabsTrigger>
+          <TabsTrigger value="premium-table">Premium Table</TabsTrigger>
+          <TabsTrigger value="tariffs">Tariffs</TabsTrigger>
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
-          <TabsTrigger value="templates">Templates / Packages</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="premium">Premium Rules</TabsTrigger>
+          <TabsTrigger value="internal">Internal</TabsTrigger>
+          <TabsTrigger value="external">External</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="verification">Verification Rules</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -365,6 +377,29 @@ const ProductDetail = () => {
           <VersionsTab productId={product.id} />
         </TabsContent>
 
+        <TabsContent value="setup">
+          <SetupTab product={product} />
+        </TabsContent>
+        <TabsContent value="payment">
+          <PaymentTab product={product} />
+        </TabsContent>
+        <TabsContent value="loan">
+          <LoanTab product={product} />
+        </TabsContent>
+        <TabsContent value="premium-table">
+          <PremiumTableTab product={product} />
+        </TabsContent>
+        <TabsContent value="tariffs">
+          <TariffsTab product={product} />
+        </TabsContent>
+        <TabsContent value="internal">
+          <InternalTab product={product} />
+        </TabsContent>
+        <TabsContent value="external">
+          <ExternalTab product={product} />
+        </TabsContent>
+
+
         <TabsContent value="coverages">
           <CoveragesTab productId={product.id} />
         </TabsContent>
@@ -436,4 +471,159 @@ const ProductDetail = () => {
   );
 };
 
+// ===== Grouped detail tabs =====
+const labelFor = <T extends { value: string; label: string }>(arr: readonly T[], v?: string) =>
+  arr.find((x) => x.value === v)?.label ?? v ?? "—";
+
+const InfoRow = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
+  <div className="flex flex-col gap-1 py-2.5 border-b border-border last:border-0">
+    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</span>
+    <span className={`text-sm text-foreground ${mono ? "font-mono" : ""}`}>{value || "—"}</span>
+  </div>
+);
+
+const GroupedCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <Card className="shadow-card border-border">
+    <div className="px-5 py-4 border-b border-border">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+    </div>
+    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6">{children}</div>
+  </Card>
+);
+
+const SetupTab = ({ product }: { product: Product }) => {
+  const s = product.setupDetails;
+  return (
+    <GroupedCard title="Setup details">
+      <InfoRow label="Legacy packet ID" value={s?.legacyPacketId} mono />
+      <InfoRow label="Bank partner" value={s?.bankPartnerCode} mono />
+      <InfoRow label="Policy type" value={labelFor(POLICY_TYPES, s?.policyType)} />
+      <InfoRow label="Insurance amount type" value={labelFor(INSURANCE_AMOUNT_TYPES, s?.insuranceAmountType)} />
+      <InfoRow label="Legacy tariff ID" value={s?.legacyTariffId} mono />
+      <InfoRow label="Max tenor (months)" value={s?.maxTenorMonths} mono />
+      <InfoRow label="Obsolete" value={s?.isObsolete ? "Yes" : "No"} />
+      <InfoRow label="API subject / API straight" value={`${s?.apiSubject ? "Yes" : "No"} / ${s?.apiStraight ? "Yes" : "No"}`} />
+    </GroupedCard>
+  );
+};
+
+const PaymentTab = ({ product }: { product: Product }) => {
+  const p = product.paymentDetails;
+  const m = PAYMENT_MODELS.find((x) => x.value === product.paymentModel);
+  return (
+    <div className="space-y-5">
+      {m && (
+        <Card className="shadow-card border-border p-5">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Payment behavior model</div>
+          <div className="text-sm font-semibold text-foreground">{m.label}</div>
+          <p className="text-xs text-muted-foreground mt-1">{m.description}</p>
+        </Card>
+      )}
+      <GroupedCard title="Payment details">
+        <InfoRow label="Premium payment type" value={labelFor(PREMIUM_PAYMENT_TYPES, p?.premiumPaymentType)} />
+        <InfoRow label="Packet payment type" value={labelFor(PACKET_PAYMENT_TYPES, p?.packetPaymentType)} />
+        <InfoRow label="Renewal type" value={labelFor(PACKET_RENEWAL_TYPES, p?.renewalType)} />
+      </GroupedCard>
+    </div>
+  );
+};
+
+const LoanTab = ({ product }: { product: Product }) => {
+  const l = product.loanDetails;
+  return (
+    <GroupedCard title="Loan details">
+      <InfoRow label="Packet loan type" value={labelFor(PACKET_LOAN_TYPES, l?.packetLoanType)} />
+      <InfoRow label="Loan product type" value={labelFor(LOAN_PRODUCT_TYPES, l?.loanProductType)} />
+    </GroupedCard>
+  );
+};
+
+const PremiumTableTab = ({ product }: { product: Product }) => {
+  const t = getPremiumTable(product.premiumTableId);
+  if (!t) return <Card className="p-8 text-center text-sm text-muted-foreground">No premium table assigned.</Card>;
+  return (
+    <Card className="shadow-card border-border">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">{t.name}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Legacy ID {t.legacyId} · {t.items.length} rows</p>
+        </div>
+        <Badge variant="outline" className="font-mono text-[10px]">{t.id}</Badge>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr><th className="text-left p-3">Gender</th><th className="text-left p-3">Min age</th><th className="text-left p-3">Max age</th><th className="text-left p-3">Coefficient</th></tr>
+          </thead>
+          <tbody>
+            {t.items.map((i) => (
+              <tr key={i.id} className="border-t border-border">
+                <td className="p-3">{i.gender}</td>
+                <td className="p-3 font-mono">{i.minAge}</td>
+                <td className="p-3 font-mono">{i.maxAge}</td>
+                <td className="p-3 font-mono">{i.coefficient}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+};
+
+const TariffsTab = ({ product }: { product: Product }) => {
+  const ts = listTariffs(product.id);
+  if (!ts.length) return <Card className="p-8 text-center text-sm text-muted-foreground">No tariffs configured for this product.</Card>;
+  return (
+    <div className="space-y-4">
+      {ts.map((t) => (
+        <Card key={t.id} className="shadow-card border-border p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">{t.name}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{t.tariffType} · {t.currency} · Legacy ID {t.legacyTariffId}</p>
+            </div>
+            <Badge className={t.isActive ? "bg-success/15 text-success border-0" : "bg-muted text-muted-foreground border-0"}>
+              {t.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6">
+            <InfoRow label="Effective from" value={t.effectiveFrom} mono />
+            <InfoRow label="Effective to" value={t.effectiveTo} mono />
+            <InfoRow label="Min / Max premium" value={`${t.minPremium} / ${t.maxPremium}`} mono />
+            <InfoRow label="Fixed premium" value={t.fixedPremium} mono />
+            <InfoRow label="Fixed monthly" value={t.fixedMonthlyPremium} mono />
+            <InfoRow label="Fixed annual" value={t.fixedAnnualPremium} mono />
+            <InfoRow label="Formula" value={<span className="font-mono text-xs">{t.formula}</span>} />
+            <InfoRow label="Notes" value={t.notes} />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+const InternalTab = ({ product }: { product: Product }) => {
+  const i = product.internalDetails;
+  return (
+    <GroupedCard title="Internal details">
+      <div className="sm:col-span-2"><InfoRow label="Coverage printable text" value={i?.coveragePrintableText} /></div>
+      <InfoRow label="Packet fin type" value={i?.packetFinType ?? "—"} mono />
+    </GroupedCard>
+  );
+};
+
+const ExternalTab = ({ product }: { product: Product }) => {
+  const e = product.externalDetails;
+  return (
+    <GroupedCard title="External details">
+      <InfoRow label="SAP product code" value={e?.sapProductCode} mono />
+      <InfoRow label="SAP channel code" value={e?.sapChannelCode} mono />
+      <InfoRow label="F5 product code" value={e?.f5ProductCode} mono />
+      <InfoRow label="Actuarial product code" value={labelFor(ACTUARIAL_CODES, e?.actuarialProductCode)} />
+    </GroupedCard>
+  );
+};
+
 export default ProductDetail;
+
