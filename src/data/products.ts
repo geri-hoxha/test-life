@@ -243,6 +243,10 @@ export const addPremiumTable = (name: string, legacyId?: number, items?: Premium
   premiumTables = [...premiumTables, t];
   return t;
 };
+export const updatePremiumTable = (id: string, patch: Partial<Omit<PremiumTable, "id">>) => {
+  premiumTables = premiumTables.map((t) => (t.id === id ? { ...t, ...patch } : t));
+  return premiumTables.find((t) => t.id === id);
+};
 
 // === Tariffs ===
 export type Tariff = {
