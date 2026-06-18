@@ -103,15 +103,6 @@ const seed: Coverage[] = [
     basePremiumType: "Fixed amount", basePremiumValue: 15,
     commissionPct: 12, isActive: true,
   },
-  {
-    id: "COV-2073B", productId: "PRD-073", versionId: "VRS-2073",
-    name: "Semundje Kritike", code: "CI",
-    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 5000, minSumInsured: 1000, maxSumInsured: 25000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.28,
-    commissionPct: 10, isActive: true,
-  },
   // PRD-074 — ISP On-Vita (combined)
   {
     id: "COV-2074A", productId: "PRD-074", versionId: "VRS-2074",
