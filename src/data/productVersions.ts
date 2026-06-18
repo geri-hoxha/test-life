@@ -25,6 +25,13 @@ const seed: ProductVersion[] = [
   { id: "VRS-1030", productId: "PRD-004", name: "2026 Endowment 15Y", number: "v0.9", status: "Draft", notes: "Awaiting actuary sign-off.", author: "Erin Hoxha" },
   // PRD-005
   { id: "VRS-1040", productId: "PRD-005", name: "2024 TermLife 30Y", number: "v2.1", effectiveFrom: "2024-09-14", effectiveTo: "2025-12-31", status: "Retired", author: "M. Hoxha" },
+  // ISP family
+  { id: "VRS-2069", productId: "PRD-069", name: "ISP Standard 2026", number: "v1.0", effectiveFrom: "2026-01-01", status: "Active", author: "Erin Hoxha" },
+  { id: "VRS-2070", productId: "PRD-070", name: "ISP Mortgage Upfront 2026", number: "v1.0", effectiveFrom: "2026-01-01", status: "Active", author: "Erin Hoxha" },
+  { id: "VRS-2071", productId: "PRD-071", name: "ISP PPI Konsumatore 2026", number: "v1.0", effectiveFrom: "2026-01-01", status: "Active", author: "Erin Hoxha" },
+  { id: "VRS-2072", productId: "PRD-072", name: "ISP PPI Karta Krediti 2026", number: "v1.0", effectiveFrom: "2026-01-01", status: "Active", author: "Erin Hoxha" },
+  { id: "VRS-2073", productId: "PRD-073", name: "ISP PPI Overdraft 2026", number: "v1.0", effectiveFrom: "2026-01-01", status: "Active", author: "Erin Hoxha" },
+  { id: "VRS-2074", productId: "PRD-074", name: "ISP On-Vita 2026", number: "v1.0", effectiveFrom: "2026-01-01", status: "Active", author: "Erin Hoxha" },
 ];
 
 let versions: ProductVersion[] = [...seed];
