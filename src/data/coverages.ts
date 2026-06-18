@@ -83,15 +83,6 @@ const seed: Coverage[] = [
     basePremiumType: "Fixed amount", basePremiumValue: 20,
     commissionPct: 12, isActive: true,
   },
-  {
-    id: "COV-2071B", productId: "PRD-071", versionId: "VRS-2071",
-    name: "Semundje Kritike", code: "CI",
-    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 10000, minSumInsured: 2000, maxSumInsured: 50000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.30,
-    commissionPct: 10, isActive: true,
-  },
   // PRD-072 — ISP PPI Karta e Kreditit
   {
     id: "COV-2072A", productId: "PRD-072", versionId: "VRS-2072",
