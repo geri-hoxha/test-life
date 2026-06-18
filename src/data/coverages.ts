@@ -113,15 +113,6 @@ const seed: Coverage[] = [
     basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
     commissionPct: 14, isActive: true,
   },
-  {
-    id: "COV-2074B", productId: "PRD-074", versionId: "VRS-2074",
-    name: "Shpenzime mjekesore te shtrimit ne spital", code: "HOSP",
-    description: "Shpenzime mjekesore te shtrimit ne spital si pasoje e nje Aksidenti ose nje Nderhyrje Kirurgjikale deri ne limitin vjetor te percaktuar ne formularin e polices. Ato mbulohen vetem nese jane kryer brenda periudhes se sigurimit per nje ngjarje te ndodhur brenda periudhes se sigurimit, ne nje spital te Rrjetit mjekesor ne Shqiperi te SIGAL.",
-    coverageType: "Optional Rider", sumInsuredType: "Fixed",
-    defaultSumInsured: 3000, minSumInsured: 1000, maxSumInsured: 10000,
-    basePremiumType: "Fixed amount", basePremiumValue: 60,
-    commissionPct: 10, isActive: true,
-  },
 ];
 
 let coverages: Coverage[] = [...seed];
