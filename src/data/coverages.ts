@@ -79,6 +79,112 @@ const seed: Coverage[] = [
     basePremiumType: "Percentage of insured amount", basePremiumValue: 0.45,
     commissionPct: 9, isActive: true,
   },
+  // ===== ISP family (PRD-069..074) =====
+  // PRD-069 — ISP standart me tabele
+  {
+    id: "COV-2069A", productId: "PRD-069", versionId: "VRS-2069",
+    name: "Humbja e jetes", code: "DTH",
+    description: "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.",
+    coverageType: "Mandatory", sumInsuredType: "Based on loan amount",
+    defaultSumInsured: 0, minSumInsured: 1000, maxSumInsured: 500000,
+    basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
+    commissionPct: 12, isActive: true,
+  },
+  // PRD-070 — ISP A_Mortgage Upfront
+  {
+    id: "COV-2070A", productId: "PRD-070", versionId: "VRS-2070",
+    name: "Humbja e jetes", code: "DTH",
+    description: "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.",
+    coverageType: "Mandatory", sumInsuredType: "Based on loan amount",
+    defaultSumInsured: 0, minSumInsured: 1000, maxSumInsured: 500000,
+    basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
+    commissionPct: 12, isActive: true,
+  },
+  {
+    id: "COV-2070B", productId: "PRD-070", versionId: "VRS-2070",
+    name: "Semundje Kritike", code: "CI",
+    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
+    coverageType: "Optional Rider", sumInsuredType: "User entered",
+    defaultSumInsured: 20000, minSumInsured: 5000, maxSumInsured: 150000,
+    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.32,
+    commissionPct: 10, isActive: true,
+  },
+  // PRD-071 — ISP PPI Konsumatore
+  {
+    id: "COV-2071A", productId: "PRD-071", versionId: "VRS-2071",
+    name: "Humbja e jetes", code: "DTH",
+    description: "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.",
+    coverageType: "Mandatory", sumInsuredType: "Based on loan amount",
+    defaultSumInsured: 0, minSumInsured: 500, maxSumInsured: 100000,
+    basePremiumType: "Fixed amount", basePremiumValue: 20,
+    commissionPct: 12, isActive: true,
+  },
+  {
+    id: "COV-2071B", productId: "PRD-071", versionId: "VRS-2071",
+    name: "Semundje Kritike", code: "CI",
+    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
+    coverageType: "Optional Rider", sumInsuredType: "User entered",
+    defaultSumInsured: 10000, minSumInsured: 2000, maxSumInsured: 50000,
+    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.30,
+    commissionPct: 10, isActive: true,
+  },
+  // PRD-072 — ISP PPI Karta e Kreditit
+  {
+    id: "COV-2072A", productId: "PRD-072", versionId: "VRS-2072",
+    name: "Humbja e jetes", code: "DTH",
+    description: "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.",
+    coverageType: "Mandatory", sumInsuredType: "Based on loan amount",
+    defaultSumInsured: 0, minSumInsured: 500, maxSumInsured: 50000,
+    basePremiumType: "Fixed amount", basePremiumValue: 15,
+    commissionPct: 12, isActive: true,
+  },
+  {
+    id: "COV-2072B", productId: "PRD-072", versionId: "VRS-2072",
+    name: "Semundje Kritike", code: "CI",
+    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
+    coverageType: "Optional Rider", sumInsuredType: "User entered",
+    defaultSumInsured: 5000, minSumInsured: 1000, maxSumInsured: 25000,
+    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.28,
+    commissionPct: 10, isActive: true,
+  },
+  // PRD-073 — ISP PPI Overdraft
+  {
+    id: "COV-2073A", productId: "PRD-073", versionId: "VRS-2073",
+    name: "Humbja e jetes", code: "DTH",
+    description: "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.",
+    coverageType: "Mandatory", sumInsuredType: "Based on loan amount",
+    defaultSumInsured: 0, minSumInsured: 500, maxSumInsured: 50000,
+    basePremiumType: "Fixed amount", basePremiumValue: 15,
+    commissionPct: 12, isActive: true,
+  },
+  {
+    id: "COV-2073B", productId: "PRD-073", versionId: "VRS-2073",
+    name: "Semundje Kritike", code: "CI",
+    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
+    coverageType: "Optional Rider", sumInsuredType: "User entered",
+    defaultSumInsured: 5000, minSumInsured: 1000, maxSumInsured: 25000,
+    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.28,
+    commissionPct: 10, isActive: true,
+  },
+  // PRD-074 — ISP On-Vita (combined)
+  {
+    id: "COV-2074A", productId: "PRD-074", versionId: "VRS-2074",
+    name: "Sigurimi i Jetes me Afat", code: "TL",
+    description: "Ngjarja e sigurimit do te jete Humbja e jetes se te Siguruarit brenda periudhës se sigurimit.",
+    coverageType: "Mandatory", sumInsuredType: "User entered",
+    defaultSumInsured: 25000, minSumInsured: 5000, maxSumInsured: 200000,
+    basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
+    commissionPct: 14, isActive: true,
+  },
+  {
+    id: "COV-2074B", productId: "PRD-074", versionId: "VRS-2074",
+    name: "Shpenzime mjekesore te shtrimit ne spital", code: "HOSP",
+    description: "Shpenzime mjekesore te shtrimit ne spital si pasoje e nje Aksidenti ose nje Nderhyrje Kirurgjikale deri ne limitin vjetor te percaktuar ne formularin e polices. Ato mbulohen vetem nese jane kryer brenda periudhes se sigurimit per nje ngjarje te ndodhur brenda periudhes se sigurimit, ne nje spital te Rrjetit mjekesor ne Shqiperi te SIGAL.",
+    coverageType: "Optional Rider", sumInsuredType: "Fixed",
+    defaultSumInsured: 3000, minSumInsured: 1000, maxSumInsured: 10000,
+    basePremiumType: "Fixed amount", basePremiumValue: 60,
+    commissionPct: 10, isActive: true,
+  },
 ];
 
 let coverages: Coverage[] = [...seed];
