@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   getProduct, updateProductFlags, updateProduct, ProductStatus, Product,
   PRODUCT_GROUPS, POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
@@ -524,7 +524,6 @@ const SelectField = <T extends { value: string; label: string }>({
 const defaultSetup: ProductSetupDetails = {
   legacyPacketId: 0, bankPartnerCode: "ISP", policyType: "WithTable",
   insuranceAmountType: "TotalAmount", legacyTariffId: 0, maxTenorMonths: 240,
-  isObsolete: false, apiSubject: false, apiStraight: false,
 };
 
 const SetupTab = ({ product }: { product: Product }) => {
