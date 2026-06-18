@@ -477,157 +477,408 @@ const ProductDetail = () => {
   );
 };
 
-// ===== Grouped detail tabs =====
-const labelFor = <T extends { value: string; label: string }>(arr: readonly T[], v?: string) =>
-  arr.find((x) => x.value === v)?.label ?? v ?? "—";
+// ===== Editable grouped detail tabs =====
 
-const InfoRow = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
-  <div className="flex flex-col gap-1 py-2.5 border-b border-border last:border-0">
-    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</span>
-    <span className={`text-sm text-foreground ${mono ? "font-mono" : ""}`}>{value || "—"}</span>
-  </div>
-);
-
-const GroupedCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <Card className="shadow-card border-border">
-    <div className="px-5 py-4 border-b border-border">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+const SectionShell = ({
+  title, description, onSave, dirty, children,
+}: {
+  title: string; description?: string; onSave: () => void; dirty: boolean; children: React.ReactNode;
+}) => (
+  <Card className="shadow-card border-border overflow-hidden">
+    <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      </div>
+      <Button
+        size="sm"
+        onClick={onSave}
+        disabled={!dirty}
+        className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+      >
+        <Save className="h-4 w-4" /> Save changes
+      </Button>
     </div>
-    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6">{children}</div>
+    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">{children}</div>
   </Card>
 );
 
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="space-y-2">
+    <Label className="text-xs">{label}</Label>
+    {children}
+  </div>
+);
+
+const SelectField = <T extends { value: string; label: string }>({
+  options, value, onChange,
+}: { options: readonly T[]; value: string; onChange: (v: string) => void }) => (
+  <Select value={value} onValueChange={onChange}>
+    <SelectTrigger><SelectValue /></SelectTrigger>
+    <SelectContent>
+      {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+    </SelectContent>
+  </Select>
+);
+
+const defaultSetup: ProductSetupDetails = {
+  legacyPacketId: 0, bankPartnerCode: "ISP", policyType: "WithTable",
+  insuranceAmountType: "TotalAmount", legacyTariffId: 0, maxTenorMonths: 240,
+  isObsolete: false, apiSubject: false, apiStraight: false,
+};
+
 const SetupTab = ({ product }: { product: Product }) => {
-  const s = product.setupDetails;
+  const initial = product.setupDetails ?? defaultSetup;
+  const [s, setS] = useState<ProductSetupDetails>(initial);
+  const dirty = JSON.stringify(s) !== JSON.stringify(initial);
+  const save = () => { updateProduct(product.id, { setupDetails: s }); toast.success("Setup details saved"); };
   return (
-    <GroupedCard title="Setup details">
-      <InfoRow label="Legacy packet ID" value={s?.legacyPacketId} mono />
-      <InfoRow label="Bank partner" value={s?.bankPartnerCode} mono />
-      <InfoRow label="Policy type" value={labelFor(POLICY_TYPES, s?.policyType)} />
-      <InfoRow label="Insurance amount type" value={labelFor(INSURANCE_AMOUNT_TYPES, s?.insuranceAmountType)} />
-      <InfoRow label="Legacy tariff ID" value={s?.legacyTariffId} mono />
-      <InfoRow label="Max tenor (months)" value={s?.maxTenorMonths} mono />
-      <InfoRow label="Obsolete" value={s?.isObsolete ? "Yes" : "No"} />
-      <InfoRow label="API subject / API straight" value={`${s?.apiSubject ? "Yes" : "No"} / ${s?.apiStraight ? "Yes" : "No"}`} />
-    </GroupedCard>
+    <SectionShell title="Setup details" onSave={save} dirty={dirty}>
+      <Field label="Legacy packet ID">
+        <Input type="number" value={s.legacyPacketId} onChange={(e) => setS({ ...s, legacyPacketId: +e.target.value })} className="font-mono" />
+      </Field>
+      <Field label="Bank partner">
+        <Input value={s.bankPartnerCode} onChange={(e) => setS({ ...s, bankPartnerCode: e.target.value })} className="font-mono" />
+      </Field>
+      <Field label="Policy type">
+        <SelectField options={POLICY_TYPES} value={s.policyType} onChange={(v) => setS({ ...s, policyType: v })} />
+      </Field>
+      <Field label="Insurance amount type">
+        <SelectField options={INSURANCE_AMOUNT_TYPES} value={s.insuranceAmountType} onChange={(v) => setS({ ...s, insuranceAmountType: v })} />
+      </Field>
+      <Field label="Legacy tariff ID">
+        <Input type="number" value={s.legacyTariffId} onChange={(e) => setS({ ...s, legacyTariffId: +e.target.value })} className="font-mono" />
+      </Field>
+      <Field label="Max tenor (months)">
+        <Input type="number" value={s.maxTenorMonths} onChange={(e) => setS({ ...s, maxTenorMonths: +e.target.value })} className="font-mono" />
+      </Field>
+      <div className="md:col-span-2 flex flex-wrap gap-6 pt-2">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox checked={s.isObsolete} onCheckedChange={(v) => setS({ ...s, isObsolete: !!v })} /> Obsolete
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox checked={s.apiSubject} onCheckedChange={(v) => setS({ ...s, apiSubject: !!v })} /> API subject
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox checked={s.apiStraight} onCheckedChange={(v) => setS({ ...s, apiStraight: !!v })} /> API straight
+        </label>
+      </div>
+    </SectionShell>
   );
+};
+
+const defaultPayment: ProductPaymentDetails = {
+  premiumPaymentType: "NotApplicable", packetPaymentType: "NotApplicable", renewalType: "NotApplicable",
 };
 
 const PaymentTab = ({ product }: { product: Product }) => {
-  const p = product.paymentDetails;
-  const m = PAYMENT_MODELS.find((x) => x.value === product.paymentModel);
+  const initial = product.paymentDetails ?? defaultPayment;
+  const [p, setP] = useState<ProductPaymentDetails>(initial);
+  const [model, setModel] = useState<PaymentModel | undefined>(product.paymentModel);
+  const dirty = JSON.stringify(p) !== JSON.stringify(initial) || model !== product.paymentModel;
+  const save = () => {
+    updateProduct(product.id, { paymentDetails: p, paymentModel: model });
+    toast.success("Payment details saved");
+  };
+  const applyModel = (v: PaymentModel) => {
+    setModel(v);
+    const m = PAYMENT_MODELS.find((x) => x.value === v);
+    if (m) setP({
+      premiumPaymentType: m.defaults.premiumPaymentType,
+      packetPaymentType: m.defaults.packetPaymentType,
+      renewalType: m.defaults.renewalType,
+    });
+  };
   return (
-    <div className="space-y-5">
-      {m && (
-        <Card className="shadow-card border-border p-5">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Payment behavior model</div>
-          <div className="text-sm font-semibold text-foreground">{m.label}</div>
-          <p className="text-xs text-muted-foreground mt-1">{m.description}</p>
-        </Card>
-      )}
-      <GroupedCard title="Payment details">
-        <InfoRow label="Premium payment type" value={labelFor(PREMIUM_PAYMENT_TYPES, p?.premiumPaymentType)} />
-        <InfoRow label="Packet payment type" value={labelFor(PACKET_PAYMENT_TYPES, p?.packetPaymentType)} />
-        <InfoRow label="Renewal type" value={labelFor(PACKET_RENEWAL_TYPES, p?.renewalType)} />
-      </GroupedCard>
-    </div>
+    <SectionShell title="Payment details" description="Choose a behavior model to seed defaults, then override individual fields." onSave={save} dirty={dirty}>
+      <div className="md:col-span-2">
+        <Field label="Payment behavior model">
+          <Select value={model ?? ""} onValueChange={(v) => applyModel(v as PaymentModel)}>
+            <SelectTrigger><SelectValue placeholder="Select a model" /></SelectTrigger>
+            <SelectContent>
+              {PAYMENT_MODELS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        {model && (
+          <p className="text-xs text-muted-foreground mt-2">{PAYMENT_MODELS.find((m) => m.value === model)?.description}</p>
+        )}
+      </div>
+      <Field label="Premium payment type">
+        <SelectField options={PREMIUM_PAYMENT_TYPES} value={p.premiumPaymentType} onChange={(v) => setP({ ...p, premiumPaymentType: v })} />
+      </Field>
+      <Field label="Packet payment type">
+        <SelectField options={PACKET_PAYMENT_TYPES} value={p.packetPaymentType} onChange={(v) => setP({ ...p, packetPaymentType: v })} />
+      </Field>
+      <Field label="Renewal type">
+        <SelectField options={PACKET_RENEWAL_TYPES} value={p.renewalType} onChange={(v) => setP({ ...p, renewalType: v })} />
+      </Field>
+    </SectionShell>
   );
 };
 
+const defaultLoan: ProductLoanDetails = { packetLoanType: "NotApplicable", loanProductType: "NotApplicable" };
+
 const LoanTab = ({ product }: { product: Product }) => {
-  const l = product.loanDetails;
+  const initial = product.loanDetails ?? defaultLoan;
+  const [l, setL] = useState<ProductLoanDetails>(initial);
+  const dirty = JSON.stringify(l) !== JSON.stringify(initial);
+  const save = () => { updateProduct(product.id, { loanDetails: l }); toast.success("Loan details saved"); };
   return (
-    <GroupedCard title="Loan details">
-      <InfoRow label="Packet loan type" value={labelFor(PACKET_LOAN_TYPES, l?.packetLoanType)} />
-      <InfoRow label="Loan product type" value={labelFor(LOAN_PRODUCT_TYPES, l?.loanProductType)} />
-    </GroupedCard>
+    <SectionShell title="Loan details" onSave={save} dirty={dirty}>
+      <Field label="Packet loan type">
+        <SelectField options={PACKET_LOAN_TYPES} value={l.packetLoanType} onChange={(v) => setL({ ...l, packetLoanType: v })} />
+      </Field>
+      <Field label="Loan product type">
+        <SelectField options={LOAN_PRODUCT_TYPES} value={l.loanProductType} onChange={(v) => setL({ ...l, loanProductType: v })} />
+      </Field>
+    </SectionShell>
   );
 };
 
 const PremiumTableTab = ({ product }: { product: Product }) => {
-  const t = getPremiumTable(product.premiumTableId);
-  if (!t) return <Card className="p-8 text-center text-sm text-muted-foreground">No premium table assigned.</Card>;
+  const tables = listPremiumTables();
+  const [selectedId, setSelectedId] = useState<string>(product.premiumTableId ?? "");
+  const [tick, setTick] = useState(0); // force re-render after item edits
+  const selected = tables.find((t) => t.id === selectedId);
+  const [items, setItems] = useState<PremiumTableItem[]>(selected?.items ?? []);
+  const [name, setName] = useState(selected?.name ?? "");
+  const [newOpen, setNewOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  // when selected table changes, hydrate local state
+  const ensureHydrated = (id: string) => {
+    setSelectedId(id);
+    const t = listPremiumTables().find((x) => x.id === id);
+    setItems(t?.items ?? []);
+    setName(t?.name ?? "");
+  };
+
+  const linkDirty = selectedId !== (product.premiumTableId ?? "");
+  const tableDirty = !!selected && (
+    name !== selected.name ||
+    JSON.stringify(items) !== JSON.stringify(selected.items)
+  );
+
+  const saveLink = () => { updateProduct(product.id, { premiumTableId: selectedId }); toast.success("Premium table linked"); };
+  const saveTable = () => {
+    if (!selected) return;
+    updatePremiumTable(selected.id, { name, items });
+    setTick((n) => n + 1);
+    toast.success("Premium table updated");
+  };
+
+  const updateItem = (id: string, patch: Partial<PremiumTableItem>) =>
+    setItems((arr) => arr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  const addItem = () =>
+    setItems((arr) => [...arr, { id: `row-${Date.now()}`, gender: "Any", minAge: 0, maxAge: 0, coefficient: 0 }]);
+  const removeItem = (id: string) => setItems((arr) => arr.filter((i) => i.id !== id));
+
+  const createTable = () => {
+    if (!newName.trim()) return;
+    const created = addPremiumTable(newName.trim());
+    setNewName(""); setNewOpen(false);
+    ensureHydrated(created.id);
+    toast.success("Premium table created");
+  };
+
   return (
-    <Card className="shadow-card border-border">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">{t.name}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Legacy ID {t.legacyId} · {t.items.length} rows</p>
+    <div className="space-y-5">
+      <Card className="shadow-card border-border overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Linked premium table</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Pick an existing table or create a new one.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => setNewOpen((v) => !v)}>
+              <Plus className="h-4 w-4" /> New table
+            </Button>
+            <Button size="sm" onClick={saveLink} disabled={!linkDirty} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Save className="h-4 w-4" /> Save link
+            </Button>
+          </div>
         </div>
-        <Badge variant="outline" className="font-mono text-[10px]">{t.id}</Badge>
+        <div className="p-5 space-y-4">
+          <Select value={selectedId} onValueChange={ensureHydrated}>
+            <SelectTrigger className="max-w-md"><SelectValue placeholder="Select a premium table" /></SelectTrigger>
+            <SelectContent>
+              {tables.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.id})</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {newOpen && (
+            <div className="flex gap-2 items-end pt-2 border-t border-border">
+              <div className="flex-1 max-w-md">
+                <Label className="text-xs">New table name</Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Mortality 2027 — EUR" />
+              </div>
+              <Button size="sm" onClick={createTable} className="bg-accent hover:bg-accent/90 text-accent-foreground">Create</Button>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {selected && (
+        <Card className="shadow-card border-border overflow-hidden" key={`${selected.id}-${tick}`}>
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+            <div className="flex-1">
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="font-semibold max-w-md" />
+              <p className="text-xs text-muted-foreground mt-1">Legacy ID {selected.legacyId} · {items.length} rows</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="gap-2" onClick={addItem}>
+                <Plus className="h-4 w-4" /> Add row
+              </Button>
+              <Button size="sm" onClick={saveTable} disabled={!tableDirty} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Save className="h-4 w-4" /> Save table
+              </Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left p-3">Gender</th>
+                  <th className="text-left p-3">Min age</th>
+                  <th className="text-left p-3">Max age</th>
+                  <th className="text-left p-3">Coefficient</th>
+                  <th className="w-12"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((i) => (
+                  <tr key={i.id} className="border-t border-border">
+                    <td className="p-2">
+                      <Select value={i.gender} onValueChange={(v) => updateItem(i.id, { gender: v as PremiumTableItem["gender"] })}>
+                        <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Any">Any</SelectItem>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="p-2"><Input type="number" value={i.minAge} onChange={(e) => updateItem(i.id, { minAge: +e.target.value })} className="h-8 w-24 font-mono" /></td>
+                    <td className="p-2"><Input type="number" value={i.maxAge} onChange={(e) => updateItem(i.id, { maxAge: +e.target.value })} className="h-8 w-24 font-mono" /></td>
+                    <td className="p-2"><Input type="number" step="0.0001" value={i.coefficient} onChange={(e) => updateItem(i.id, { coefficient: +e.target.value })} className="h-8 w-32 font-mono" /></td>
+                    <td className="p-2"><Button size="icon" variant="ghost" onClick={() => removeItem(i.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></td>
+                  </tr>
+                ))}
+                {!items.length && (
+                  <tr><td colSpan={5} className="p-6 text-center text-sm text-muted-foreground">No rows yet — click "Add row".</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+const blankTariff = (productId: string): Omit<Tariff, "id"> => ({
+  productId, name: "New tariff", legacyTariffId: 0, tariffType: "Standard", currency: "EUR",
+  effectiveFrom: new Date().toISOString().slice(0, 10), effectiveTo: "2030-12-31", isActive: true,
+  minPremium: 0, maxPremium: 0, fixedPremium: 0, fixedMonthlyPremium: 0, fixedAnnualPremium: 0,
+  formula: "premium = coefficient × sum_insured", notes: "",
+});
+
+const TariffsTab = ({ product }: { product: Product }) => {
+  const [tick, setTick] = useState(0);
+  const ts = listTariffs(product.id);
+  const refresh = () => setTick((n) => n + 1);
+  return (
+    <div className="space-y-4" key={tick}>
+      <div className="flex justify-end">
+        <Button size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground" onClick={() => { addTariff(blankTariff(product.id)); refresh(); toast.success("Tariff added"); }}>
+          <Plus className="h-4 w-4" /> Add tariff
+        </Button>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <tr><th className="text-left p-3">Gender</th><th className="text-left p-3">Min age</th><th className="text-left p-3">Max age</th><th className="text-left p-3">Coefficient</th></tr>
-          </thead>
-          <tbody>
-            {t.items.map((i) => (
-              <tr key={i.id} className="border-t border-border">
-                <td className="p-3">{i.gender}</td>
-                <td className="p-3 font-mono">{i.minAge}</td>
-                <td className="p-3 font-mono">{i.maxAge}</td>
-                <td className="p-3 font-mono">{i.coefficient}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {!ts.length && <Card className="p-8 text-center text-sm text-muted-foreground">No tariffs configured for this product.</Card>}
+      {ts.map((t) => <TariffEditor key={t.id} tariff={t} onChange={refresh} />)}
+    </div>
+  );
+};
+
+const TariffEditor = ({ tariff, onChange }: { tariff: Tariff; onChange: () => void }) => {
+  const [t, setT] = useState<Tariff>(tariff);
+  const dirty = JSON.stringify(t) !== JSON.stringify(tariff);
+  const save = () => { updateTariff(tariff.id, t); onChange(); toast.success("Tariff saved"); };
+  const del = () => { removeTariff(tariff.id); onChange(); toast.success("Tariff removed"); };
+  return (
+    <Card className="shadow-card border-border overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+        <Input value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} className="font-semibold max-w-md" />
+        <div className="flex gap-2">
+          <label className="flex items-center gap-2 text-xs">
+            <Switch checked={t.isActive} onCheckedChange={(v) => setT({ ...t, isActive: v })} /> Active
+          </label>
+          <Button size="sm" variant="outline" onClick={del} className="gap-2 text-destructive"><Trash2 className="h-4 w-4" /> Remove</Button>
+          <Button size="sm" onClick={save} disabled={!dirty} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"><Save className="h-4 w-4" /> Save</Button>
+        </div>
+      </div>
+      <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+        <Field label="Tariff type"><Input value={t.tariffType} onChange={(e) => setT({ ...t, tariffType: e.target.value })} /></Field>
+        <Field label="Currency">
+          <Select value={t.currency} onValueChange={(v) => setT({ ...t, currency: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{ALL_CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          </Select>
+        </Field>
+        <Field label="Legacy tariff ID"><Input type="number" value={t.legacyTariffId} onChange={(e) => setT({ ...t, legacyTariffId: +e.target.value })} className="font-mono" /></Field>
+        <Field label="Effective from"><Input type="date" value={t.effectiveFrom} onChange={(e) => setT({ ...t, effectiveFrom: e.target.value })} /></Field>
+        <Field label="Effective to"><Input type="date" value={t.effectiveTo} onChange={(e) => setT({ ...t, effectiveTo: e.target.value })} /></Field>
+        <Field label="Min premium"><Input type="number" value={t.minPremium} onChange={(e) => setT({ ...t, minPremium: +e.target.value })} className="font-mono" /></Field>
+        <Field label="Max premium"><Input type="number" value={t.maxPremium} onChange={(e) => setT({ ...t, maxPremium: +e.target.value })} className="font-mono" /></Field>
+        <Field label="Fixed premium"><Input type="number" value={t.fixedPremium} onChange={(e) => setT({ ...t, fixedPremium: +e.target.value })} className="font-mono" /></Field>
+        <Field label="Fixed monthly"><Input type="number" value={t.fixedMonthlyPremium} onChange={(e) => setT({ ...t, fixedMonthlyPremium: +e.target.value })} className="font-mono" /></Field>
+        <Field label="Fixed annual"><Input type="number" value={t.fixedAnnualPremium} onChange={(e) => setT({ ...t, fixedAnnualPremium: +e.target.value })} className="font-mono" /></Field>
+        <div className="md:col-span-3"><Field label="Formula"><Input value={t.formula} onChange={(e) => setT({ ...t, formula: e.target.value })} className="font-mono" /></Field></div>
+        <div className="md:col-span-3"><Field label="Notes"><Textarea rows={2} value={t.notes} onChange={(e) => setT({ ...t, notes: e.target.value })} /></Field></div>
       </div>
     </Card>
   );
 };
 
-const TariffsTab = ({ product }: { product: Product }) => {
-  const ts = listTariffs(product.id);
-  if (!ts.length) return <Card className="p-8 text-center text-sm text-muted-foreground">No tariffs configured for this product.</Card>;
-  return (
-    <div className="space-y-4">
-      {ts.map((t) => (
-        <Card key={t.id} className="shadow-card border-border p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">{t.name}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{t.tariffType} · {t.currency} · Legacy ID {t.legacyTariffId}</p>
-            </div>
-            <Badge className={t.isActive ? "bg-success/15 text-success border-0" : "bg-muted text-muted-foreground border-0"}>
-              {t.isActive ? "Active" : "Inactive"}
-            </Badge>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6">
-            <InfoRow label="Effective from" value={t.effectiveFrom} mono />
-            <InfoRow label="Effective to" value={t.effectiveTo} mono />
-            <InfoRow label="Min / Max premium" value={`${t.minPremium} / ${t.maxPremium}`} mono />
-            <InfoRow label="Fixed premium" value={t.fixedPremium} mono />
-            <InfoRow label="Fixed monthly" value={t.fixedMonthlyPremium} mono />
-            <InfoRow label="Fixed annual" value={t.fixedAnnualPremium} mono />
-            <InfoRow label="Formula" value={<span className="font-mono text-xs">{t.formula}</span>} />
-            <InfoRow label="Notes" value={t.notes} />
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-};
-
+const defaultInternal: ProductInternalDetails = { coveragePrintableText: "", packetFinType: null };
 const InternalTab = ({ product }: { product: Product }) => {
-  const i = product.internalDetails;
+  const initial = product.internalDetails ?? defaultInternal;
+  const [i, setI] = useState<ProductInternalDetails>(initial);
+  const dirty = JSON.stringify(i) !== JSON.stringify(initial);
+  const save = () => { updateProduct(product.id, { internalDetails: i }); toast.success("Internal details saved"); };
   return (
-    <GroupedCard title="Internal details">
-      <div className="sm:col-span-2"><InfoRow label="Coverage printable text" value={i?.coveragePrintableText} /></div>
-      <InfoRow label="Packet fin type" value={i?.packetFinType ?? "—"} mono />
-    </GroupedCard>
+    <SectionShell title="Internal details" onSave={save} dirty={dirty}>
+      <div className="md:col-span-2">
+        <Field label="Coverage printable text">
+          <Textarea rows={3} value={i.coveragePrintableText} onChange={(e) => setI({ ...i, coveragePrintableText: e.target.value })} />
+        </Field>
+      </div>
+      <Field label="Packet fin type">
+        <Input type="number" value={i.packetFinType ?? ""} onChange={(e) => setI({ ...i, packetFinType: e.target.value === "" ? null : +e.target.value })} className="font-mono" />
+      </Field>
+    </SectionShell>
   );
 };
 
+const defaultExternal: ProductExternalDetails = {
+  sapProductCode: "", sapChannelCode: "", f5ProductCode: "", actuarialProductCode: "RegularPersonal",
+};
 const ExternalTab = ({ product }: { product: Product }) => {
-  const e = product.externalDetails;
+  const initial = product.externalDetails ?? defaultExternal;
+  const [e, setE] = useState<ProductExternalDetails>(initial);
+  const dirty = JSON.stringify(e) !== JSON.stringify(initial);
+  const save = () => { updateProduct(product.id, { externalDetails: e }); toast.success("External details saved"); };
   return (
-    <GroupedCard title="External details">
-      <InfoRow label="SAP product code" value={e?.sapProductCode} mono />
-      <InfoRow label="SAP channel code" value={e?.sapChannelCode} mono />
-      <InfoRow label="F5 product code" value={e?.f5ProductCode} mono />
-      <InfoRow label="Actuarial product code" value={labelFor(ACTUARIAL_CODES, e?.actuarialProductCode)} />
-    </GroupedCard>
+    <SectionShell title="External details" onSave={save} dirty={dirty}>
+      <Field label="SAP product code"><Input value={e.sapProductCode} onChange={(ev) => setE({ ...e, sapProductCode: ev.target.value })} className="font-mono" /></Field>
+      <Field label="SAP channel code"><Input value={e.sapChannelCode} onChange={(ev) => setE({ ...e, sapChannelCode: ev.target.value })} className="font-mono" /></Field>
+      <Field label="F5 product code"><Input value={e.f5ProductCode} onChange={(ev) => setE({ ...e, f5ProductCode: ev.target.value })} className="font-mono" /></Field>
+      <Field label="Actuarial product code">
+        <SelectField options={ACTUARIAL_CODES} value={e.actuarialProductCode} onChange={(v) => setE({ ...e, actuarialProductCode: v })} />
+      </Field>
+    </SectionShell>
   );
 };
 
