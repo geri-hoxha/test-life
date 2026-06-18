@@ -404,14 +404,6 @@ const ProductDetail = () => {
           <CoveragesTab productId={product.id} />
         </TabsContent>
 
-        <TabsContent value="templates">
-          <TemplatesTab productId={product.id} />
-        </TabsContent>
-
-        <TabsContent value="premium">
-          <PremiumRulesTab productId={product.id} />
-        </TabsContent>
-
         <TabsContent value="documents">
           <DocumentsTab productId={product.id} />
         </TabsContent>
