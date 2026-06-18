@@ -524,6 +524,7 @@ const SelectField = <T extends { value: string; label: string }>({
 const defaultSetup: ProductSetupDetails = {
   legacyPacketId: 0, bankPartnerCode: "ISP", policyType: "WithTable",
   insuranceAmountType: "TotalAmount", legacyTariffId: 0, maxTenorMonths: 240,
+  isObsolete: false, apiSubject: false, apiStraight: false,
 };
 
 const SetupTab = ({ product }: { product: Product }) => {
