@@ -503,7 +503,7 @@ seedAuxiliary();
 
 
 // In-memory store backed by localStorage (demo persistence)
-const STORAGE_KEY = "esiglife.products.v3";
+const STORAGE_KEY = "esiglife.products.v4";
 
 const loadProducts = (): Product[] => {
   if (typeof window === "undefined") return [...seedProducts];
