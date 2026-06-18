@@ -376,62 +376,6 @@ const baseSetup = (overrides: Partial<ProductSetupDetails> = {}): ProductSetupDe
 });
 
 export const seedProducts: Product[] = [
-  // === The 6 product families ===
-  {
-    id: "PRD-001", name: "Sigurim i Jetes i Kombinuar", code: "05", status: "Active",
-    currencies: ["EUR", "ALL", "USD"], activeVersion: "v3.2", createdDate: "Jan 12, 2025",
-    type: "Life Insurance",
-    description: "Sigurim jete me mbulim baze Death dhe mbulime shtese opsionale (aksident, paaftesi, semundje kritike).",
-    requiredDocuments: ["ID document", "Medical questionnaire"],
-    flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
-    agentCommission: 0.1, bankCommission: 0.02, productGroup: "GroupLife", premiumTableId: "PT-001",
-  },
-  {
-    id: "PRD-002", name: "Jete e Debitorit Regular", code: "07", status: "Active",
-    currencies: ["EUR", "ALL"], activeVersion: "v2.4", createdDate: "Mar 04, 2025",
-    type: "Life Insurance",
-    description: "Sigurim jete per debitorin me pagese primi te rregullt — mbulim baze Death, distribuim nepermjet bankave partnere.",
-    requiredDocuments: ["ID document", "Loan agreement", "Medical questionnaire"],
-    flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
-    agentCommission: 0.08, bankCommission: 0.05, productGroup: "CreditLifeRegular", premiumTableId: "PT-002",
-  },
-  {
-    id: "PRD-003", name: "Jete e Debitorit Single", code: "08", status: "Active",
-    currencies: ["EUR", "ALL"], activeVersion: "v2.1", createdDate: "Apr 18, 2025",
-    type: "Life Insurance",
-    description: "Sigurim jete per debitorin me pagese te vetme upfront per gjithe periudhen — mbulim baze Death.",
-    requiredDocuments: ["ID document", "Loan agreement", "Medical questionnaire"],
-    flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: false, compliance: true },
-    agentCommission: 0.12, bankCommission: 0.04, productGroup: "CreditLifeSingle", premiumTableId: "PT-003",
-  },
-  {
-    id: "PRD-004", name: "Sigurimi i Jetes i Kombinuar 09", code: "09", status: "Active",
-    currencies: ["EUR", "ALL"], activeVersion: "v1.6", createdDate: "Jun 21, 2025",
-    type: "Life Insurance",
-    description: "Variant i kombinuar i sigurimit te jetes me mbulim baze Death dhe rider opsionale per aksident dhe paaftesi.",
-    requiredDocuments: ["ID document", "Medical questionnaire"],
-    flags: { pep: true, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: false },
-    agentCommission: 0.09, bankCommission: 0.03, productGroup: "Protect", premiumTableId: "PT-001",
-  },
-  {
-    id: "PRD-005", name: "Sigurimi i Jetes i Kombinuar 10", code: "10", status: "Active",
-    currencies: ["EUR", "ALL", "USD"], activeVersion: "v1.3", createdDate: "Aug 09, 2025",
-    type: "Life Insurance",
-    description: "Variant i zgjeruar i sigurimit te jetes te kombinuar — mbulim baze Death plus pakete e plote rider-ash opsionale.",
-    requiredDocuments: ["ID document", "Medical report"],
-    flags: { pep: true, highInsuredAmount: true, totalExposure: true, manualUnderwriting: true, compliance: true },
-    agentCommission: 0.11, bankCommission: 0.04, productGroup: "OnVita", premiumTableId: "PT-001",
-  },
-  {
-    id: "PRD-006", name: "Sigurim i Jetes me Kursim", code: "SJ", status: "Active",
-    currencies: ["EUR", "ALL"], activeVersion: "v1.0", createdDate: "Oct 02, 2025",
-    type: "Life Insurance",
-    description: "Sigurim jete me komponent kursimi — mbulim baze Death me akumulim kapitali ne maturim dhe rider opsionale.",
-    requiredDocuments: ["ID document", "Medical questionnaire", "Proof of income"],
-    flags: { pep: true, highInsuredAmount: true, totalExposure: false, manualUnderwriting: true, compliance: true },
-    agentCommission: 0.15, bankCommission: 0.06, productGroup: "Endowment", premiumTableId: "PT-001",
-  },
-
   // === Legacy ISP / bank-partner configurations ===
   {
     id: "PRD-069", name: "ISP A_Mortgage Standard 07", code: "69", status: "Active",
@@ -525,6 +469,7 @@ export const seedProducts: Product[] = [
   },
 ];
 
+
 // Seed initial tariffs and coverages for the 6 product families
 const seedAuxiliary = () => {
   if (tariffs.length || productCoverages.length) return;
@@ -537,25 +482,28 @@ const seedAuxiliary = () => {
       minPremium: 0, maxPremium: 0, fixedPremium: 0, fixedMonthlyPremium: 0, fixedAnnualPremium: 0,
       formula: "premium = coefficient × sum_insured", notes: "", ...extra,
     });
-  seedT("PRD-001", "Group Life EUR", 510, "EUR");
-  seedT("PRD-002", "Credit Life Regular EUR", 710, "EUR");
-  seedT("PRD-003", "Credit Life Single EUR", 810, "EUR");
-  seedT("PRD-004", "Protect EUR", 910, "EUR");
-  seedT("PRD-005", "On-Vita EUR", 1010, "EUR");
-  seedT("PRD-006", "Endowment EUR", 1110, "EUR");
+  seedT("PRD-069", "ISP Mortgage Standard EUR", 690, "EUR");
+  seedT("PRD-070", "ISP Mortgage Upfront EUR", 700, "EUR");
+  seedT("PRD-071", "ISP PPI Konsumatore EUR", 711, "EUR", { fixedPremium: 20 });
+  seedT("PRD-071", "ISP PPI Konsumatore ALL", 712, "ALL", { fixedPremium: 2000 });
+  seedT("PRD-072", "ISP PPI Karte Krediti EUR", 721, "EUR", { fixedPremium: 15 });
+  seedT("PRD-072", "ISP PPI Karte Krediti ALL", 722, "ALL", { fixedPremium: 1500 });
+  seedT("PRD-073", "ISP PPI Overdraft EUR", 731, "EUR", { fixedPremium: 15 });
+  seedT("PRD-073", "ISP PPI Overdraft ALL", 732, "ALL", { fixedPremium: 1500 });
+  seedT("PRD-074", "ISP On-Vita EUR", 740, "EUR");
 
   const seedC = (productId: string, name: string, mandatory = true, desc = "Death benefit cover.") =>
     addProductCoverage({ productId, name, description: desc, legacyCoverageId: Math.floor(Math.random() * 9000 + 1000), isMandatory: mandatory });
-  ["PRD-001", "PRD-002", "PRD-003", "PRD-004", "PRD-005", "PRD-006"].forEach((id) => seedC(id, "Death"));
-  seedC("PRD-001", "Accident", false, "Optional accidental death rider.");
-  seedC("PRD-005", "Critical Illness", false, "Optional critical illness rider.");
-  seedC("PRD-006", "Savings maturity benefit", true, "Capital accumulation paid at maturity.");
+  ["PRD-069", "PRD-070", "PRD-071", "PRD-072", "PRD-073", "PRD-074"].forEach((id) => seedC(id, "Death"));
+  seedC("PRD-070", "Permanent Disability", false, "Optional permanent disability rider.");
+  seedC("PRD-074", "Accident", false, "Accidental death rider.");
+
 };
 seedAuxiliary();
 
 
 // In-memory store backed by localStorage (demo persistence)
-const STORAGE_KEY = "esiglife.products.v3";
+const STORAGE_KEY = "esiglife.products.v4";
 
 const loadProducts = (): Product[] => {
   if (typeof window === "undefined") return [...seedProducts];
