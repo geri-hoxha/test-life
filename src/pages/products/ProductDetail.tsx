@@ -377,6 +377,29 @@ const ProductDetail = () => {
           <VersionsTab productId={product.id} />
         </TabsContent>
 
+        <TabsContent value="setup">
+          <SetupTab product={product} />
+        </TabsContent>
+        <TabsContent value="payment">
+          <PaymentTab product={product} />
+        </TabsContent>
+        <TabsContent value="loan">
+          <LoanTab product={product} />
+        </TabsContent>
+        <TabsContent value="premium-table">
+          <PremiumTableTab product={product} />
+        </TabsContent>
+        <TabsContent value="tariffs">
+          <TariffsTab product={product} />
+        </TabsContent>
+        <TabsContent value="internal">
+          <InternalTab product={product} />
+        </TabsContent>
+        <TabsContent value="external">
+          <ExternalTab product={product} />
+        </TabsContent>
+
+
         <TabsContent value="coverages">
           <CoveragesTab productId={product.id} />
         </TabsContent>
