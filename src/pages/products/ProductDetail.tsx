@@ -830,9 +830,6 @@ const InternalTab = ({ product }: { product: Product }) => {
           <Textarea rows={3} value={i.coveragePrintableText} onChange={(e) => setI({ ...i, coveragePrintableText: e.target.value })} />
         </Field>
       </div>
-      <Field label="Packet fin type">
-        <Input type="number" value={i.packetFinType ?? ""} onChange={(e) => setI({ ...i, packetFinType: e.target.value === "" ? null : +e.target.value })} className="font-mono" />
-      </Field>
     </SectionShell>
   );
 };
