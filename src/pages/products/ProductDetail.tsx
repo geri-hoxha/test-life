@@ -13,7 +13,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getProduct, updateProductFlags, updateProduct, ProductStatus, Product } from "@/data/products";
+import {
+  getProduct, updateProductFlags, updateProduct, ProductStatus, Product,
+  PRODUCT_GROUPS, POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
+  PREMIUM_PAYMENT_TYPES, PACKET_PAYMENT_TYPES, PACKET_RENEWAL_TYPES,
+  PACKET_LOAN_TYPES, LOAN_PRODUCT_TYPES, ACTUARIAL_CODES,
+  PAYMENT_MODELS, listTariffs, listProductCoverages, getPremiumTable,
+} from "@/data/products";
 import { Check, AlertCircle, ScrollText, Save, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
@@ -190,12 +196,18 @@ const ProductDetail = () => {
       <Tabs defaultValue="overview" className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          {/* <TabsTrigger value="versions">Versions</TabsTrigger> */}
+          <TabsTrigger value="setup">Setup</TabsTrigger>
+          <TabsTrigger value="payment">Payment</TabsTrigger>
+          <TabsTrigger value="loan">Loan</TabsTrigger>
+          <TabsTrigger value="premium-table">Premium Table</TabsTrigger>
+          <TabsTrigger value="tariffs">Tariffs</TabsTrigger>
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
-          <TabsTrigger value="templates">Templates / Packages</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="premium">Premium Rules</TabsTrigger>
+          <TabsTrigger value="internal">Internal</TabsTrigger>
+          <TabsTrigger value="external">External</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="verification">Verification Rules</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
