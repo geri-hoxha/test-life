@@ -31,33 +31,6 @@ const seed: Coverage[] = [
     basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
     commissionPct: 12, isActive: true,
   },
-  {
-    id: "COV-2002", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Total & Permanent Disability", code: "TPD",
-    description: "Payout if the insured becomes totally and permanently disabled.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 25000, minSumInsured: 5000, maxSumInsured: 250000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.18,
-    commissionPct: 10, isActive: true,
-  },
-  {
-    id: "COV-2003", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Critical Illness", code: "CI",
-    description: "Lump-sum payout on diagnosis of a covered critical illness.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 20000, minSumInsured: 5000, maxSumInsured: 150000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.32,
-    commissionPct: 10, isActive: true,
-  },
-  {
-    id: "COV-2004", productId: "PRD-001", versionId: "VRS-1001",
-    name: "Accidental Death Benefit", code: "ADB",
-    description: "Additional payout if death occurs due to an accident.",
-    coverageType: "Optional Rider", sumInsuredType: "Fixed",
-    defaultSumInsured: 10000, minSumInsured: 5000, maxSumInsured: 50000,
-    basePremiumType: "Fixed amount", basePremiumValue: 24,
-    commissionPct: 8, isActive: false,
-  },
   // PRD-001 / VRS-1003 draft has none yet
   // PRD-003 / VRS-1020 WholeLife
   {
@@ -100,15 +73,6 @@ const seed: Coverage[] = [
     basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
     commissionPct: 12, isActive: true,
   },
-  {
-    id: "COV-2070B", productId: "PRD-070", versionId: "VRS-2070",
-    name: "Semundje Kritike", code: "CI",
-    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 20000, minSumInsured: 5000, maxSumInsured: 150000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.32,
-    commissionPct: 10, isActive: true,
-  },
   // PRD-071 — ISP PPI Konsumatore
   {
     id: "COV-2071A", productId: "PRD-071", versionId: "VRS-2071",
@@ -118,15 +82,6 @@ const seed: Coverage[] = [
     defaultSumInsured: 0, minSumInsured: 500, maxSumInsured: 100000,
     basePremiumType: "Fixed amount", basePremiumValue: 20,
     commissionPct: 12, isActive: true,
-  },
-  {
-    id: "COV-2071B", productId: "PRD-071", versionId: "VRS-2071",
-    name: "Semundje Kritike", code: "CI",
-    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 10000, minSumInsured: 2000, maxSumInsured: 50000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.30,
-    commissionPct: 10, isActive: true,
   },
   // PRD-072 — ISP PPI Karta e Kreditit
   {
@@ -138,15 +93,6 @@ const seed: Coverage[] = [
     basePremiumType: "Fixed amount", basePremiumValue: 15,
     commissionPct: 12, isActive: true,
   },
-  {
-    id: "COV-2072B", productId: "PRD-072", versionId: "VRS-2072",
-    name: "Semundje Kritike", code: "CI",
-    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 5000, minSumInsured: 1000, maxSumInsured: 25000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.28,
-    commissionPct: 10, isActive: true,
-  },
   // PRD-073 — ISP PPI Overdraft
   {
     id: "COV-2073A", productId: "PRD-073", versionId: "VRS-2073",
@@ -157,15 +103,6 @@ const seed: Coverage[] = [
     basePremiumType: "Fixed amount", basePremiumValue: 15,
     commissionPct: 12, isActive: true,
   },
-  {
-    id: "COV-2073B", productId: "PRD-073", versionId: "VRS-2073",
-    name: "Semundje Kritike", code: "CI",
-    description: "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.",
-    coverageType: "Optional Rider", sumInsuredType: "User entered",
-    defaultSumInsured: 5000, minSumInsured: 1000, maxSumInsured: 25000,
-    basePremiumType: "Percentage of insured amount", basePremiumValue: 0.28,
-    commissionPct: 10, isActive: true,
-  },
   // PRD-074 — ISP On-Vita (combined)
   {
     id: "COV-2074A", productId: "PRD-074", versionId: "VRS-2074",
@@ -175,15 +112,6 @@ const seed: Coverage[] = [
     defaultSumInsured: 25000, minSumInsured: 5000, maxSumInsured: 200000,
     basePremiumType: "Rate table by age/gender", basePremiumValue: 0,
     commissionPct: 14, isActive: true,
-  },
-  {
-    id: "COV-2074B", productId: "PRD-074", versionId: "VRS-2074",
-    name: "Shpenzime mjekesore te shtrimit ne spital", code: "HOSP",
-    description: "Shpenzime mjekesore te shtrimit ne spital si pasoje e nje Aksidenti ose nje Nderhyrje Kirurgjikale deri ne limitin vjetor te percaktuar ne formularin e polices. Ato mbulohen vetem nese jane kryer brenda periudhes se sigurimit per nje ngjarje te ndodhur brenda periudhes se sigurimit, ne nje spital te Rrjetit mjekesor ne Shqiperi te SIGAL.",
-    coverageType: "Optional Rider", sumInsuredType: "Fixed",
-    defaultSumInsured: 3000, minSumInsured: 1000, maxSumInsured: 10000,
-    basePremiumType: "Fixed amount", basePremiumValue: 60,
-    commissionPct: 10, isActive: true,
   },
 ];
 
