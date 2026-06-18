@@ -482,19 +482,22 @@ const seedAuxiliary = () => {
       minPremium: 0, maxPremium: 0, fixedPremium: 0, fixedMonthlyPremium: 0, fixedAnnualPremium: 0,
       formula: "premium = coefficient × sum_insured", notes: "", ...extra,
     });
-  seedT("PRD-001", "Group Life EUR", 510, "EUR");
-  seedT("PRD-002", "Credit Life Regular EUR", 710, "EUR");
-  seedT("PRD-003", "Credit Life Single EUR", 810, "EUR");
-  seedT("PRD-004", "Protect EUR", 910, "EUR");
-  seedT("PRD-005", "On-Vita EUR", 1010, "EUR");
-  seedT("PRD-006", "Endowment EUR", 1110, "EUR");
+  seedT("PRD-069", "ISP Mortgage Standard EUR", 690, "EUR");
+  seedT("PRD-070", "ISP Mortgage Upfront EUR", 700, "EUR");
+  seedT("PRD-071", "ISP PPI Konsumatore EUR", 711, "EUR", { fixedPremium: 20 });
+  seedT("PRD-071", "ISP PPI Konsumatore ALL", 712, "ALL", { fixedPremium: 2000 });
+  seedT("PRD-072", "ISP PPI Karte Krediti EUR", 721, "EUR", { fixedPremium: 15 });
+  seedT("PRD-072", "ISP PPI Karte Krediti ALL", 722, "ALL", { fixedPremium: 1500 });
+  seedT("PRD-073", "ISP PPI Overdraft EUR", 731, "EUR", { fixedPremium: 15 });
+  seedT("PRD-073", "ISP PPI Overdraft ALL", 732, "ALL", { fixedPremium: 1500 });
+  seedT("PRD-074", "ISP On-Vita EUR", 740, "EUR");
 
   const seedC = (productId: string, name: string, mandatory = true, desc = "Death benefit cover.") =>
     addProductCoverage({ productId, name, description: desc, legacyCoverageId: Math.floor(Math.random() * 9000 + 1000), isMandatory: mandatory });
-  ["PRD-001", "PRD-002", "PRD-003", "PRD-004", "PRD-005", "PRD-006"].forEach((id) => seedC(id, "Death"));
-  seedC("PRD-001", "Accident", false, "Optional accidental death rider.");
-  seedC("PRD-005", "Critical Illness", false, "Optional critical illness rider.");
-  seedC("PRD-006", "Savings maturity benefit", true, "Capital accumulation paid at maturity.");
+  ["PRD-069", "PRD-070", "PRD-071", "PRD-072", "PRD-073", "PRD-074"].forEach((id) => seedC(id, "Death"));
+  seedC("PRD-070", "Permanent Disability", false, "Optional permanent disability rider.");
+  seedC("PRD-074", "Accident", false, "Accidental death rider.");
+
 };
 seedAuxiliary();
 
