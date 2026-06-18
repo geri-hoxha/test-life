@@ -392,9 +392,6 @@ const ProductDetail = () => {
         <TabsContent value="premium-table">
           <PremiumTableTab product={product} />
         </TabsContent>
-        <TabsContent value="tariffs">
-          <TariffsTab product={product} />
-        </TabsContent>
         <TabsContent value="internal">
           <InternalTab product={product} />
         </TabsContent>
