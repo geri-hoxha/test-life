@@ -496,11 +496,42 @@ const seedAuxiliary = () => {
   seedT("PRD-073", "ISP PPI Overdraft ALL", 732, "ALL", { fixedPremium: 1500 });
   seedT("PRD-074", "ISP On-Vita EUR", 740, "EUR");
 
-  const seedC = (productId: string, name: string, mandatory = true, desc = "Death benefit cover.") =>
+  const seedC = (productId: string, name: string, mandatory: boolean, desc: string) =>
     addProductCoverage({ productId, name, description: desc, legacyCoverageId: Math.floor(Math.random() * 9000 + 1000), isMandatory: mandatory });
-  ["PRD-069", "PRD-070", "PRD-071", "PRD-072", "PRD-073", "PRD-074"].forEach((id) => seedC(id, "Death"));
-  seedC("PRD-070", "Permanent Disability", false, "Optional permanent disability rider.");
-  seedC("PRD-074", "Accident", false, "Accidental death rider.");
+
+  // PRD-069 — ISP standart me tabele (legacy code 77)
+  seedC("PRD-069", "Humbja e jetes", true,
+    "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.");
+
+  // PRD-070 — ISP A_Mortgage Upfront
+  seedC("PRD-070", "Humbja e jetes", true,
+    "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.");
+  seedC("PRD-070", "Semundje Kritike", false,
+    "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.");
+
+  // PRD-071 — ISP PPI Konsumatore
+  seedC("PRD-071", "Humbja e jetes", true,
+    "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.");
+  seedC("PRD-071", "Semundje Kritike", false,
+    "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.");
+
+  // PRD-072 — ISP PPI Karta e Kreditit
+  seedC("PRD-072", "Humbja e jetes", true,
+    "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.");
+  seedC("PRD-072", "Semundje Kritike", false,
+    "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.");
+
+  // PRD-073 — ISP PPI Overdraft
+  seedC("PRD-073", "Humbja e jetes", true,
+    "Ne perputhje me Kushtet e Pergjithshme te Sigurimit kjo police mbulon: Humbja e jetes se te siguruarit brenda periudhes se sigurimit.");
+  seedC("PRD-073", "Semundje Kritike", false,
+    "Ne perputhje me Shtojcen 1. Kushte te veçanta per sigurimin e Semundjeve Kritike kjo police mbulon: Semundjet Kritike qe shfaqen per here te pare brenda periudhes se sigurimit dhe raportohen brenda kesaj periudhe. Periudha fillestare e pritjes per kete mbulim eshte 90 dite.");
+
+  // PRD-074 — ISP Sigurimi i Jetes i Kombinuar
+  seedC("PRD-074", "Sigurimi i Jetes me Afat", true,
+    "Ngjarja e sigurimit do te jete Humbja e jetes se te Siguruarit brenda periudhës se sigurimit.");
+  seedC("PRD-074", "Shpenzime mjekesore te shtrimit ne spital", false,
+    "Shpenzime mjekesore te shtrimit ne spital si pasoje e nje Aksidenti ose nje Nderhyrje Kirurgjikale deri ne limitin vjetor te percaktuar ne formularin e polices. Ato mbulohen vetem nese jane kryer brenda periudhes se sigurimit per nje ngjarje te ndodhur brenda periudhes se sigurimit, ne nje spital te Rrjetit mjekesor ne Shqiperi te SIGAL.");
 
 };
 seedAuxiliary();
