@@ -206,10 +206,7 @@ const ProductDetail = () => {
           <TabsTrigger value="payment">Payment</TabsTrigger>
           <TabsTrigger value="loan">Loan</TabsTrigger>
           <TabsTrigger value="premium-table">Premium Table</TabsTrigger>
-          <TabsTrigger value="tariffs">Tariffs</TabsTrigger>
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="premium">Premium Rules</TabsTrigger>
           <TabsTrigger value="internal">Internal</TabsTrigger>
           <TabsTrigger value="external">External</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
