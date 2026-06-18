@@ -206,10 +206,7 @@ const ProductDetail = () => {
           <TabsTrigger value="payment">Payment</TabsTrigger>
           <TabsTrigger value="loan">Loan</TabsTrigger>
           <TabsTrigger value="premium-table">Premium Table</TabsTrigger>
-          <TabsTrigger value="tariffs">Tariffs</TabsTrigger>
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="premium">Premium Rules</TabsTrigger>
           <TabsTrigger value="internal">Internal</TabsTrigger>
           <TabsTrigger value="external">External</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -395,9 +392,6 @@ const ProductDetail = () => {
         <TabsContent value="premium-table">
           <PremiumTableTab product={product} />
         </TabsContent>
-        <TabsContent value="tariffs">
-          <TariffsTab product={product} />
-        </TabsContent>
         <TabsContent value="internal">
           <InternalTab product={product} />
         </TabsContent>
@@ -408,14 +402,6 @@ const ProductDetail = () => {
 
         <TabsContent value="coverages">
           <CoveragesTab productId={product.id} />
-        </TabsContent>
-
-        <TabsContent value="templates">
-          <TemplatesTab productId={product.id} />
-        </TabsContent>
-
-        <TabsContent value="premium">
-          <PremiumRulesTab productId={product.id} />
         </TabsContent>
 
         <TabsContent value="documents">
