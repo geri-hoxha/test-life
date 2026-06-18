@@ -524,6 +524,7 @@ const SelectField = <T extends { value: string; label: string }>({
 const defaultSetup: ProductSetupDetails = {
   legacyPacketId: 0, bankPartnerCode: "ISP", policyType: "WithTable",
   insuranceAmountType: "TotalAmount", legacyTariffId: 0, maxTenorMonths: 240,
+  isObsolete: false, apiSubject: false, apiStraight: false,
 };
 
 const SetupTab = ({ product }: { product: Product }) => {
@@ -551,17 +552,6 @@ const SetupTab = ({ product }: { product: Product }) => {
       <Field label="Max tenor (months)">
         <Input type="number" value={s.maxTenorMonths} onChange={(e) => setS({ ...s, maxTenorMonths: +e.target.value })} className="font-mono" />
       </Field>
-      <div className="md:col-span-2 flex flex-wrap gap-6 pt-2">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox checked={s.isObsolete} onCheckedChange={(v) => setS({ ...s, isObsolete: !!v })} /> Obsolete
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox checked={s.apiSubject} onCheckedChange={(v) => setS({ ...s, apiSubject: !!v })} /> API subject
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox checked={s.apiStraight} onCheckedChange={(v) => setS({ ...s, apiStraight: !!v })} /> API straight
-        </label>
-      </div>
     </SectionShell>
   );
 };
