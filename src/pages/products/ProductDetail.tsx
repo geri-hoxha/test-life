@@ -13,14 +13,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   getProduct, updateProductFlags, updateProduct, ProductStatus, Product,
   PRODUCT_GROUPS, POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
   PREMIUM_PAYMENT_TYPES, PACKET_PAYMENT_TYPES, PACKET_RENEWAL_TYPES,
   PACKET_LOAN_TYPES, LOAN_PRODUCT_TYPES, ACTUARIAL_CODES,
   PAYMENT_MODELS, listTariffs, listProductCoverages, getPremiumTable,
+  listPremiumTables, addPremiumTable, updatePremiumTable,
+  addTariff, updateTariff, removeTariff,
+  PremiumTable, PremiumTableItem, Tariff,
+  ProductSetupDetails, ProductPaymentDetails, ProductLoanDetails,
+  ProductInternalDetails, ProductExternalDetails, PaymentModel,
 } from "@/data/products";
-import { Check, AlertCircle, ScrollText, Save, X, Plus } from "lucide-react";
+import { Check, AlertCircle, ScrollText, Save, X, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
