@@ -251,7 +251,7 @@ const ProductsList = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => {
+              {paged.map((p) => {
                 const pm = PAYMENT_MODELS.find((m) => m.value === p.paymentModel);
                 const pg = PRODUCT_GROUPS.find((g) => g.value === p.productGroup);
                 const s = p.setupDetails;
