@@ -357,7 +357,7 @@ const ProductsList = () => {
                           {flagChips.length ? (
                             <div className="flex flex-wrap gap-1">
                               {flagChips.map((f) => (
-                                <Badge key={f} variant="secondary" className="text-[10px] px-1.5 py-0">{f}</Badge>
+                                <PrimaryBadge key={f}>{f}</PrimaryBadge>
                               ))}
                             </div>
                           ) : (
@@ -376,11 +376,11 @@ const ProductsList = () => {
                     {/* External codes */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
-                        <MiniField label="SAP Ch" value={<span className="font-mono">{dash(ext?.sapChannelCode)}</span>} />
-                        <MiniField label="F5" value={<span className="font-mono">{dash(ext?.f5ProductCode)}</span>} />
-                        <MiniField label="Actuarial" value={<span className="font-mono">{dash(ext?.actuarialProductCode)}</span>} />
-                        <MiniField label="Legacy Pkt" value={<span className="font-mono">{dash(s?.legacyPacketId)}</span>} />
+                        <MiniField label="SAP Prod" value={<PrimaryBadge>{dash(ext?.sapProductCode)}</PrimaryBadge>} />
+                        <MiniField label="SAP Ch" value={<PrimaryBadge>{dash(ext?.sapChannelCode)}</PrimaryBadge>} />
+                        <MiniField label="F5" value={<PrimaryBadge>{dash(ext?.f5ProductCode)}</PrimaryBadge>} />
+                        <MiniField label="Actuarial" value={<PrimaryBadge>{dash(ext?.actuarialProductCode)}</PrimaryBadge>} />
+                        <MiniField label="Legacy Pkt" value={<PrimaryBadge>{dash(s?.legacyPacketId)}</PrimaryBadge>} />
                       </div>
                     </td>
 
