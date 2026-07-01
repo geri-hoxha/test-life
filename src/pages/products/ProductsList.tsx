@@ -23,11 +23,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 
-const statusClass: Record<ProductStatus, string> = {
-  Active: "bg-success/15 text-success",
-  Draft: "bg-muted text-muted-foreground",
-  Inactive: "bg-destructive/10 text-destructive",
-};
 
 const ProductsList = () => {
   const navigate = useNavigate();
