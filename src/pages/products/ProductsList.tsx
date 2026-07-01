@@ -311,12 +311,12 @@ const ProductsList = () => {
                     {/* Classification */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Group" value={pg?.english ?? dash(p.productGroup)} />
-                        <MiniField label="Type" value={p.type} />
-                        <MiniField label="Policy" value={dash(s?.policyType)} />
-                        <MiniField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
-                        <MiniField label="Max Tenor" value={s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : "—"} />
-                        <MiniField label="Bank Partner" value={dash(s?.bankPartnerCode)} />
+                        <MiniField label="Group" value={<PrimaryBadge>{pg?.english ?? dash(p.productGroup)}</PrimaryBadge>} />
+                        <MiniField label="Type" value={<PrimaryBadge>{p.type}</PrimaryBadge>} />
+                        <MiniField label="Policy" value={<PrimaryBadge>{dash(s?.policyType)}</PrimaryBadge>} />
+                        <MiniField label="Insured Amt" value={<PrimaryBadge>{dash(s?.insuranceAmountType)}</PrimaryBadge>} />
+                        <MiniField label="Max Tenor" value={<PrimaryBadge>{s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : "—"}</PrimaryBadge>} />
+                        <MiniField label="Bank Partner" value={<PrimaryBadge>{dash(s?.bankPartnerCode)}</PrimaryBadge>} />
                       </div>
                     </td>
 
