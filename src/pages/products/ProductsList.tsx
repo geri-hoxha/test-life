@@ -242,12 +242,12 @@ const ProductsList = () => {
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
                 <th className="h-9 px-2 text-left font-medium w-[20%]">Product</th>
-                <th className="h-9 px-2 text-left font-medium w-[10%]">Classification</th>
-                <th className="h-9 px-2 text-left font-medium w-[15%]">Commercial</th>
+                <th className="h-9 px-2 text-left font-medium w-[20%]">Setup & Commercial</th>
                 <th className="h-9 px-2 text-left font-medium w-[25%]">Payment & Loan</th>
                 <th className="h-9 px-2 text-left font-medium w-[20%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
                 <th className="h-9 px-2 text-right font-medium">Actions</th>
+
 
               </tr>
             </thead>
@@ -300,18 +300,11 @@ const ProductsList = () => {
 
                     </td>
 
-                    {/* Classification */}
+                    {/* Setup & Commercial */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
                         <MiniField label="Policy" value={dash(s?.policyType)} />
                         <MiniField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
-                      </div>
-                    </td>
-
-
-                    {/* Commercial */}
-                    <td className="px-2 py-2">
-                      <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
                         <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
                         <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
                         <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
@@ -325,6 +318,7 @@ const ProductsList = () => {
                         </div>
                       </div>
                     </td>
+
 
                     {/* Payment & Loan */}
                     <td className="px-2 py-2">
