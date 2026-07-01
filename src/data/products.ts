@@ -26,6 +26,19 @@ const persistGroups = () => {
   if (typeof window === "undefined") return;
   try { window.localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(customGroups)); } catch { /* ignore */ }
 };
+
+// One-time cleanup: remove the legacy "wef" custom group if it still exists.
+const migrateDeleteWefGroup = () => {
+  if (typeof window === "undefined") return;
+  const migratedKey = "esiglife.productGroups.wefDeleted.v1";
+  if (window.localStorage.getItem(migratedKey)) return;
+  if (customGroups.some((g) => g.code === "wef")) {
+    customGroups = customGroups.filter((g) => g.code !== "wef");
+    persistGroups();
+  }
+  window.localStorage.setItem(migratedKey, "1");
+};
+migrateDeleteWefGroup();
 export const listProductGroups = (): ProductGroupDef[] =>
   [...(PRODUCT_GROUPS as readonly ProductGroupDef[]), ...customGroups];
 export const addProductGroup = (g: Omit<ProductGroupDef, "value"> & { value?: string }): ProductGroupDef => {
