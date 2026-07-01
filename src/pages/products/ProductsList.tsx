@@ -34,19 +34,39 @@ const ProductsList = () => {
   const { code: activeCode } = useParams<{ code: string }>();
   const [query, setQuery] = useState("");
 
+  const [groupsVersion, setGroupsVersion] = useState(0);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [ngEnglish, setNgEnglish] = useState("");
+  const [ngLabel, setNgLabel] = useState("");
+  const [ngCode, setNgCode] = useState("");
+
   const allProducts = listProducts();
 
   const groups = useMemo(() => {
-    return PRODUCT_GROUPS.map((g) => {
+    const defs = listProductGroups();
+    return defs.map((g) => {
       const items = allProducts.filter((p) => {
-        const pg = PRODUCT_GROUPS.find((x) => x.value === p.productGroup);
+        const pg = defs.find((x) => x.value === p.productGroup);
         return pg?.code === g.code;
       });
       return { ...g, items };
-    }).filter((g) => g.items.length > 0);
-  }, [allProducts]);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProducts, groupsVersion]);
 
   const activeGroup = activeCode ? groups.find((g) => g.code === activeCode) : null;
+
+  const handleCreateGroup = () => {
+    if (!ngEnglish.trim() || !ngCode.trim()) {
+      toast({ title: "Missing fields", description: "English name and code are required.", variant: "destructive" });
+      return;
+    }
+    addProductGroup({ english: ngEnglish.trim(), label: ngLabel.trim() || ngEnglish.trim(), code: ngCode.trim() });
+    toast({ title: "Product group created", description: `${ngEnglish} (${ngCode})` });
+    setNgEnglish(""); setNgLabel(""); setNgCode("");
+    setNewGroupOpen(false);
+    setGroupsVersion((v) => v + 1);
+  };
 
   // ---- Group grid view ----
   if (!activeGroup) {
@@ -57,13 +77,15 @@ const ProductsList = () => {
           title="Product Groups"
           description="Browse life-insurance product families. Select a group to view its products."
           actions={
-            <Button asChild className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link to="/products/new">
-                <Plus className="h-4 w-4" /> Create Product
-              </Link>
+            <Button
+              className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+              onClick={() => setNewGroupOpen(true)}
+            >
+              <Plus className="h-4 w-4" /> Create product group
             </Button>
           }
         />
+
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {groups.map((g) => (
