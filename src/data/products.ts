@@ -35,6 +35,16 @@ export const addProductGroup = (g: Omit<ProductGroupDef, "value"> & { value?: st
   persistGroups();
   return created;
 };
+export const isBuiltInProductGroup = (code: string): boolean =>
+  (PRODUCT_GROUPS as readonly ProductGroupDef[]).some((g) => g.code === code);
+export const deleteProductGroup = (code: string): boolean => {
+  if (isBuiltInProductGroup(code)) return false;
+  const before = customGroups.length;
+  customGroups = customGroups.filter((g) => g.code !== code);
+  if (customGroups.length === before) return false;
+  persistGroups();
+  return true;
+};
 
 export const POLICY_TYPES = [
   { value: "NotApplicable", label: "NA" },
