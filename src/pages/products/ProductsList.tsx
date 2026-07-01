@@ -38,6 +38,7 @@ const ProductsList = () => {
 
   const [groupsVersion, setGroupsVersion] = useState(0);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  useEffect(() => { setPage(1); }, [query, pageSize, activeCode]);
   const [ngEnglish, setNgEnglish] = useState("");
   const [ngLabel, setNgLabel] = useState("");
   const [ngCode, setNgCode] = useState("");
