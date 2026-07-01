@@ -282,7 +282,7 @@ const ProductsList = () => {
                     onClick={() => navigate(`/products/${p.id}`)}
                   >
                     {/* Product identity */}
-                    <td className="px-4 py-4">
+                    <td className="px-3 py-3">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[11px] text-accent">{p.id}</span>
@@ -299,8 +299,8 @@ const ProductsList = () => {
                     </td>
 
                     {/* Classification */}
-                    <td className="px-4 py-4">
-                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
+                    <td className="px-3 py-3">
+                      <div className="rounded-md bg-muted/40 p-2 space-y-1">
                         <MiniField label="Group" value={pg?.english ?? dash(p.productGroup)} />
                         <MiniField label="Type" value={p.type} />
                         <MiniField label="Policy" value={dash(s?.policyType)} />
@@ -311,8 +311,8 @@ const ProductsList = () => {
                     </td>
 
                     {/* Commercial */}
-                    <td className="px-4 py-4">
-                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
+                    <td className="px-3 py-3">
+                      <div className="rounded-md bg-muted/40 p-2 space-y-1">
                         <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
                         <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
                         <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
@@ -328,8 +328,8 @@ const ProductsList = () => {
                     </td>
 
                     {/* Payment & Loan */}
-                    <td className="px-4 py-4">
-                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
+                    <td className="px-3 py-3">
+                      <div className="rounded-md bg-muted/40 p-2 space-y-1">
                         <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
                         <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
                         <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
@@ -340,8 +340,8 @@ const ProductsList = () => {
                     </td>
 
                     {/* Compliance & flags */}
-                    <td className="px-4 py-4">
-                      <div className="rounded-md bg-muted/40 p-2.5 space-y-2">
+                    <td className="px-3 py-3">
+                      <div className="rounded-md bg-muted/40 p-2 space-y-1">
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Flags</div>
                           {flagChips.length ? (
@@ -364,8 +364,8 @@ const ProductsList = () => {
                     </td>
 
                     {/* External codes */}
-                    <td className="px-4 py-4">
-                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
+                    <td className="px-3 py-3">
+                      <div className="rounded-md bg-muted/40 p-2 space-y-1">
                         <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
                         <MiniField label="SAP Ch" value={<span className="font-mono">{dash(ext?.sapChannelCode)}</span>} />
                         <MiniField label="F5" value={<span className="font-mono">{dash(ext?.f5ProductCode)}</span>} />
@@ -374,7 +374,7 @@ const ProductsList = () => {
                       </div>
                     </td>
 
-                    <td className="px-3 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
