@@ -14,7 +14,7 @@ import {
   Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
-  listProducts, PRODUCT_GROUPS, PAYMENT_MODELS,
+  listProducts, ProductStatus, PRODUCT_GROUPS, listTariffs, listProductCoverages, PAYMENT_MODELS,
   listProductGroups, addProductGroup, deleteProductGroup, isBuiltInProductGroup,
 } from "@/data/products";
 import {
@@ -23,6 +23,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 
+const statusClass: Record<ProductStatus, string> = {
+  Active: "bg-success/15 text-success",
+  Draft: "bg-muted text-muted-foreground",
+  Inactive: "bg-destructive/10 text-destructive",
+};
 
 const ProductsList = () => {
   const navigate = useNavigate();
@@ -263,16 +268,6 @@ const ProductsList = () => {
                   p.flags.compliance && "Compliance",
                 ].filter(Boolean) as string[];
 
-                const AccentBadge = ({ children, title }: { children: React.ReactNode; title?: string }) => (
-                  <Badge
-                    variant="default"
-                    className="bg-accent text-accent-foreground hover:bg-accent/90 border-0 text-[10px] px-1.5 py-0 font-medium"
-                    title={title}
-                  >
-                    {children}
-                  </Badge>
-                );
-
                 const MiniField = ({ label, value }: { label: string; value: React.ReactNode }) => (
                   <div className="flex items-baseline justify-between gap-2 min-w-0">
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">{label}</span>
@@ -289,10 +284,10 @@ const ProductsList = () => {
                     {/* Product identity */}
                     <td className="px-2 py-2">
                       <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
                           <span className="font-mono text-[11px] text-accent">{p.id}</span>
-                          <AccentBadge>{p.status}</AccentBadge>
-                          <AccentBadge>v{p.activeVersion}</AccentBadge>
+                          <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
+                          <Badge variant="outline" className="text-[10px]">v{p.activeVersion}</Badge>
                         </div>
                         <div className="font-semibold text-sm text-foreground leading-tight">{p.name}</div>
                         <div className="text-[11px] text-muted-foreground font-mono">{p.code}</div>
@@ -323,9 +318,11 @@ const ProductsList = () => {
                         <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Currencies</span>
-                          <AccentBadge title={p.currencies.join(", ")}>
-                            {p.currencies.length ? p.currencies.join(", ") : "—"}
-                          </AccentBadge>
+                          <div className="flex gap-1 flex-wrap justify-end">
+                            {p.currencies.map((c) => (
+                              <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -333,7 +330,7 @@ const ProductsList = () => {
                     {/* Payment & Loan */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Model" value={<AccentBadge>{pm?.label ?? dash(p.paymentModel)}</AccentBadge>} />
+                        <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
                         <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
                         <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
                         <MiniField label="Renewal" value={dash(pay?.renewalType)} />
@@ -345,17 +342,17 @@ const ProductsList = () => {
                     {/* Compliance & flags */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">Flags</span>
-                          <span className="text-xs font-medium text-foreground truncate text-right">
-                            {flagChips.length ? (
-                              <AccentBadge title={flagChips.join(", ")}>
-                                {flagChips.length} {flagChips.length === 1 ? "flag" : "flags"}
-                              </AccentBadge>
-                            ) : (
-                              "—"
-                            )}
-                          </span>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Flags</div>
+                          {flagChips.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {flagChips.map((f) => (
+                                <Badge key={f} variant="secondary" className="text-[10px] px-1.5 py-0">{f}</Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">None</span>
+                          )}
                         </div>
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Required Docs</div>
