@@ -241,7 +241,7 @@ const ProductsList = () => {
           <table className="w-full text-xs">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
-                <th className="h-9 px-4 text-left font-medium w-[22%]">Product</th>
+                <th className="h-9 px-4 text-left font-medium w-[30%]">Product</th>
                 <th className="h-9 px-4 text-left font-medium w-[18%]">Classification</th>
                 <th className="h-9 px-4 text-left font-medium w-[18%]">Commercial</th>
                 <th className="h-9 px-4 text-left font-medium w-[18%]">Payment & Loan</th>
@@ -301,7 +301,7 @@ const ProductsList = () => {
 
                     {/* Classification */}
                     <td className="px-4 py-4">
-                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
                         <MiniField label="Group" value={pg?.english ?? dash(p.productGroup)} />
                         <MiniField label="Type" value={p.type} />
                         <MiniField label="Policy" value={dash(s?.policyType)} />
@@ -313,7 +313,7 @@ const ProductsList = () => {
 
                     {/* Commercial */}
                     <td className="px-4 py-4">
-                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
                         <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
                         <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
                         <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
@@ -330,7 +330,7 @@ const ProductsList = () => {
 
                     {/* Payment & Loan */}
                     <td className="px-4 py-4">
-                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
                         <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
                         <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
                         <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
@@ -342,7 +342,7 @@ const ProductsList = () => {
 
                     {/* Compliance & flags */}
                     <td className="px-4 py-4">
-                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-2">
+                      <div className="rounded-md bg-muted/40 p-2.5 space-y-2">
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Flags</div>
                           {flagChips.length ? (
@@ -366,7 +366,7 @@ const ProductsList = () => {
 
                     {/* External codes */}
                     <td className="px-4 py-4">
-                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                      <div className="rounded-md bg-muted/40 p-2.5 space-y-1.5">
                         <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
                         <MiniField label="SAP Ch" value={<span className="font-mono">{dash(ext?.sapChannelCode)}</span>} />
                         <MiniField label="F5" value={<span className="font-mono">{dash(ext?.f5ProductCode)}</span>} />
