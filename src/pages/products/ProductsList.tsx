@@ -323,14 +323,14 @@ const ProductsList = () => {
                     {/* Commercial */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
-                        <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
-                        <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
+                        <MiniField label="Agent Comm." value={<PrimaryBadge>{`${(p.agentCommission * 100).toFixed(1)}%`}</PrimaryBadge>} />
+                        <MiniField label="Bank Comm." value={<PrimaryBadge>{`${(p.bankCommission * 100).toFixed(1)}%`}</PrimaryBadge>} />
+                        <MiniField label="Premium Tbl" value={<PrimaryBadge>{dash(p.premiumTableId)}</PrimaryBadge>} />
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Currencies</span>
                           <div className="flex gap-1 flex-wrap justify-end">
                             {p.currencies.map((c) => (
-                              <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+                              <PrimaryBadge key={c}>{c}</PrimaryBadge>
                             ))}
                           </div>
                         </div>
@@ -340,12 +340,12 @@ const ProductsList = () => {
                     {/* Payment & Loan */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
-                        <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
-                        <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
-                        <MiniField label="Renewal" value={dash(pay?.renewalType)} />
-                        <MiniField label="Packet Loan" value={dash(loan?.packetLoanType)} />
-                        <MiniField label="Loan Product" value={dash(loan?.loanProductType)} />
+                        <MiniField label="Model" value={<PrimaryBadge>{pm?.label ?? dash(p.paymentModel)}</PrimaryBadge>} />
+                        <MiniField label="Premium Pay" value={<PrimaryBadge>{dash(pay?.premiumPaymentType)}</PrimaryBadge>} />
+                        <MiniField label="Packet Pay" value={<PrimaryBadge>{dash(pay?.packetPaymentType)}</PrimaryBadge>} />
+                        <MiniField label="Renewal" value={<PrimaryBadge>{dash(pay?.renewalType)}</PrimaryBadge>} />
+                        <MiniField label="Packet Loan" value={<PrimaryBadge>{dash(loan?.packetLoanType)}</PrimaryBadge>} />
+                        <MiniField label="Loan Product" value={<PrimaryBadge>{dash(loan?.loanProductType)}</PrimaryBadge>} />
                       </div>
                     </td>
 
