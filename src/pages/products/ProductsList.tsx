@@ -192,8 +192,9 @@ const ProductsList = () => {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  // reset to page 1 when search/pageSize changes
-  useMemo(() => { setPage(1); }, [query, pageSize, activeGroup.code]);
+  // reset to page 1 when search/pageSize/group changes
+  useEffect(() => { setPage(1); }, [query, pageSize, activeGroup.code]);
+
 
 
   return (
