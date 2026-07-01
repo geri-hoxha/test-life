@@ -145,103 +145,131 @@ const ProductsList = () => {
         <div className="text-xs text-muted-foreground">{filtered.length} product(s)</div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filtered.map((p) => {
-          const fam = PRODUCT_GROUPS.find((g) => g.value === p.productGroup);
-          const pm = PAYMENT_MODELS.find((m) => m.value === p.paymentModel);
-          const tariffCount = listTariffs(p.id).length;
-          const coverageCount = listProductCoverages(p.id).length;
-          return (
-            <Card
-              key={p.id}
-              className="shadow-card border-border hover:shadow-md hover:border-accent/40 transition-all cursor-pointer group flex flex-col"
-              onClick={() => navigate(`/products/${p.id}`)}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
-                      <Package className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-base leading-tight truncate group-hover:text-accent transition-colors">
-                        {p.name}
-                      </CardTitle>
-                      <p className="font-mono text-xs text-accent mt-1">{p.code}</p>
-                    </div>
-                  </div>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-1">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem><Settings2 className="h-4 w-4 mr-2" />Configure</DropdownMenuItem>
-                        <DropdownMenuItem>Manage versions</DropdownMenuItem>
-                        <DropdownMenuItem>Clone product</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">Archive</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </CardHeader>
+      <Card className="shadow-card border-border overflow-hidden">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-xs whitespace-nowrap">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr className="border-b">
+                {[
+                  "ID", "Name", "Code", "Status", "Version", "Type", "Product Group",
+                  "Payment Model", "Premium Table", "Currencies", "Agent Comm.", "Bank Comm.",
+                  "Description", "Required Documents",
+                  "PEP", "High Amount", "Total Exposure", "Manual UW", "Compliance",
+                  "Legacy Packet Id", "Bank Partner", "Policy Type", "Insurance Amount Type",
+                  "Legacy Tariff Id", "Max Tenor (mo)", "Obsolete", "API Subject", "API Straight",
+                  "Premium Payment", "Packet Payment", "Renewal",
+                  "Packet Loan", "Loan Product",
+                  "Coverage Text", "Packet Fin Type",
+                  "SAP Product", "SAP Channel", "F5 Product", "Actuarial Code",
+                  "Created",
+                ].map((h) => (
+                  <th key={h} className="h-9 px-3 text-left font-medium">{h}</th>
+                ))}
+                <th className="h-9 px-3 text-right font-medium sticky right-0 bg-muted/40">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => {
+                const pm = PAYMENT_MODELS.find((m) => m.value === p.paymentModel);
+                const pg = PRODUCT_GROUPS.find((g) => g.value === p.productGroup);
+                const s = p.setupDetails;
+                const pay = p.paymentDetails;
+                const loan = p.loanDetails;
+                const intd = p.internalDetails;
+                const ext = p.externalDetails;
+                const yesNo = (v?: boolean) => (v ? "Yes" : "No");
+                const dash = (v?: string | number | null) => (v === undefined || v === null || v === "" ? "—" : String(v));
+                return (
+                  <tr
+                    key={p.id}
+                    className="border-b hover:bg-muted/40 cursor-pointer"
+                    onClick={() => navigate(`/products/${p.id}`)}
+                  >
+                    <td className="px-3 py-2 font-mono text-accent">{p.id}</td>
+                    <td className="px-3 py-2 font-medium text-foreground">{p.name}</td>
+                    <td className="px-3 py-2 font-mono">{p.code}</td>
+                    <td className="px-3 py-2">
+                      <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
+                    </td>
+                    <td className="px-3 py-2">{p.activeVersion}</td>
+                    <td className="px-3 py-2">{p.type}</td>
+                    <td className="px-3 py-2">{pg?.english ?? dash(p.productGroup)}</td>
+                    <td className="px-3 py-2">{pm?.label ?? dash(p.paymentModel)}</td>
+                    <td className="px-3 py-2 font-mono">{dash(p.premiumTableId)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        {p.currencies.map((c) => (
+                          <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">{(p.agentCommission * 100).toFixed(1)}%</td>
+                    <td className="px-3 py-2">{(p.bankCommission * 100).toFixed(1)}%</td>
+                    <td className="px-3 py-2 max-w-[280px] truncate" title={p.description}>{p.description}</td>
+                    <td className="px-3 py-2 max-w-[220px] truncate" title={p.requiredDocuments.join(", ")}>
+                      {p.requiredDocuments.join(", ")}
+                    </td>
+                    <td className="px-3 py-2">{yesNo(p.flags.pep)}</td>
+                    <td className="px-3 py-2">{yesNo(p.flags.highInsuredAmount)}</td>
+                    <td className="px-3 py-2">{yesNo(p.flags.totalExposure)}</td>
+                    <td className="px-3 py-2">{yesNo(p.flags.manualUnderwriting)}</td>
+                    <td className="px-3 py-2">{yesNo(p.flags.compliance)}</td>
+                    <td className="px-3 py-2">{dash(s?.legacyPacketId)}</td>
+                    <td className="px-3 py-2">{dash(s?.bankPartnerCode)}</td>
+                    <td className="px-3 py-2">{dash(s?.policyType)}</td>
+                    <td className="px-3 py-2">{dash(s?.insuranceAmountType)}</td>
+                    <td className="px-3 py-2">{dash(s?.legacyTariffId)}</td>
+                    <td className="px-3 py-2">{dash(s?.maxTenorMonths)}</td>
+                    <td className="px-3 py-2">{yesNo(s?.isObsolete)}</td>
+                    <td className="px-3 py-2">{yesNo(s?.apiSubject)}</td>
+                    <td className="px-3 py-2">{yesNo(s?.apiStraight)}</td>
+                    <td className="px-3 py-2">{dash(pay?.premiumPaymentType)}</td>
+                    <td className="px-3 py-2">{dash(pay?.packetPaymentType)}</td>
+                    <td className="px-3 py-2">{dash(pay?.renewalType)}</td>
+                    <td className="px-3 py-2">{dash(loan?.packetLoanType)}</td>
+                    <td className="px-3 py-2">{dash(loan?.loanProductType)}</td>
+                    <td className="px-3 py-2 max-w-[260px] truncate" title={intd?.coveragePrintableText}>
+                      {dash(intd?.coveragePrintableText)}
+                    </td>
+                    <td className="px-3 py-2">{dash(intd?.packetFinType)}</td>
+                    <td className="px-3 py-2 font-mono">{dash(ext?.sapProductCode)}</td>
+                    <td className="px-3 py-2 font-mono">{dash(ext?.sapChannelCode)}</td>
+                    <td className="px-3 py-2 font-mono">{dash(ext?.f5ProductCode)}</td>
+                    <td className="px-3 py-2">{dash(ext?.actuarialProductCode)}</td>
+                    <td className="px-3 py-2">{p.createdDate}</td>
+                    <td className="px-3 py-2 text-right sticky right-0 bg-background" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => navigate(`/products/${p.id}`)}>
+                            <Settings2 className="h-4 w-4 mr-2" />Open
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>Manage versions</DropdownMenuItem>
+                          <DropdownMenuItem>Clone product</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive focus:text-destructive">Archive</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={40} className="p-8 text-center text-muted-foreground">
+                    No products match your search.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
-              <CardContent className="flex-1 space-y-4">
-                <CardDescription className="line-clamp-2 min-h-[2.5rem]">{p.description}</CardDescription>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
-                  <Badge variant="outline" className="text-[10px] gap-1"><GitBranch className="h-3 w-3" />{p.activeVersion}</Badge>
-                  {pm && <Badge variant="outline" className="text-[10px]">{pm.label}</Badge>}
-                </div>
-
-                {fam && (
-                  <div className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{fam.english}</span> · {fam.label}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  <div className="rounded-md border border-border p-2">
-                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Layers className="h-3 w-3" /> Tariffs</div>
-                    <div className="text-sm font-semibold mt-0.5">{tariffCount}</div>
-                  </div>
-                  <div className="rounded-md border border-border p-2">
-                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3" /> Coverages</div>
-                    <div className="text-sm font-semibold mt-0.5">{coverageCount}</div>
-                  </div>
-                  <div className="rounded-md border border-border p-2">
-                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Receipt className="h-3 w-3" /> Models</div>
-                    <div className="text-sm font-semibold mt-0.5">{p.paymentModel ? 1 : 0}</div>
-                  </div>
-                </div>
-
-                <div className="space-y-1 pt-1">
-                  <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Currencies</div>
-                  <div className="flex flex-wrap gap-1">
-                    {p.currencies.map((c) => (
-                      <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
-                  <Calendar className="h-3.5 w-3.5" /> Created {p.createdDate}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {filtered.length === 0 && (
-        <Card className="shadow-card border-border p-12 text-center text-muted-foreground">
-          No products match your search.
-        </Card>
-      )}
     </AppShell>
   );
 };
