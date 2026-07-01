@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,8 +25,7 @@ const statusClass: Record<ProductStatus, string> = {
 
 const ProductsList = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeCode = searchParams.get("group"); // insuranceProductCode e.g. "07"
+  const { code: activeCode } = useParams<{ code: string }>();
   const [query, setQuery] = useState("");
 
   const allProducts = listProducts();
@@ -65,7 +64,7 @@ const ProductsList = () => {
             <Card
               key={g.code}
               className="shadow-card border-border hover:shadow-md hover:border-accent/40 transition-all cursor-pointer group"
-              onClick={() => setSearchParams({ group: g.code })}
+              onClick={() => navigate(`/products/groups/${g.code}`)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
@@ -118,7 +117,7 @@ const ProductsList = () => {
         description={`${activeGroup.label} · Code ${activeGroup.code}`}
         actions={
           <>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setSearchParams({})}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/products")}>
               <ArrowLeft className="h-4 w-4" /> All groups
             </Button>
             <Button variant="outline" size="sm" className="gap-2">
