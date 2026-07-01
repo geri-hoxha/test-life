@@ -33,6 +33,8 @@ const ProductsList = () => {
   const navigate = useNavigate();
   const { code: activeCode } = useParams<{ code: string }>();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [groupsVersion, setGroupsVersion] = useState(0);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
