@@ -107,7 +107,30 @@ const ProductsList = () => {
                       <p className="text-xs text-muted-foreground mt-1 truncate">{g.label}</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="font-mono text-[10px]">{g.code}</Badge>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Badge variant="outline" className="font-mono text-[10px]">{g.code}</Badge>
+                    {!isBuiltInProductGroup(g.code) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (g.items.length > 0) {
+                            toast({ title: "Cannot delete", description: `${g.english} has ${g.items.length} product(s).`, variant: "destructive" });
+                            return;
+                          }
+                          if (deleteProductGroup(g.code)) {
+                            toast({ title: "Product group deleted", description: g.english });
+                            setGroupsVersion((v) => v + 1);
+                          }
+                        }}
+                        title="Delete group"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
