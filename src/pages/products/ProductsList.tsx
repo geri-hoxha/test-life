@@ -263,10 +263,10 @@ const ProductsList = () => {
                   p.flags.compliance && "Compliance",
                 ].filter(Boolean) as string[];
 
-                const PrimaryBadge = ({ children, title }: { children: React.ReactNode; title?: string }) => (
+                const AccentBadge = ({ children, title }: { children: React.ReactNode; title?: string }) => (
                   <Badge
                     variant="default"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 border-0 text-[10px] px-1.5 py-0 font-medium"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 border-0 text-[10px] px-1.5 py-0 font-medium"
                     title={title}
                   >
                     {children}
@@ -291,8 +291,8 @@ const ProductsList = () => {
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-[11px] text-accent">{p.id}</span>
-                          <PrimaryBadge>{p.status}</PrimaryBadge>
-                          <PrimaryBadge>v{p.activeVersion}</PrimaryBadge>
+                          <AccentBadge>{p.status}</AccentBadge>
+                          <AccentBadge>v{p.activeVersion}</AccentBadge>
                         </div>
                         <div className="font-semibold text-sm text-foreground leading-tight">{p.name}</div>
                         <div className="text-[11px] text-muted-foreground font-mono">{p.code}</div>
@@ -306,28 +306,26 @@ const ProductsList = () => {
                     {/* Classification */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Group" value={<PrimaryBadge>{pg?.english ?? dash(p.productGroup)}</PrimaryBadge>} />
-                        <MiniField label="Type" value={<PrimaryBadge>{p.type}</PrimaryBadge>} />
-                        <MiniField label="Policy" value={<PrimaryBadge>{dash(s?.policyType)}</PrimaryBadge>} />
-                        <MiniField label="Insured Amt" value={<PrimaryBadge>{dash(s?.insuranceAmountType)}</PrimaryBadge>} />
-                        <MiniField label="Max Tenor" value={<PrimaryBadge>{s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : "—"}</PrimaryBadge>} />
-                        <MiniField label="Bank Partner" value={<PrimaryBadge>{dash(s?.bankPartnerCode)}</PrimaryBadge>} />
+                        <MiniField label="Group" value={pg?.english ?? dash(p.productGroup)} />
+                        <MiniField label="Type" value={p.type} />
+                        <MiniField label="Policy" value={dash(s?.policyType)} />
+                        <MiniField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
+                        <MiniField label="Max Tenor" value={s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : "—"} />
+                        <MiniField label="Bank Partner" value={dash(s?.bankPartnerCode)} />
                       </div>
                     </td>
 
                     {/* Commercial */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Agent Comm." value={<PrimaryBadge>{`${(p.agentCommission * 100).toFixed(1)}%`}</PrimaryBadge>} />
-                        <MiniField label="Bank Comm." value={<PrimaryBadge>{`${(p.bankCommission * 100).toFixed(1)}%`}</PrimaryBadge>} />
-                        <MiniField label="Premium Tbl" value={<PrimaryBadge>{dash(p.premiumTableId)}</PrimaryBadge>} />
+                        <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
+                        <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
+                        <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Currencies</span>
-                          <div className="flex gap-1 flex-wrap justify-end">
-                            {p.currencies.map((c) => (
-                              <PrimaryBadge key={c}>{c}</PrimaryBadge>
-                            ))}
-                          </div>
+                          <AccentBadge title={p.currencies.join(", ")}>
+                            {p.currencies.length ? p.currencies.join(", ") : "—"}
+                          </AccentBadge>
                         </div>
                       </div>
                     </td>
@@ -335,29 +333,29 @@ const ProductsList = () => {
                     {/* Payment & Loan */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Model" value={<PrimaryBadge>{pm?.label ?? dash(p.paymentModel)}</PrimaryBadge>} />
-                        <MiniField label="Premium Pay" value={<PrimaryBadge>{dash(pay?.premiumPaymentType)}</PrimaryBadge>} />
-                        <MiniField label="Packet Pay" value={<PrimaryBadge>{dash(pay?.packetPaymentType)}</PrimaryBadge>} />
-                        <MiniField label="Renewal" value={<PrimaryBadge>{dash(pay?.renewalType)}</PrimaryBadge>} />
-                        <MiniField label="Packet Loan" value={<PrimaryBadge>{dash(loan?.packetLoanType)}</PrimaryBadge>} />
-                        <MiniField label="Loan Product" value={<PrimaryBadge>{dash(loan?.loanProductType)}</PrimaryBadge>} />
+                        <MiniField label="Model" value={<AccentBadge>{pm?.label ?? dash(p.paymentModel)}</AccentBadge>} />
+                        <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
+                        <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
+                        <MiniField label="Renewal" value={dash(pay?.renewalType)} />
+                        <MiniField label="Packet Loan" value={dash(loan?.packetLoanType)} />
+                        <MiniField label="Loan Product" value={dash(loan?.loanProductType)} />
                       </div>
                     </td>
 
                     {/* Compliance & flags */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Flags</div>
-                          {flagChips.length ? (
-                            <div className="flex flex-wrap gap-1">
-                              {flagChips.map((f) => (
-                                <PrimaryBadge key={f}>{f}</PrimaryBadge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground">None</span>
-                          )}
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">Flags</span>
+                          <span className="text-xs font-medium text-foreground truncate text-right">
+                            {flagChips.length ? (
+                              <AccentBadge title={flagChips.join(", ")}>
+                                {flagChips.length} {flagChips.length === 1 ? "flag" : "flags"}
+                              </AccentBadge>
+                            ) : (
+                              "—"
+                            )}
+                          </span>
                         </div>
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Required Docs</div>
@@ -371,11 +369,11 @@ const ProductsList = () => {
                     {/* External codes */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="SAP Prod" value={<PrimaryBadge>{dash(ext?.sapProductCode)}</PrimaryBadge>} />
-                        <MiniField label="SAP Ch" value={<PrimaryBadge>{dash(ext?.sapChannelCode)}</PrimaryBadge>} />
-                        <MiniField label="F5" value={<PrimaryBadge>{dash(ext?.f5ProductCode)}</PrimaryBadge>} />
-                        <MiniField label="Actuarial" value={<PrimaryBadge>{dash(ext?.actuarialProductCode)}</PrimaryBadge>} />
-                        <MiniField label="Legacy Pkt" value={<PrimaryBadge>{dash(s?.legacyPacketId)}</PrimaryBadge>} />
+                        <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
+                        <MiniField label="SAP Ch" value={<span className="font-mono">{dash(ext?.sapChannelCode)}</span>} />
+                        <MiniField label="F5" value={<span className="font-mono">{dash(ext?.f5ProductCode)}</span>} />
+                        <MiniField label="Actuarial" value={<span className="font-mono">{dash(ext?.actuarialProductCode)}</span>} />
+                        <MiniField label="Legacy Pkt" value={<span className="font-mono">{dash(s?.legacyPacketId)}</span>} />
                       </div>
                     </td>
 
