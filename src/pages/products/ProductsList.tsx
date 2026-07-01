@@ -413,7 +413,7 @@ const ProductsList = () => {
               value={pageSize}
               onChange={(e) => setPageSize(Number(e.target.value))}
             >
-              {[5, 10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+              {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             <span className="ml-2">
               {filtered.length === 0
