@@ -33,9 +33,12 @@ const ProductsList = () => {
   const navigate = useNavigate();
   const { code: activeCode } = useParams<{ code: string }>();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [groupsVersion, setGroupsVersion] = useState(0);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  useEffect(() => { setPage(1); }, [query, pageSize, activeCode]);
   const [ngEnglish, setNgEnglish] = useState("");
   const [ngLabel, setNgLabel] = useState("");
   const [ngCode, setNgCode] = useState("");
@@ -187,13 +190,9 @@ const ProductsList = () => {
       p.code.toLowerCase().includes(query.toLowerCase())
   );
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  // reset to page 1 when search/pageSize/group changes
-  useEffect(() => { setPage(1); }, [query, pageSize, activeGroup.code]);
 
 
 
