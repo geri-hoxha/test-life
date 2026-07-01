@@ -406,7 +406,32 @@ const ProductsList = () => {
             </tbody>
           </table>
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-2.5 text-xs">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <span>Rows per page</span>
+            <select
+              className="h-7 rounded border border-border bg-background px-2 text-xs"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+            >
+              {[5, 10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span className="ml-2">
+              {filtered.length === 0
+                ? "0 of 0"
+                : `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === 1} onClick={() => setPage(1)}>« First</Button>
+            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹ Prev</Button>
+            <span className="px-2 text-muted-foreground">Page {currentPage} of {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next ›</Button>
+            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === totalPages} onClick={() => setPage(totalPages)}>Last »</Button>
+          </div>
+        </div>
       </Card>
+
 
 
     </AppShell>
