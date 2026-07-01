@@ -25,8 +25,7 @@ const statusClass: Record<ProductStatus, string> = {
 
 const ProductsList = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeCode = searchParams.get("group"); // insuranceProductCode e.g. "07"
+  const { code: activeCode } = useParams<{ code: string }>();
   const [query, setQuery] = useState("");
 
   const allProducts = listProducts();
