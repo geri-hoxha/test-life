@@ -294,10 +294,10 @@ const ProductsList = () => {
                     {/* Product identity */}
                     <td className="px-2 py-2">
                       <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-[11px] text-accent">{p.id}</span>
-                          <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
-                          <Badge variant="outline" className="text-[10px]">v{p.activeVersion}</Badge>
+                          <PrimaryBadge>{p.status}</PrimaryBadge>
+                          <PrimaryBadge>v{p.activeVersion}</PrimaryBadge>
                         </div>
                         <div className="font-semibold text-sm text-foreground leading-tight">{p.name}</div>
                         <div className="text-[11px] text-muted-foreground font-mono">{p.code}</div>
