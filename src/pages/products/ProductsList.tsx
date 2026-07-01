@@ -263,10 +263,10 @@ const ProductsList = () => {
                   p.flags.compliance && "Compliance",
                 ].filter(Boolean) as string[];
 
-                const PrimaryBadge = ({ children, title }: { children: React.ReactNode; title?: string }) => (
+                const AccentBadge = ({ children, title }: { children: React.ReactNode; title?: string }) => (
                   <Badge
                     variant="default"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 border-0 text-[10px] px-1.5 py-0 font-medium"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 border-0 text-[10px] px-1.5 py-0 font-medium"
                     title={title}
                   >
                     {children}
