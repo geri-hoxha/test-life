@@ -11,11 +11,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Plus, Search, MoreHorizontal, Settings2, Filter, Package, Calendar, GitBranch,
-  Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight,
+  Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
   listProducts, ProductStatus, PRODUCT_GROUPS, listTariffs, listProductCoverages, PAYMENT_MODELS,
-  listProductGroups, addProductGroup,
+  listProductGroups, addProductGroup, deleteProductGroup, isBuiltInProductGroup,
 } from "@/data/products";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
