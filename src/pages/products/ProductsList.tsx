@@ -15,7 +15,13 @@ import {
 } from "lucide-react";
 import {
   listProducts, ProductStatus, PRODUCT_GROUPS, listTariffs, listProductCoverages, PAYMENT_MODELS,
+  listProductGroups, addProductGroup,
 } from "@/data/products";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/hooks/use-toast";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
