@@ -260,7 +260,7 @@ const ProductsList = () => {
                 const intd = p.internalDetails;
                 const ext = p.externalDetails;
                 const dash = (v?: string | number | null) =>
-                  v === undefined || v === null || v === "" ? "—" : String(v);
+                  v === undefined || v === null || v === "" ? null : String(v);
                 const flagChips = [
                   p.flags.pep && "PEP",
                   p.flags.highInsuredAmount && "High Amt",
@@ -269,12 +269,25 @@ const ProductsList = () => {
                   p.flags.compliance && "Compliance",
                 ].filter(Boolean) as string[];
 
-                const MiniField = ({ label, value }: { label: string; value: React.ReactNode }) => (
-                  <div className="flex items-baseline justify-between gap-2 min-w-0">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">{label}</span>
-                    <span className="text-xs font-medium text-foreground truncate text-right">{value}</span>
-                  </div>
-                );
+                const BadgeField = ({ label, value, mono = false, empty = "—" }: { label: string; value?: React.ReactNode; mono?: boolean; empty?: string }) => {
+                  const val = value ?? empty;
+                  if (!val || val === "—") {
+                    return (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+                        <span className="text-[11px] text-muted-foreground">{empty}</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-auto font-medium ${mono ? "font-mono" : ""}`}>
+                        {val}
+                      </Badge>
+                    </div>
+                  );
+                };
 
                 return (
                   <tr
@@ -285,13 +298,13 @@ const ProductsList = () => {
                     {/* Product identity */}
                     <td className="px-4 py-4">
                       <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-[11px] text-accent">{p.id}</span>
                           <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
                           <Badge variant="outline" className="text-[10px]">v{p.activeVersion}</Badge>
+                          <Badge variant="outline" className="text-[10px] font-mono">{p.code}</Badge>
                         </div>
                         <div className="font-semibold text-sm text-foreground leading-tight">{p.name}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono">{p.code}</div>
                         <div className="text-[11px] text-muted-foreground line-clamp-2" title={p.description}>
                           {p.description}
                         </div>
@@ -302,27 +315,27 @@ const ProductsList = () => {
                     {/* Classification */}
                     <td className="px-4 py-4">
                       <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
-                        <MiniField label="Group" value={pg?.english ?? dash(p.productGroup)} />
-                        <MiniField label="Type" value={p.type} />
-                        <MiniField label="Policy" value={dash(s?.policyType)} />
-                        <MiniField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
-                        <MiniField label="Max Tenor" value={s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : "—"} />
-                        <MiniField label="Bank Partner" value={dash(s?.bankPartnerCode)} />
+                        <BadgeField label="Group" value={pg?.english ?? dash(p.productGroup)} />
+                        <BadgeField label="Type" value={p.type} />
+                        <BadgeField label="Policy" value={dash(s?.policyType)} />
+                        <BadgeField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
+                        <BadgeField label="Max Tenor" value={s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : null} mono />
+                        <BadgeField label="Bank Partner" value={dash(s?.bankPartnerCode)} mono />
                       </div>
                     </td>
 
                     {/* Commercial */}
                     <td className="px-4 py-4">
                       <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
-                        <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
-                        <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
-                        <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
-                        <div className="flex items-baseline justify-between gap-2">
+                        <BadgeField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
+                        <BadgeField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
+                        <BadgeField label="Premium Tbl" value={dash(p.premiumTableId)} mono />
+                        <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Currencies</span>
                           <div className="flex gap-1 flex-wrap justify-end">
-                            {p.currencies.map((c) => (
-                              <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
-                            ))}
+                            {p.currencies.length ? p.currencies.map((c) => (
+                              <Badge key={c} variant="secondary" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+                            )) : <span className="text-[11px] text-muted-foreground">—</span>}
                           </div>
                         </div>
                       </div>
@@ -331,12 +344,12 @@ const ProductsList = () => {
                     {/* Payment & Loan */}
                     <td className="px-4 py-4">
                       <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
-                        <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
-                        <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
-                        <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
-                        <MiniField label="Renewal" value={dash(pay?.renewalType)} />
-                        <MiniField label="Packet Loan" value={dash(loan?.packetLoanType)} />
-                        <MiniField label="Loan Product" value={dash(loan?.loanProductType)} />
+                        <BadgeField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
+                        <BadgeField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
+                        <BadgeField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
+                        <BadgeField label="Renewal" value={dash(pay?.renewalType)} />
+                        <BadgeField label="Packet Loan" value={dash(loan?.packetLoanType)} />
+                        <BadgeField label="Loan Product" value={dash(loan?.loanProductType)} />
                       </div>
                     </td>
 
@@ -357,9 +370,15 @@ const ProductsList = () => {
                         </div>
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Required Docs</div>
-                          <div className="text-[11px] text-foreground line-clamp-3" title={p.requiredDocuments.join(", ")}>
-                            {p.requiredDocuments.length ? p.requiredDocuments.join(", ") : "—"}
-                          </div>
+                          {p.requiredDocuments.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {p.requiredDocuments.map((d) => (
+                                <Badge key={d} variant="outline" className="text-[10px] px-1.5 py-0 h-auto">{d}</Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">—</span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -367,11 +386,11 @@ const ProductsList = () => {
                     {/* External codes */}
                     <td className="px-4 py-4">
                       <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
-                        <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
-                        <MiniField label="SAP Ch" value={<span className="font-mono">{dash(ext?.sapChannelCode)}</span>} />
-                        <MiniField label="F5" value={<span className="font-mono">{dash(ext?.f5ProductCode)}</span>} />
-                        <MiniField label="Actuarial" value={<span className="font-mono">{dash(ext?.actuarialProductCode)}</span>} />
-                        <MiniField label="Legacy Pkt" value={<span className="font-mono">{dash(s?.legacyPacketId)}</span>} />
+                        <BadgeField label="SAP Prod" value={dash(ext?.sapProductCode)} mono />
+                        <BadgeField label="SAP Ch" value={dash(ext?.sapChannelCode)} mono />
+                        <BadgeField label="F5" value={dash(ext?.f5ProductCode)} mono />
+                        <BadgeField label="Actuarial" value={dash(ext?.actuarialProductCode)} mono />
+                        <BadgeField label="Legacy Pkt" value={dash(s?.legacyPacketId)} mono />
                       </div>
                     </td>
 
