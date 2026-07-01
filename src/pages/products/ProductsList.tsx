@@ -64,7 +64,7 @@ const ProductsList = () => {
             <Card
               key={g.code}
               className="shadow-card border-border hover:shadow-md hover:border-accent/40 transition-all cursor-pointer group"
-              onClick={() => setSearchParams({ group: g.code })}
+              onClick={() => navigate(`/products/groups/${g.code}`)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
@@ -117,7 +117,7 @@ const ProductsList = () => {
         description={`${activeGroup.label} · Code ${activeGroup.code}`}
         actions={
           <>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setSearchParams({})}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/products")}>
               <ArrowLeft className="h-4 w-4" /> All groups
             </Button>
             <Button variant="outline" size="sm" className="gap-2">
