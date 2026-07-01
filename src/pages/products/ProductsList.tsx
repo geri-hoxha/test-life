@@ -268,6 +268,16 @@ const ProductsList = () => {
                   p.flags.compliance && "Compliance",
                 ].filter(Boolean) as string[];
 
+                const PrimaryBadge = ({ children, title }: { children: React.ReactNode; title?: string }) => (
+                  <Badge
+                    variant="default"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 border-0 text-[10px] px-1.5 py-0 font-medium"
+                    title={title}
+                  >
+                    {children}
+                  </Badge>
+                );
+
                 const MiniField = ({ label, value }: { label: string; value: React.ReactNode }) => (
                   <div className="flex items-baseline justify-between gap-2 min-w-0">
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">{label}</span>
