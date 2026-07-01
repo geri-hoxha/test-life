@@ -235,17 +235,17 @@ const ProductsList = () => {
         <div className="text-xs text-muted-foreground">{filtered.length} product(s)</div>
       </div>
 
-      <Card className="shadow-card border-border overflow-hidden">
-        <div className="w-full overflow-x-auto">
+      <Card className="shadow-card border-border overflow-hidden flex flex-col">
+        <div className="w-full overflow-auto max-h-[calc(100vh-16rem)]">
           <table className="w-full text-xs">
-            <thead className="bg-muted/40 text-muted-foreground">
+            <thead className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
               <tr className="border-b">
-                <th className="h-9 px-2 text-left font-medium w-[26%]">Product</th>
-                <th className="h-9 px-2 text-left font-medium w-[15%]">Classification</th>
-                <th className="h-9 px-2 text-left font-medium w-[15%]">Commercial</th>
-                <th className="h-9 px-2 text-left font-medium w-[16%]">Payment & Loan</th>
-                <th className="h-9 px-2 text-left font-medium w-[20%]">Compliance</th>
-                <th className="h-9 px-2 text-left font-medium w-[8%]">External</th>
+                <th className="h-9 px-2 text-left font-medium w-[32%]">Product</th>
+                <th className="h-9 px-2 text-left font-medium w-[13%]">Classification</th>
+                <th className="h-9 px-2 text-left font-medium w-[13%]">Commercial</th>
+                <th className="h-9 px-2 text-left font-medium w-[14%]">Payment & Loan</th>
+                <th className="h-9 px-2 text-left font-medium w-[22%]">Compliance</th>
+                <th className="h-9 px-2 text-left font-medium w-[6%]">External</th>
                 <th className="h-9 px-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
