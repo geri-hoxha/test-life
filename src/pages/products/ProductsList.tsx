@@ -240,12 +240,12 @@ const ProductsList = () => {
           <table className="min-w-[1600px] w-full text-xs table-fixed">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
-                <th className="h-9 px-2 text-left font-medium w-[40%]">Product</th>
-                <th className="h-9 px-2 text-left font-medium w-[8%]">Classification</th>
-                <th className="h-9 px-2 text-left font-medium w-[8%]">Commercial</th>
-                <th className="h-9 px-2 text-left font-medium w-[10%]">Payment & Loan</th>
-                <th className="h-9 px-2 text-left font-medium w-[32%]">Compliance</th>
-                <th className="h-9 px-2 text-left font-medium w-[2%]">External</th>
+                <th className="h-9 px-2 text-left font-medium w-[25%]">Product</th>
+                <th className="h-9 px-2 text-left font-medium w-[15%]">Classification</th>
+                <th className="h-9 px-2 text-left font-medium w-[15%]">Commercial</th>
+                <th className="h-9 px-2 text-left font-medium w-[20%]">Payment & Loan</th>
+                <th className="h-9 px-2 text-left font-medium w-[15%]">Compliance</th>
+                <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
                 <th className="h-9 px-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
