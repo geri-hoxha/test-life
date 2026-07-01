@@ -14,8 +14,9 @@ import {
   Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
-  listProducts, ProductStatus, PRODUCT_GROUPS, listTariffs, listProductCoverages, PAYMENT_MODELS,
+  listProducts, ProductStatus, PAYMENT_MODELS,
   listProductGroups, addProductGroup, deleteProductGroup, isBuiltInProductGroup,
+
 } from "@/data/products";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -241,19 +242,20 @@ const ProductsList = () => {
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
                 <th className="h-9 px-2 text-left font-medium w-[20%]">Product</th>
-                <th className="h-9 px-2 text-left font-medium w-[15%]">Classification</th>
+                <th className="h-9 px-2 text-left font-medium w-[10%]">Classification</th>
                 <th className="h-9 px-2 text-left font-medium w-[15%]">Commercial</th>
                 <th className="h-9 px-2 text-left font-medium w-[25%]">Payment & Loan</th>
-                <th className="h-9 px-2 text-left font-medium w-[15%]">Compliance</th>
+                <th className="h-9 px-2 text-left font-medium w-[20%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
                 <th className="h-9 px-2 text-right font-medium">Actions</th>
+
               </tr>
             </thead>
             <tbody>
               {paged.map((p) => {
                 const pm = PAYMENT_MODELS.find((m) => m.value === p.paymentModel);
-                const pg = PRODUCT_GROUPS.find((g) => g.value === p.productGroup);
                 const s = p.setupDetails;
+
                 const pay = p.paymentDetails;
                 const loan = p.loanDetails;
                 const intd = p.internalDetails;
@@ -294,21 +296,18 @@ const ProductsList = () => {
                         <div className="text-[11px] text-muted-foreground line-clamp-2" title={p.description}>
                           {p.description}
                         </div>
-                        <div className="text-[10px] text-muted-foreground">Created {p.createdDate}</div>
                       </div>
+
                     </td>
 
                     {/* Classification */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Group" value={pg?.english ?? dash(p.productGroup)} />
-                        <MiniField label="Type" value={p.type} />
                         <MiniField label="Policy" value={dash(s?.policyType)} />
                         <MiniField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
-                        <MiniField label="Max Tenor" value={s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : "—"} />
-                        <MiniField label="Bank Partner" value={dash(s?.bankPartnerCode)} />
                       </div>
                     </td>
+
 
                     {/* Commercial */}
                     <td className="px-2 py-2">
