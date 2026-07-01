@@ -228,25 +228,16 @@ const ProductsList = () => {
 
       <Card className="shadow-card border-border overflow-hidden">
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-xs whitespace-nowrap">
+          <table className="w-full text-xs">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
-                {[
-                  "ID", "Name", "Code", "Status", "Version", "Type", "Product Group",
-                  "Payment Model", "Premium Table", "Currencies", "Agent Comm.", "Bank Comm.",
-                  "Description", "Required Documents",
-                  "PEP", "High Amount", "Total Exposure", "Manual UW", "Compliance",
-                  "Legacy Packet Id", "Bank Partner", "Policy Type", "Insurance Amount Type",
-                  "Legacy Tariff Id", "Max Tenor (mo)", "Obsolete", "API Subject", "API Straight",
-                  "Premium Payment", "Packet Payment", "Renewal",
-                  "Packet Loan", "Loan Product",
-                  "Coverage Text", "Packet Fin Type",
-                  "SAP Product", "SAP Channel", "F5 Product", "Actuarial Code",
-                  "Created",
-                ].map((h) => (
-                  <th key={h} className="h-9 px-3 text-left font-medium">{h}</th>
-                ))}
-                <th className="h-9 px-3 text-right font-medium sticky right-0 bg-muted/40">Actions</th>
+                <th className="h-9 px-4 text-left font-medium w-[22%]">Product</th>
+                <th className="h-9 px-4 text-left font-medium w-[18%]">Classification</th>
+                <th className="h-9 px-4 text-left font-medium w-[18%]">Commercial</th>
+                <th className="h-9 px-4 text-left font-medium w-[18%]">Payment & Loan</th>
+                <th className="h-9 px-4 text-left font-medium w-[16%]">Compliance</th>
+                <th className="h-9 px-4 text-left font-medium w-[8%]">External</th>
+                <th className="h-9 px-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -258,67 +249,123 @@ const ProductsList = () => {
                 const loan = p.loanDetails;
                 const intd = p.internalDetails;
                 const ext = p.externalDetails;
-                const yesNo = (v?: boolean) => (v ? "Yes" : "No");
-                const dash = (v?: string | number | null) => (v === undefined || v === null || v === "" ? "—" : String(v));
+                const dash = (v?: string | number | null) =>
+                  v === undefined || v === null || v === "" ? "—" : String(v);
+                const flagChips = [
+                  p.flags.pep && "PEP",
+                  p.flags.highInsuredAmount && "High Amt",
+                  p.flags.totalExposure && "Exposure",
+                  p.flags.manualUnderwriting && "Manual UW",
+                  p.flags.compliance && "Compliance",
+                ].filter(Boolean) as string[];
+
+                const MiniField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+                  <div className="flex items-baseline justify-between gap-2 min-w-0">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">{label}</span>
+                    <span className="text-xs font-medium text-foreground truncate text-right">{value}</span>
+                  </div>
+                );
+
                 return (
                   <tr
                     key={p.id}
-                    className="border-b hover:bg-muted/40 cursor-pointer"
+                    className="border-b hover:bg-muted/40 cursor-pointer align-top"
                     onClick={() => navigate(`/products/${p.id}`)}
                   >
-                    <td className="px-3 py-2 font-mono text-accent">{p.id}</td>
-                    <td className="px-3 py-2 font-medium text-foreground">{p.name}</td>
-                    <td className="px-3 py-2 font-mono">{p.code}</td>
-                    <td className="px-3 py-2">
-                      <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
-                    </td>
-                    <td className="px-3 py-2">{p.activeVersion}</td>
-                    <td className="px-3 py-2">{p.type}</td>
-                    <td className="px-3 py-2">{pg?.english ?? dash(p.productGroup)}</td>
-                    <td className="px-3 py-2">{pm?.label ?? dash(p.paymentModel)}</td>
-                    <td className="px-3 py-2 font-mono">{dash(p.premiumTableId)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex gap-1">
-                        {p.currencies.map((c) => (
-                          <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
-                        ))}
+                    {/* Product identity */}
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] text-accent">{p.id}</span>
+                          <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
+                          <Badge variant="outline" className="text-[10px]">v{p.activeVersion}</Badge>
+                        </div>
+                        <div className="font-semibold text-sm text-foreground leading-tight">{p.name}</div>
+                        <div className="text-[11px] text-muted-foreground font-mono">{p.code}</div>
+                        <div className="text-[11px] text-muted-foreground line-clamp-2" title={p.description}>
+                          {p.description}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Created {p.createdDate}</div>
                       </div>
                     </td>
-                    <td className="px-3 py-2">{(p.agentCommission * 100).toFixed(1)}%</td>
-                    <td className="px-3 py-2">{(p.bankCommission * 100).toFixed(1)}%</td>
-                    <td className="px-3 py-2 max-w-[280px] truncate" title={p.description}>{p.description}</td>
-                    <td className="px-3 py-2 max-w-[220px] truncate" title={p.requiredDocuments.join(", ")}>
-                      {p.requiredDocuments.join(", ")}
+
+                    {/* Classification */}
+                    <td className="px-4 py-4">
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                        <MiniField label="Group" value={pg?.english ?? dash(p.productGroup)} />
+                        <MiniField label="Type" value={p.type} />
+                        <MiniField label="Policy" value={dash(s?.policyType)} />
+                        <MiniField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
+                        <MiniField label="Max Tenor" value={s?.maxTenorMonths ? `${s.maxTenorMonths} mo` : "—"} />
+                        <MiniField label="Bank Partner" value={dash(s?.bankPartnerCode)} />
+                      </div>
                     </td>
-                    <td className="px-3 py-2">{yesNo(p.flags.pep)}</td>
-                    <td className="px-3 py-2">{yesNo(p.flags.highInsuredAmount)}</td>
-                    <td className="px-3 py-2">{yesNo(p.flags.totalExposure)}</td>
-                    <td className="px-3 py-2">{yesNo(p.flags.manualUnderwriting)}</td>
-                    <td className="px-3 py-2">{yesNo(p.flags.compliance)}</td>
-                    <td className="px-3 py-2">{dash(s?.legacyPacketId)}</td>
-                    <td className="px-3 py-2">{dash(s?.bankPartnerCode)}</td>
-                    <td className="px-3 py-2">{dash(s?.policyType)}</td>
-                    <td className="px-3 py-2">{dash(s?.insuranceAmountType)}</td>
-                    <td className="px-3 py-2">{dash(s?.legacyTariffId)}</td>
-                    <td className="px-3 py-2">{dash(s?.maxTenorMonths)}</td>
-                    <td className="px-3 py-2">{yesNo(s?.isObsolete)}</td>
-                    <td className="px-3 py-2">{yesNo(s?.apiSubject)}</td>
-                    <td className="px-3 py-2">{yesNo(s?.apiStraight)}</td>
-                    <td className="px-3 py-2">{dash(pay?.premiumPaymentType)}</td>
-                    <td className="px-3 py-2">{dash(pay?.packetPaymentType)}</td>
-                    <td className="px-3 py-2">{dash(pay?.renewalType)}</td>
-                    <td className="px-3 py-2">{dash(loan?.packetLoanType)}</td>
-                    <td className="px-3 py-2">{dash(loan?.loanProductType)}</td>
-                    <td className="px-3 py-2 max-w-[260px] truncate" title={intd?.coveragePrintableText}>
-                      {dash(intd?.coveragePrintableText)}
+
+                    {/* Commercial */}
+                    <td className="px-4 py-4">
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                        <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
+                        <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
+                        <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Currencies</span>
+                          <div className="flex gap-1 flex-wrap justify-end">
+                            {p.currencies.map((c) => (
+                              <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-3 py-2">{dash(intd?.packetFinType)}</td>
-                    <td className="px-3 py-2 font-mono">{dash(ext?.sapProductCode)}</td>
-                    <td className="px-3 py-2 font-mono">{dash(ext?.sapChannelCode)}</td>
-                    <td className="px-3 py-2 font-mono">{dash(ext?.f5ProductCode)}</td>
-                    <td className="px-3 py-2">{dash(ext?.actuarialProductCode)}</td>
-                    <td className="px-3 py-2">{p.createdDate}</td>
-                    <td className="px-3 py-2 text-right sticky right-0 bg-background" onClick={(e) => e.stopPropagation()}>
+
+                    {/* Payment & Loan */}
+                    <td className="px-4 py-4">
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                        <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
+                        <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
+                        <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
+                        <MiniField label="Renewal" value={dash(pay?.renewalType)} />
+                        <MiniField label="Packet Loan" value={dash(loan?.packetLoanType)} />
+                        <MiniField label="Loan Product" value={dash(loan?.loanProductType)} />
+                      </div>
+                    </td>
+
+                    {/* Compliance & flags */}
+                    <td className="px-4 py-4">
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-2">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Flags</div>
+                          {flagChips.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {flagChips.map((f) => (
+                                <Badge key={f} variant="secondary" className="text-[10px] px-1.5 py-0">{f}</Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">None</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Required Docs</div>
+                          <div className="text-[11px] text-foreground line-clamp-3" title={p.requiredDocuments.join(", ")}>
+                            {p.requiredDocuments.length ? p.requiredDocuments.join(", ") : "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* External codes */}
+                    <td className="px-4 py-4">
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                        <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
+                        <MiniField label="SAP Ch" value={<span className="font-mono">{dash(ext?.sapChannelCode)}</span>} />
+                        <MiniField label="F5" value={<span className="font-mono">{dash(ext?.f5ProductCode)}</span>} />
+                        <MiniField label="Actuarial" value={<span className="font-mono">{dash(ext?.actuarialProductCode)}</span>} />
+                        <MiniField label="Legacy Pkt" value={<span className="font-mono">{dash(s?.legacyPacketId)}</span>} />
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -341,7 +388,7 @@ const ProductsList = () => {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={40} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
                     No products match your search.
                   </td>
                 </tr>
@@ -350,6 +397,7 @@ const ProductsList = () => {
           </table>
         </div>
       </Card>
+
 
     </AppShell>
   );
