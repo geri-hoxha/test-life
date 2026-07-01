@@ -9,7 +9,32 @@ export const PRODUCT_GROUPS = [
   { value: "OnVita", code: "10", label: "Sigurimi i Jetës i Kombinuar", english: "On-Vita" },
   { value: "Endowment", code: "SJ", label: "Sigurim i Jetes me Kursim", english: "Endowment" },
 ] as const;
-export type ProductGroup = typeof PRODUCT_GROUPS[number]["value"];
+export type ProductGroup = typeof PRODUCT_GROUPS[number]["value"] | string;
+
+export type ProductGroupDef = { value: string; code: string; label: string; english: string };
+
+const GROUPS_STORAGE_KEY = "esiglife.productGroups.v1";
+const loadCustomGroups = (): ProductGroupDef[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(GROUPS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as ProductGroupDef[]) : [];
+  } catch { return []; }
+};
+let customGroups: ProductGroupDef[] = loadCustomGroups();
+const persistGroups = () => {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(customGroups)); } catch { /* ignore */ }
+};
+export const listProductGroups = (): ProductGroupDef[] =>
+  [...(PRODUCT_GROUPS as readonly ProductGroupDef[]), ...customGroups];
+export const addProductGroup = (g: Omit<ProductGroupDef, "value"> & { value?: string }): ProductGroupDef => {
+  const value = g.value?.trim() || `Custom_${g.code}_${Date.now()}`;
+  const created: ProductGroupDef = { value, code: g.code, label: g.label, english: g.english };
+  customGroups = [...customGroups, created];
+  persistGroups();
+  return created;
+};
 
 export const POLICY_TYPES = [
   { value: "NotApplicable", label: "NA" },
