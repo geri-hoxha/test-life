@@ -14,7 +14,7 @@ import {
   Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
-  listProducts, PRODUCT_GROUPS, listTariffs, listProductCoverages, PAYMENT_MODELS,
+  listProducts, PRODUCT_GROUPS, PAYMENT_MODELS,
   listProductGroups, addProductGroup, deleteProductGroup, isBuiltInProductGroup,
 } from "@/data/products";
 import {
