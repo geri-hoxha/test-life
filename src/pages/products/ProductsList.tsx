@@ -190,9 +190,13 @@ const ProductsList = () => {
 
   // ---- Products within a group ----
   const filtered = activeGroup.items.filter(
-    (p) =>
-      p.name.toLowerCase().includes(query.toLowerCase()) ||
-      p.code.toLowerCase().includes(query.toLowerCase())
+    (p) => {
+      const matchesQuery =
+        p.name.toLowerCase().includes(query.toLowerCase()) ||
+        p.code.toLowerCase().includes(query.toLowerCase());
+      const matchesBank = !bankFilter || p.bankPartnerCode === bankFilter;
+      return matchesQuery && matchesBank;
+    }
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
