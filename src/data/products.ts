@@ -135,7 +135,30 @@ export const ACTUARIAL_CODES = [
   { value: "SingleTermSe", label: "STse — SE" },
 ] as const;
 
-export const BANK_PARTNERS = ["ABI", "FAF", "AFB", "BKT", "CRS", "NA", "ISP", "NOA", "OTP", "PCB", "RBA", "TIB", "UBA", "UFN", "UNI", "TRZ", "SGV", "MIA", "Iut"] as const;
+export const BANK_PARTNERS = [
+  { value: "ABI", label: "ABI Bank" },
+  { value: "AFB", label: "Alpha Bank" },
+  { value: "BKT", label: "Banka Kombetare Tregtare" },
+  { value: "CRS", label: "Credins" },
+  { value: "FAF", label: "Agrocredit (FAF)" },
+  { value: "FIB", label: "FIB" },
+  { value: "ISP", label: "Intesa SanPaolo Bank" },
+  { value: "Iut", label: "IuteCredit Albania" },
+  { value: "MIA", label: "Mia Finance Sha" },
+  { value: "NA", label: "Not Applicable" },
+  { value: "NOA", label: "NOA" },
+  { value: "OTP", label: "OTP Bank" },
+  { value: "PCB", label: "ProCredit Bank" },
+  { value: "RBA", label: "Raiffeisen Bank" },
+  { value: "SGV", label: "SIGAL" },
+  { value: "TIB", label: "Tirana Bank" },
+  { value: "TRZ", label: "Tranzit" },
+  { value: "TST", label: "Test Partner" },
+  { value: "UBA", label: "UBA" },
+  { value: "UFN", label: "UNIFIN" },
+  { value: "UNI", label: "Union Bank" },
+] as const;
+export type BankPartner = (typeof BANK_PARTNERS)[number]["value"];
 
 // === Payment behavior models ===
 export type PaymentModel =
