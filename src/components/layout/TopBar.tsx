@@ -97,7 +97,7 @@ const TopBar = () => {
 
       {/* Lower row: main nav */}
       <nav className="border-t border-topbar-border/60">
-        <div className="container flex items-center gap-1 h-11 overflow-x-auto">
+        <div className="container flex items-center gap-1 h-11 overflow-x-auto overflow-y-hidden scrollbar-hide">
           {navItems.map((item) => {
             const active =
               item.to === "/"
