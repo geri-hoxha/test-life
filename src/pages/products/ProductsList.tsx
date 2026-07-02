@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  Plus, Search, MoreHorizontal, Settings2, Filter, Package, Calendar, GitBranch,
+  Plus, Search, MoreHorizontal, Settings2, Package, Calendar, GitBranch,
   Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
