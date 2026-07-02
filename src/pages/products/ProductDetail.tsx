@@ -33,6 +33,7 @@ import CoveragesTab from "./CoveragesTab";
 import PremiumRulesTab from "./PremiumRulesTab";
 import TemplatesTab from "./TemplatesTab";
 import DocumentsTab from "./DocumentsTab";
+import CurrenciesTab from "./CurrenciesTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -210,6 +211,7 @@ const ProductDetail = () => {
           <TabsTrigger value="internal">Internal</TabsTrigger>
           <TabsTrigger value="external">External</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="currencies">Currencies</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
         </TabsList>
 
@@ -407,6 +409,11 @@ const ProductDetail = () => {
         <TabsContent value="documents">
           <DocumentsTab productId={product.id} />
         </TabsContent>
+
+        <TabsContent value="currencies">
+          <CurrenciesTab productId={product.id} currencies={fields.currencies} />
+        </TabsContent>
+
 
         <TabsContent value="verification">
           <Card className="shadow-card border-border overflow-hidden">
