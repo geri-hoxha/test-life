@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Save, Landmark } from "lucide-react";
+import { Save, Landmark, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type CurrencyConfig = {
@@ -15,30 +15,29 @@ type CurrencyConfig = {
   swiftCode: string;
 };
 
-const DEFAULTS: Record<string, CurrencyConfig> = {
-  ALL: { bankCode: "091", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL7020511014043002CLPRCLALLF", swiftCode: "NCBAALTX" },
-  EUR: { bankCode: "092", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL0420511014043002CLPRCFEURR", swiftCode: "NCBAALTX" },
-  USD: { bankCode: "093", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL8120511014043002CLPRCFUSDF", swiftCode: "NCBAALTX" },
-  GBP: { bankCode: "094", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL0020511014043002CLPRCFGBPF", swiftCode: "NCBAALTX" },
-  CHF: { bankCode: "095", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL0020511014043002CLPRCFCHFF", swiftCode: "NCBAALTX" },
-};
-
 const empty = (): CurrencyConfig => ({ bankCode: "", bankName: "", account: "", iban: "", swiftCode: "" });
 
 const CurrenciesTab = ({ productId, currencies }: { productId: string; currencies: string[] }) => {
   const [configs, setConfigs] = useState<Record<string, CurrencyConfig>>({});
 
   useEffect(() => {
-    const next: Record<string, CurrencyConfig> = {};
-    currencies.forEach((c) => {
-      next[c] = configs[c] ?? DEFAULTS[c] ?? empty();
+    setConfigs((prev) => {
+      const next: Record<string, CurrencyConfig> = {};
+      currencies.forEach((c) => {
+        next[c] = prev[c] ?? empty();
+      });
+      return next;
     });
-    setConfigs(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, currencies.join(",")]);
 
   const update = (cur: string, key: keyof CurrencyConfig, value: string) =>
-    setConfigs((prev) => ({ ...prev, [cur]: { ...prev[cur], [key]: value } }));
+    setConfigs((prev) => ({ ...prev, [cur]: { ...(prev[cur] ?? empty()), [key]: value } }));
+
+  const clear = (cur: string) => {
+    setConfigs((prev) => ({ ...prev, [cur]: empty() }));
+    toast.success(`${cur} bank configuration cleared`);
+  };
 
   const save = (cur: string) => toast.success(`${cur} bank configuration saved`);
 
@@ -73,9 +72,14 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
                   </p>
                 </div>
               </div>
-              <Button size="sm" onClick={() => save(cur)} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Save className="h-4 w-4" /> Save
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => clear(cur)} className="gap-2">
+                  <Trash2 className="h-4 w-4" /> Clear
+                </Button>
+                <Button size="sm" onClick={() => save(cur)} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Save className="h-4 w-4" /> Save
+                </Button>
+              </div>
             </div>
             <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
