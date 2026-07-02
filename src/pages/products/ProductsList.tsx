@@ -279,7 +279,7 @@ const ProductsList = () => {
                 <th className="h-9 px-2 text-left font-medium w-[22%]">Payment & Loan</th>
                 <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
-                <th className="h-9 px-2 text-right font-medium sticky right-0 bg-muted/40 z-20 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
+                <th className="h-9 px-2 text-right font-medium w-14 sticky right-0 bg-muted/40 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -405,7 +405,7 @@ const ProductsList = () => {
                       </div>
                     </td>
 
-                    <td className="px-2 py-2 text-right sticky right-0 bg-background z-10 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-1 py-2 text-right w-14 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
