@@ -236,11 +236,11 @@ const ProductsList = () => {
               placeholder="Search by name or code…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="pl-9 h-9"
+              className="pl-9 h-9 bg-background"
             />
           </div>
           <Select value={bankFilter} onValueChange={setBankFilter}>
-            <SelectTrigger className="w-[260px] h-9 text-xs">
+            <SelectTrigger className="w-[260px] h-9 text-xs bg-background">
               <SelectValue placeholder="Bank partner" />
             </SelectTrigger>
             <SelectContent>
