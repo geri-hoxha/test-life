@@ -429,7 +429,7 @@ const ProductsList = () => {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
                     No products match your search.
                   </td>
                 </tr>
