@@ -65,8 +65,8 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-foreground">Bank configuration</h3>
-                    <Badge variant="outline" className="font-mono text-[10px]">{cur}</Badge>
+                    <h3 className="text-sm font-semibold text-foreground">Bank configuration - </h3>
+                     <span className="text-accent font-semibold bg-accent/20 px-1 rounded-sm text-sm">{cur}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Collection account used for policies denominated in {cur}.
@@ -94,7 +94,7 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
                 <Label htmlFor={`${cur}-swift`}>F5 SWIFT Code</Label>
                 <Input id={`${cur}-swift`} value={cfg.swiftCode} onChange={(e) => update(cur, "swiftCode", e.target.value)} className="font-mono" />
               </div>
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor={`${cur}-iban`}>F5 IBAN</Label>
                 <Input id={`${cur}-iban`} value={cfg.iban} onChange={(e) => update(cur, "iban", e.target.value)} className="font-mono" />
               </div>
