@@ -274,7 +274,7 @@ const ProductsList = () => {
           <table className="min-w-[1600px] w-full text-xs table-fixed">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
-                <th className="h-9 px-2 text-left font-medium w-[22%]">Product</th>
+                <th className="h-9 px-2 text-left font-medium w-[20%]">Product</th>
                 <th className="h-9 px-2 text-left font-medium w-[17%]">Setup & Commercial</th>
                 <th className="h-9 px-2 text-left font-medium w-[22%]">Payment & Loan</th>
                 <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
