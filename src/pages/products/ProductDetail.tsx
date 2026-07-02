@@ -410,6 +410,11 @@ const ProductDetail = () => {
           <DocumentsTab productId={product.id} />
         </TabsContent>
 
+        <TabsContent value="currencies">
+          <CurrenciesTab productId={product.id} currencies={fields.currencies} />
+        </TabsContent>
+
+
         <TabsContent value="verification">
           <Card className="shadow-card border-border overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
