@@ -337,6 +337,19 @@ const ProductsList = () => {
 
                     </td>
 
+                    {/* Bank partner */}
+                    <td className="px-2 py-2">
+                      {(() => {
+                        const bank = BANK_PARTNERS.find((b) => b.value === p.bankPartnerCode);
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <span className="font-mono text-[11px] font-semibold text-foreground">{dash(bank?.value)}</span>
+                            <span className="text-[10px] text-muted-foreground leading-tight" title={bank?.label}>{bank?.label ?? dash(p.bankPartnerCode)}</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+
                     {/* Setup & Commercial */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
