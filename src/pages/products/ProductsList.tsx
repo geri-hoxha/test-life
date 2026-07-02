@@ -278,9 +278,10 @@ const ProductsList = () => {
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
                 <th className="h-9 px-2 text-left font-medium w-[20%]">Product</th>
-                <th className="h-9 px-2 text-left font-medium w-[20%]">Setup & Commercial</th>
-                <th className="h-9 px-2 text-left font-medium w-[25%]">Payment & Loan</th>
-                <th className="h-9 px-2 text-left font-medium w-[20%]">Compliance</th>
+                <th className="h-9 px-2 text-left font-medium w-[8%]">Bank</th>
+                <th className="h-9 px-2 text-left font-medium w-[17%]">Setup & Commercial</th>
+                <th className="h-9 px-2 text-left font-medium w-[23%]">Payment & Loan</th>
+                <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
                 <th className="h-9 px-2 text-right font-medium">Actions</th>
 
@@ -334,6 +335,19 @@ const ProductsList = () => {
                         </div>
                       </div>
 
+                    </td>
+
+                    {/* Bank partner */}
+                    <td className="px-2 py-2">
+                      {(() => {
+                        const bank = BANK_PARTNERS.find((b) => b.value === p.bankPartnerCode);
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <span className="font-mono text-[11px] font-semibold text-foreground">{dash(bank?.value)}</span>
+                            <span className="text-[10px] text-muted-foreground leading-tight" title={bank?.label}>{bank?.label ?? dash(p.bankPartnerCode)}</span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Setup & Commercial */}
