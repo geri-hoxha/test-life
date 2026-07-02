@@ -195,6 +195,7 @@ const CreateProduct = () => {
       currencies, requiredDocuments: docs, flags,
       agentCommission: (parseFloat(agentCommissionPct) || 0) / 100,
       bankCommission: (parseFloat(bankCommissionPct) || 0) / 100,
+      bankPartnerCode,
       productGroup: productGroup as any,
       paymentModel,
       premiumTableId,
