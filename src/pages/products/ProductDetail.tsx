@@ -33,6 +33,7 @@ import CoveragesTab from "./CoveragesTab";
 import PremiumRulesTab from "./PremiumRulesTab";
 import TemplatesTab from "./TemplatesTab";
 import DocumentsTab from "./DocumentsTab";
+import CurrenciesTab from "./CurrenciesTab";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
