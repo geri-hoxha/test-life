@@ -37,12 +37,13 @@ const ProductsList = () => {
   const navigate = useNavigate();
   const { code: activeCode } = useParams<{ code: string }>();
   const [query, setQuery] = useState("");
+  const [bankFilter, setBankFilter] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
   const [groupsVersion, setGroupsVersion] = useState(0);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
-  useEffect(() => { setPage(1); }, [query, pageSize, activeCode]);
+  useEffect(() => { setPage(1); }, [query, pageSize, activeCode, bankFilter]);
   const [ngEnglish, setNgEnglish] = useState("");
   const [ngLabel, setNgLabel] = useState("");
   const [ngCode, setNgCode] = useState("");
