@@ -427,6 +427,7 @@ export type Product = {
   };
   agentCommission: number;
   bankCommission: number;
+  bankPartnerCode: string;
   productGroup?: ProductGroup;
   paymentModel?: PaymentModel;
   premiumTableId?: string;
@@ -763,6 +764,7 @@ const productFromLegacy = (row: LegacyProductRow): Product => ({
   flags: flagsFromLegacy(row),
   agentCommission: agentCommissionFromLegacy(row),
   bankCommission: bankCommissionFromLegacy(row),
+  bankPartnerCode: row.bankPartnerCode,
   productGroup: productGroupFromCode(row.insuranceProductCode),
   paymentModel: paymentModelFromLegacy(row),
   premiumTableId: premiumTableIdFromLegacy(row),
@@ -836,7 +838,7 @@ seedAuxiliary();
 
 
 // In-memory store backed by localStorage (demo persistence)
-const STORAGE_KEY = "esiglife.products.v5";
+const STORAGE_KEY = "esiglife.products.v6";
 
 const loadProducts = (): Product[] => {
   if (typeof window === "undefined") return [...seedProducts];
