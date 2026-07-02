@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -14,7 +17,7 @@ import {
   Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
-  listProducts, ProductStatus, PAYMENT_MODELS,
+  listProducts, ProductStatus, PAYMENT_MODELS, BANK_PARTNERS,
   listProductGroups, addProductGroup, deleteProductGroup, isBuiltInProductGroup,
 
 } from "@/data/products";
