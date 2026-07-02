@@ -247,7 +247,7 @@ const ProductsList = () => {
               <SelectValue placeholder="Bank partner" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="" className="text-xs">
+              <SelectItem value="ALL" className="text-xs">
                 <span className="text-muted-foreground">All bank partners</span>
               </SelectItem>
               {BANK_PARTNERS.map((b) => (
