@@ -279,7 +279,7 @@ const ProductsList = () => {
                 <th className="h-9 px-2 text-left font-medium w-[22%]">Payment & Loan</th>
                 <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
-                <th className="h-9 px-2 text-right font-medium">Actions</th>
+                <th className="h-9 px-2 text-right font-medium sticky right-0 bg-muted/40 z-20 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
               </tr>
             </thead>
             <tbody>
