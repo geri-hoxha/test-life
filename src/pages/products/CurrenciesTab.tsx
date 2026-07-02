@@ -15,30 +15,29 @@ type CurrencyConfig = {
   swiftCode: string;
 };
 
-const DEFAULTS: Record<string, CurrencyConfig> = {
-  ALL: { bankCode: "091", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL7020511014043002CLPRCLALLF", swiftCode: "NCBAALTX" },
-  EUR: { bankCode: "092", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL0420511014043002CLPRCFEURR", swiftCode: "NCBAALTX" },
-  USD: { bankCode: "093", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL8120511014043002CLPRCFUSDF", swiftCode: "NCBAALTX" },
-  GBP: { bankCode: "094", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL0020511014043002CLPRCFGBPF", swiftCode: "NCBAALTX" },
-  CHF: { bankCode: "095", bankName: "Banka Kombetare Tregtare", account: "401043002", iban: "AL0020511014043002CLPRCFCHFF", swiftCode: "NCBAALTX" },
-};
-
 const empty = (): CurrencyConfig => ({ bankCode: "", bankName: "", account: "", iban: "", swiftCode: "" });
 
 const CurrenciesTab = ({ productId, currencies }: { productId: string; currencies: string[] }) => {
   const [configs, setConfigs] = useState<Record<string, CurrencyConfig>>({});
 
   useEffect(() => {
-    const next: Record<string, CurrencyConfig> = {};
-    currencies.forEach((c) => {
-      next[c] = configs[c] ?? DEFAULTS[c] ?? empty();
+    setConfigs((prev) => {
+      const next: Record<string, CurrencyConfig> = {};
+      currencies.forEach((c) => {
+        next[c] = prev[c] ?? empty();
+      });
+      return next;
     });
-    setConfigs(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, currencies.join(",")]);
 
   const update = (cur: string, key: keyof CurrencyConfig, value: string) =>
-    setConfigs((prev) => ({ ...prev, [cur]: { ...prev[cur], [key]: value } }));
+    setConfigs((prev) => ({ ...prev, [cur]: { ...(prev[cur] ?? empty()), [key]: value } }));
+
+  const clear = (cur: string) => {
+    setConfigs((prev) => ({ ...prev, [cur]: empty() }));
+    toast.success(`${cur} bank configuration cleared`);
+  };
 
   const save = (cur: string) => toast.success(`${cur} bank configuration saved`);
 
