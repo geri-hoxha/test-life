@@ -195,6 +195,7 @@ const CreateProduct = () => {
       currencies, requiredDocuments: docs, flags,
       agentCommission: (parseFloat(agentCommissionPct) || 0) / 100,
       bankCommission: (parseFloat(bankCommissionPct) || 0) / 100,
+      bankPartnerCode,
       productGroup: productGroup as any,
       paymentModel,
       premiumTableId,
@@ -331,7 +332,7 @@ const CreateProduct = () => {
                 <Label>Bank partner</Label>
                 <Select value={bankPartnerCode} onValueChange={setBankPartnerCode}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{BANK_PARTNERS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                  <SelectContent>{BANK_PARTNERS.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
