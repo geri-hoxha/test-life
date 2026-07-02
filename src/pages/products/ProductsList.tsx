@@ -231,15 +231,43 @@ const ProductsList = () => {
         }
       />
 
-      <div className="flex items-center justify-between gap-4 mb-5">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or code…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9 h-9"
-          />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or code…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          <Select value={bankFilter} onValueChange={setBankFilter}>
+            <SelectTrigger className="w-[260px] h-9 text-xs">
+              <SelectValue placeholder="Bank partner" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="" className="text-xs">
+                <span className="text-muted-foreground">All bank partners</span>
+              </SelectItem>
+              {BANK_PARTNERS.map((b) => (
+                <SelectItem key={b.value} value={b.value} className="text-xs">
+                  <strong className="font-semibold text-foreground mr-2">{b.value}</strong>
+                  {b.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(query || bankFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2 text-muted-foreground"
+              onClick={() => { setQuery(""); setBankFilter(""); }}
+            >
+              Clear
+            </Button>
+          )}
         </div>
         <div className="text-xs text-muted-foreground">{filtered.length} product(s)</div>
       </div>
