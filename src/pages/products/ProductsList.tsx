@@ -278,9 +278,10 @@ const ProductsList = () => {
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
                 <th className="h-9 px-2 text-left font-medium w-[20%]">Product</th>
-                <th className="h-9 px-2 text-left font-medium w-[20%]">Setup & Commercial</th>
-                <th className="h-9 px-2 text-left font-medium w-[25%]">Payment & Loan</th>
-                <th className="h-9 px-2 text-left font-medium w-[20%]">Compliance</th>
+                <th className="h-9 px-2 text-left font-medium w-[8%]">Bank</th>
+                <th className="h-9 px-2 text-left font-medium w-[17%]">Setup & Commercial</th>
+                <th className="h-9 px-2 text-left font-medium w-[23%]">Payment & Loan</th>
+                <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
                 <th className="h-9 px-2 text-right font-medium">Actions</th>
 
