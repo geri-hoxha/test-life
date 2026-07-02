@@ -263,7 +263,7 @@ const ProductsList = () => {
               variant="ghost"
               size="sm"
               className="h-9 px-2 text-muted-foreground"
-              onClick={() => { setQuery(""); setBankFilter(""); }}
+              onClick={() => { setQuery(""); setBankFilter("ALL"); }}
             >
               Clear
             </Button>
