@@ -323,7 +323,6 @@ const ProductsList = () => {
                           <Badge variant="outline" className="text-[10px]">v{p.activeVersion}</Badge>
                         </div>
                         <div className="font-semibold text-sm text-foreground leading-tight">{p.name}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono">{p.code}</div>
                         {(() => {
                           const bank = BANK_PARTNERS.find((b) => b.value === p.bankPartnerCode);
                           return (
