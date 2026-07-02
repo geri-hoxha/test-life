@@ -72,9 +72,14 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
                   </p>
                 </div>
               </div>
-              <Button size="sm" onClick={() => save(cur)} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Save className="h-4 w-4" /> Save
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => clear(cur)} className="gap-2">
+                  <Trash2 className="h-4 w-4" /> Clear
+                </Button>
+                <Button size="sm" onClick={() => save(cur)} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Save className="h-4 w-4" /> Save
+                </Button>
+              </div>
             </div>
             <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
