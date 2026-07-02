@@ -17,29 +17,54 @@ type CurrencyConfig = {
 
 const empty = (): CurrencyConfig => ({ bankCode: "", bankName: "", account: "", iban: "", swiftCode: "" });
 
+const storageKey = (productId: string) => `product-currency-config:${productId}`;
+
+const loadSaved = (productId: string): Record<string, CurrencyConfig> => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(storageKey(productId));
+    return raw ? (JSON.parse(raw) as Record<string, CurrencyConfig>) : {};
+  } catch {
+    return {};
+  }
+};
+
 const CurrenciesTab = ({ productId, currencies }: { productId: string; currencies: string[] }) => {
-  const [configs, setConfigs] = useState<Record<string, CurrencyConfig>>({});
+  const [configs, setConfigs] = useState<Record<string, CurrencyConfig>>(() => loadSaved(productId));
 
   useEffect(() => {
-    setConfigs((prev) => {
-      const next: Record<string, CurrencyConfig> = {};
-      currencies.forEach((c) => {
-        next[c] = prev[c] ?? empty();
-      });
-      return next;
+    const saved = loadSaved(productId);
+    const next: Record<string, CurrencyConfig> = {};
+    currencies.forEach((c) => {
+      next[c] = saved[c] ?? empty();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setConfigs(next);
   }, [productId, currencies.join(",")]);
+
+  const persist = (all: Record<string, CurrencyConfig>) => {
+    try {
+      window.localStorage.setItem(storageKey(productId), JSON.stringify(all));
+    } catch {
+      // ignore quota errors
+    }
+  };
 
   const update = (cur: string, key: keyof CurrencyConfig, value: string) =>
     setConfigs((prev) => ({ ...prev, [cur]: { ...(prev[cur] ?? empty()), [key]: value } }));
 
   const clear = (cur: string) => {
-    setConfigs((prev) => ({ ...prev, [cur]: empty() }));
+    setConfigs((prev) => {
+      const next = { ...prev, [cur]: empty() };
+      persist(next);
+      return next;
+    });
     toast.success(`${cur} bank configuration cleared`);
   };
 
-  const save = (cur: string) => toast.success(`${cur} bank configuration saved`);
+  const save = (cur: string) => {
+    persist(configs);
+    toast.success(`${cur} bank configuration saved`);
+  };
 
   if (currencies.length === 0) {
     return (
