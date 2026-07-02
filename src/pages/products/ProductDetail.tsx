@@ -211,6 +211,7 @@ const ProductDetail = () => {
           <TabsTrigger value="internal">Internal</TabsTrigger>
           <TabsTrigger value="external">External</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="currencies">Currencies</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
         </TabsList>
 
