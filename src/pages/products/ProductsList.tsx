@@ -37,7 +37,7 @@ const ProductsList = () => {
   const navigate = useNavigate();
   const { code: activeCode } = useParams<{ code: string }>();
   const [query, setQuery] = useState("");
-  const [bankFilter, setBankFilter] = useState<string>("");
+  const [bankFilter, setBankFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
