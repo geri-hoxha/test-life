@@ -194,7 +194,7 @@ const ProductsList = () => {
       const matchesQuery =
         p.name.toLowerCase().includes(query.toLowerCase()) ||
         p.code.toLowerCase().includes(query.toLowerCase());
-      const matchesBank = !bankFilter || p.bankPartnerCode === bankFilter;
+      const matchesBank = bankFilter === "ALL" || p.bankPartnerCode === bankFilter;
       return matchesQuery && matchesBank;
     }
   );
