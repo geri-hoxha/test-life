@@ -110,9 +110,9 @@ const ProductsList = () => {
                     </div>
                     <div className="min-w-0">
                       <CardTitle className="text-base leading-tight truncate group-hover:text-accent transition-colors">
-                        {g.english}
+                        {g.label}
                       </CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{g.label}</p>
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{g.english}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
