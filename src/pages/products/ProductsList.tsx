@@ -258,7 +258,7 @@ const ProductsList = () => {
               ))}
             </SelectContent>
           </Select>
-          {(query || bankFilter) && (
+          {(query || bankFilter !== "ALL") && (
             <Button
               variant="ghost"
               size="sm"
