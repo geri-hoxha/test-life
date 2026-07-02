@@ -279,7 +279,7 @@ const ProductsList = () => {
                 <th className="h-9 px-2 text-left font-medium w-[22%]">Payment & Loan</th>
                 <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
-                <th className="h-9 px-2 text-right font-medium w-6 sticky right-0 bg-muted/40 z-50 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
+                <th className="h-9 px-0 text-center font-medium w-5 sticky right-0 bg-muted/40 z-50 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -405,11 +405,11 @@ const ProductsList = () => {
                       </div>
                     </td>
 
-                    <td className="px-0 py-2 text-right w-6 sticky right-0 bg-background z-50 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-0 py-2 text-center w-5 sticky right-0 bg-background z-50 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+                            <MoreHorizontal className="h-3 w-3" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
