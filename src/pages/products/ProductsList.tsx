@@ -219,7 +219,7 @@ const ProductsList = () => {
             <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/products")}>
               <ArrowLeft className="h-4 w-4" /> All groups
             </Button>
-            <Button asChild className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button asChild size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
               <Link to="/products/new">
                 <Plus className="h-4 w-4" /> Create Product
               </Link>
