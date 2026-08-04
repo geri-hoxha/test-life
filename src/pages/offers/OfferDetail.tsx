@@ -53,18 +53,23 @@ import {
   Package,
   AlertTriangle,
 } from "lucide-react";
-import { getOffer, statusColor, setOfferStatus, OfferStatus } from "@/data/offers";
-import { seedProducts } from "@/data/products";
+import { getOffer, statusColor } from "@/data/offers";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates, overrideSummary } from "@/data/templates";
-import { getCustomer, fullName, ageFromDob } from "@/data/customers";
+import { fullName, ageFromDob } from "@/data/customers";
 
 import { listCoverages } from "@/data/coverages";
 import { listDocuments } from "@/data/documents";
-import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
+import { PremiumResult } from "./PremiumCalculation";
 import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
+import { useGetOffer, useCancelOffer, useCalculateOfferSchedules } from "@/api/offers";
+import { mapApiOffer } from "@/api/adapters/offers";
+import { useGetProduct, mapApiProduct } from "@/api/products";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { customerPath, mergeCustomers } from "@/api/adapters/customers";
 
 const fmtMoney = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(v);
@@ -79,15 +84,45 @@ const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
 const OfferDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [, force] = useState(0);
-  const refresh = () => force((n) => n + 1);
 
-  const offer = id ? getOffer(id) : undefined;
+  const { data: apiOffer, isLoading } = useGetOffer(id ?? "", { enabled: Boolean(id) });
+  const cancelOffer = useCancelOffer();
+  const calculateSchedules = useCalculateOfferSchedules();
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+
+  const offer = useMemo(() => {
+    if (apiOffer) return mapApiOffer(apiOffer);
+    // Fallback to local seed while migrating (keep for unsupported flows).
+    return id ? getOffer(id) : undefined;
+  }, [apiOffer, id]);
+
+  const { data: apiProduct } = useGetProduct(offer?.productId ?? "", { enabled: Boolean(offer?.productId) });
+  const product = useMemo(() => {
+    if (apiProduct) return mapApiProduct(apiProduct);
+    return undefined;
+  }, [apiProduct]);
+
   const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
   const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
   const [notes, setNotes] = useState(
     "Initial draft prepared by Erin Hoxha. Awaiting underwriter review.\n• Customer requested annual payment.\n• Beneficiary split confirmed via call on 2026-04-22."
   );
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="text-center py-20">
+          <h1 className="text-xl font-semibold">Loading offer…</h1>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!offer) {
     return (
@@ -101,12 +136,11 @@ const OfferDetail = () => {
     );
   }
 
-  const product = seedProducts.find((p) => p.id === offer.productId);
   const version = listVersions(offer.productId).find((v) => v.id === offer.versionId);
   const template = listTemplates(offer.productId, offer.versionId).find((t) => t.id === offer.templateId);
-  const holder = getCustomer(offer.policyHolderId);
-  const insured = getCustomer(offer.insuredId);
-  const payer = getCustomer(offer.payerId);
+  const holder = getCustomerLocal(offer.policyHolderId);
+  const insured = getCustomerLocal(offer.insuredId);
+  const payer = getCustomerLocal(offer.payerId);
   const coverages = listCoverages(offer.productId, offer.versionId);
   const docs = listDocuments(offer.productId, offer.versionId);
 
@@ -124,15 +158,36 @@ const OfferDetail = () => {
   const reviewCount = verificationChecks.filter((c) => c.result === "Requires Review").length;
   const warnCount = verificationChecks.filter((c) => c.result === "Warning").length;
 
-  const updateStatus = (s: OfferStatus, msg: string) => {
-    setOfferStatus(offer.id, s);
-    toast.success(msg);
-    refresh();
+  const handleReject = async () => {
+    try {
+      await cancelOffer.mutateAsync(offer.id);
+      toast.success(`${offer.number} rejected`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reject offer");
+    }
+  };
+
+  const handleApprove = () => {
+    // TODO: wire when offer-approval endpoint is available
+    toast.info("Offer approval is not yet available from the API");
+  };
+
+  const handleRecalculate = async () => {
+    try {
+      await calculateSchedules.mutateAsync(offer.id);
+      toast.success("Premium recalculated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to recalculate premium");
+    }
   };
 
   const canApprove = offer.status === "Quoted" || offer.status === "Pending Review";
   const canReject = offer.status !== "Issued" && offer.status !== "Rejected";
-  const canIssue = offer.status === "Approved";
+  // API has no separate "Approved" state yet — allow issue from quoted / review.
+  const canIssue =
+    offer.status === "Approved" ||
+    offer.status === "Quoted" ||
+    offer.status === "Pending Review";
 
   return (
     <AppShell>
@@ -169,7 +224,8 @@ const OfferDetail = () => {
           </Button>
           <Button
             variant="outline" size="sm" className="gap-2"
-            onClick={() => { refresh(); toast.success("Premium recalculated"); }}
+            onClick={() => void handleRecalculate()}
+            disabled={calculateSchedules.isPending}
           >
             <RefreshCw className="h-4 w-4" /> Recalculate Premium
           </Button>
@@ -188,7 +244,7 @@ const OfferDetail = () => {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => updateStatus("Rejected", `${offer.number} rejected`)}>
+                <AlertDialogAction onClick={() => void handleReject()} disabled={cancelOffer.isPending}>
                   Reject Offer
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -196,7 +252,7 @@ const OfferDetail = () => {
           </AlertDialog>
           <Button
             size="sm" variant="secondary" className="gap-2"
-            onClick={() => updateStatus("Approved", `${offer.number} approved`)}
+            onClick={handleApprove}
             disabled={!canApprove}
           >
             <CheckCircle2 className="h-4 w-4" /> Approve
@@ -320,15 +376,15 @@ const OfferDetail = () => {
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field
                 label="Policy Holder"
-                value={holder ? <Link to={`/customers/${holder.id}`} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"}
+                value={holder ? <Link to={customerPath(holder.id, holder.customerType)} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"}
               />
               <Field
                 label="Insured Person"
-                value={insured ? <Link to={`/customers/${insured.id}`} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"}
+                value={insured ? <Link to={customerPath(insured.id, insured.customerType)} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"}
               />
               <Field
                 label="Payer / Invoice Recipient"
-                value={payer ? <Link to={`/customers/${payer.id}`} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"}
+                value={payer ? <Link to={customerPath(payer.id, payer.customerType)} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"}
               />
             </CardContent>
           </Card>
@@ -474,7 +530,7 @@ const OfferDetail = () => {
                 <CardContent className="space-y-2 text-sm">
                   {p.c ? (
                     <>
-                      <Field label="Name" value={<Link to={`/customers/${p.c.id}`} className="text-primary hover:underline">{fullName(p.c)}</Link>} />
+                      <Field label="Name" value={<Link to={customerPath(p.c.id, p.c.customerType)} className="text-primary hover:underline">{fullName(p.c)}</Link>} />
                       <Field label="Personal ID" value={<span className="font-mono text-xs">{p.c.personalId}</span>} />
                       <Field label="DOB / Age" value={`${p.c.dateOfBirth} (${ageFromDob(p.c.dateOfBirth)} yrs)`} />
                       <Field label="Gender" value={p.c.gender} />
@@ -517,11 +573,11 @@ const OfferDetail = () => {
                         </TableCell>
                       </TableRow>
                     ) : offer.beneficiaries.map((b) => {
-                      const c = getCustomer(b.customerId);
+                      const c = getCustomerLocal(b.customerId);
                       return (
                         <TableRow key={b.id}>
                           <TableCell>
-                            {c ? <Link to={`/customers/${c.id}`} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}
+                            {c ? <Link to={customerPath(c.id, c.customerType)} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}
                           </TableCell>
                           <TableCell>{b.relationship}</TableCell>
                           <TableCell className="text-right font-mono">{b.percentage}%</TableCell>

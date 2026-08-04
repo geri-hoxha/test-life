@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { CalendarIcon, User, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,22 +17,37 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Customer, customerSchema, getCustomer, newCustomerId, upsertCustomer,
+  Customer, customerSchema,
   Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPES, F5_LOCATIONS,
   SSN_ISSUING_COUNTRIES,
 } from "@/data/customers";
+import { useCreatePerson, useGetPerson, useUpdatePerson } from "@/api/people";
+import { useAddCompanyAddress, useCreateCompany, useGetCompany, useUpdateCompany } from "@/api/companies";
+import {
+  customerPath,
+  customerToCreateCompany,
+  customerToCreatePerson,
+  customerToUpdateCompany,
+  customerToUpdatePerson,
+  mapCompanyToCustomer,
+  mapPersonToCustomer,
+  parseCustomerPartyType,
+  toCountryCode,
+} from "@/api/adapters/customers";
+
+const NA = "N/A";
 
 const blank = (): Customer => ({
-  id: newCustomerId(),
+  id: "",
   customerType: "Individual",
   firstName: "", lastName: "", fatherName: "", personalId: "",
-  ssnIssuingCountry: "Albania",
-  dateOfBirth: "", gender: "Male",
-  nationality: "Albanian", placeOfBirth: "",
-  companyName: "", nipt: "", companyType: "Sh.p.k.",
+  ssnIssuingCountry: NA,
+  dateOfBirth: "", gender: "Other",
+  nationality: NA, placeOfBirth: "",
+  companyName: "", nipt: "", companyType: undefined,
   registrationDate: "", legalRepresentative: "",
-  f5Location: F5_LOCATIONS[0]?.code,
-  address: "", city: "", country: "Albania",
+  f5Location: NA,
+  address: "", city: "", country: NA,
   phone: "", email: "", occupation: "",
   pepStatus: "Unknown", notes: "",
   totalExposure: 0,
@@ -42,13 +57,46 @@ const blank = (): Customer => ({
 const CustomerForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const existing = id ? getCustomer(id) : undefined;
-  const isEdit = !!existing;
-  const initial = useMemo(() => existing ?? blank(), [existing]);
+  const [searchParams] = useSearchParams();
+  const isEdit = Boolean(id);
+  const partyType = parseCustomerPartyType(searchParams.get("type"));
 
-  const [c, setC] = useState<Customer>(initial);
+  const personQ = useGetPerson(id ?? "", {
+    enabled: isEdit && (partyType === "person" || partyType === null),
+  });
+  const companyQ = useGetCompany(id ?? "", {
+    enabled:
+      isEdit &&
+      (partyType === "company" ||
+        (partyType === null && personQ.isFetched && personQ.isError)),
+  });
+
+  const existing = useMemo(() => {
+    if (partyType !== "company" && personQ.data) return mapPersonToCustomer(personQ.data);
+    if (partyType !== "person" && companyQ.data) return mapCompanyToCustomer(companyQ.data);
+    return undefined;
+  }, [partyType, personQ.data, companyQ.data]);
+
+  const createPerson = useCreatePerson();
+  const updatePerson = useUpdatePerson();
+  const createCompany = useCreateCompany();
+  const updateCompany = useUpdateCompany();
+  const addCompanyAddress = useAddCompanyAddress();
+
+  const [c, setC] = useState<Customer>(blank());
   const set = <K extends keyof Customer>(k: K, v: Customer[K]) => setC((s) => ({ ...s, [k]: v }));
   const isCompany = c.customerType === "Company";
+
+  useEffect(() => {
+    if (existing) setC(existing);
+  }, [existing]);
+
+  const saving =
+    createPerson.isPending ||
+    updatePerson.isPending ||
+    createCompany.isPending ||
+    updateCompany.isPending ||
+    addCompanyAddress.isPending;
 
   const handleSave = () => {
     const result = customerSchema.safeParse(c);
@@ -56,10 +104,99 @@ const CustomerForm = () => {
       toast.error(result.error.issues[0].message);
       return;
     }
-    upsertCustomer(c);
-    toast.success(isEdit ? "Customer updated" : "Customer created");
-    navigate(`/customers/${c.id}`);
+
+    if (c.customerType === "Individual") {
+      if (isEdit && c.id) {
+        updatePerson.mutate(
+          { id: c.id, body: customerToUpdatePerson(c) },
+          {
+            onSuccess: (res) => {
+              toast.success("Customer updated");
+              navigate(customerPath(res.id ?? c.id, "person"));
+            },
+            onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update"),
+          }
+        );
+      } else {
+        createPerson.mutate(customerToCreatePerson(c), {
+          onSuccess: (res) => {
+            toast.success("Customer created");
+            navigate(customerPath(res.id!, "person"));
+          },
+          onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to create"),
+        });
+      }
+      return;
+    }
+
+    // Company
+    if (isEdit && c.id) {
+      updateCompany.mutate(
+        { id: c.id, body: customerToUpdateCompany(c) },
+        {
+          onSuccess: (res) => {
+            toast.success("Customer updated");
+            navigate(customerPath(res.id ?? c.id, "company"));
+          },
+          onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update"),
+        }
+      );
+    } else {
+      createCompany.mutate(customerToCreateCompany(c), {
+        onSuccess: (res) => {
+          const companyId = res.id;
+          const street = c.address?.trim();
+          const city = c.city?.trim();
+          if (companyId && street && city && c.country && c.country !== NA) {
+            addCompanyAddress.mutate(
+              {
+                companyId,
+                body: {
+                  street,
+                  city,
+                  countryCode: toCountryCode(c.country),
+                  isMain: true,
+                },
+              },
+              {
+                onSettled: () => {
+                  toast.success("Customer created");
+                  navigate(customerPath(companyId, "company"));
+                },
+              }
+            );
+          } else {
+            toast.success("Customer created");
+            navigate(customerPath(companyId!, "company"));
+          }
+        },
+        onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to create"),
+      });
+    }
   };
+
+  const isLoadingExisting =
+    isEdit &&
+    !existing &&
+    (partyType === "company"
+      ? companyQ.isLoading
+      : partyType === "person"
+        ? personQ.isLoading
+        : personQ.isLoading ||
+          (personQ.isError && !companyQ.isFetched) ||
+          companyQ.isLoading);
+
+  if (isLoadingExisting) {
+    return (
+      <AppShell>
+        <PageHeader
+          breadcrumbs={[{ label: "Customers", to: "/customers" }, { label: "Edit" }]}
+          title="Loading…"
+          description="Fetching customer."
+        />
+      </AppShell>
+    );
+  }
 
   const dob = c.dateOfBirth ? parseISO(c.dateOfBirth) : undefined;
   const regDate = c.registrationDate ? parseISO(c.registrationDate) : undefined;
@@ -79,9 +216,13 @@ const CustomerForm = () => {
         description={isEdit ? "Update the customer's profile and contact details." : "Onboard a new individual or company client."}
         actions={
           <>
-            <Button variant="outline" asChild><Link to={isEdit ? `/customers/${c.id}` : "/customers"}>Cancel</Link></Button>
-            <Button onClick={handleSave} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              {isEdit ? "Save changes" : "Create customer"}
+            <Button variant="outline" asChild><Link to={isEdit && c.id ? customerPath(c.id, c.customerType) : "/customers"}>Cancel</Link></Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              {saving ? "Saving…" : isEdit ? "Save changes" : "Create customer"}
             </Button>
           </>
         }
@@ -140,9 +281,10 @@ const CustomerForm = () => {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Type</Label>
-                  <Select value={c.companyType ?? "Sh.p.k."} onValueChange={(v) => set("companyType", v as CompanyType)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={c.companyType ?? NA} onValueChange={(v) => set("companyType", v === NA ? undefined : v as CompanyType)}>
+                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={NA}>N/A</SelectItem>
                       {COMPANY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -157,9 +299,10 @@ const CustomerForm = () => {
                 </div>
                 <div className="space-y-1.5">
                   <Label>F5 Location</Label>
-                  <Select value={c.f5Location ?? ""} onValueChange={(v) => set("f5Location", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select fiscalization location" /></SelectTrigger>
+                  <Select value={c.f5Location || NA} onValueChange={(v) => set("f5Location", v)}>
+                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={NA}>N/A</SelectItem>
                       {F5_LOCATIONS.map((l) => (
                         <SelectItem key={l.code} value={l.code}>
                           <span className="font-mono text-xs text-accent mr-2">{l.code}</span>
@@ -206,9 +349,10 @@ const CustomerForm = () => {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Issuing Country</Label>
-                  <Select value={c.ssnIssuingCountry ?? ""} onValueChange={(v) => set("ssnIssuingCountry", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={c.ssnIssuingCountry || NA} onValueChange={(v) => set("ssnIssuingCountry", v)}>
+                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={NA}>N/A</SelectItem>
                       {SSN_ISSUING_COUNTRIES.map((country) => (
                         <SelectItem key={country} value={country}>{country}</SelectItem>
                       ))}
@@ -249,9 +393,10 @@ const CustomerForm = () => {
                 </div>
                 <div className="space-y-1.5">
                   <Label>F5 Location</Label>
-                  <Select value={c.f5Location ?? ""} onValueChange={(v) => set("f5Location", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select fiscalization location" /></SelectTrigger>
+                  <Select value={c.f5Location || NA} onValueChange={(v) => set("f5Location", v)}>
+                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={NA}>N/A</SelectItem>
                       {F5_LOCATIONS.map((l) => (
                         <SelectItem key={l.code} value={l.code}>
                           <span className="font-mono text-xs text-accent mr-2">{l.code}</span>
@@ -267,12 +412,12 @@ const CustomerForm = () => {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Gender</Label>
-                  <Select value={c.gender} onValueChange={(v) => set("gender", v as Gender)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={c.gender || "Other"} onValueChange={(v) => set("gender", v as Gender)}>
+                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="Other">N/A</SelectItem>
                       <SelectItem value="Male">Male</SelectItem>
                       <SelectItem value="Female">Female</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

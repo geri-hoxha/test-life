@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
@@ -11,12 +11,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { seedProducts } from "@/data/products";
+import { useListProducts, mapApiProduct } from "@/api/products";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { customerPath, mergeCustomers } from "@/api/adapters/customers";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Plus, Search, MoreHorizontal, Eye, Pencil, FileText, Filter } from "lucide-react";
-import { listCustomers, fullName, PEPStatus } from "@/data/customers";
+import { fullName, PEPStatus } from "@/data/customers";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const pepClass: Record<PEPStatus, string> = {
@@ -32,17 +35,21 @@ const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
 
 // Deterministic pseudo-random exposure breakdown by product, derived from customer id.
-const exposureBreakdown = (customerId: string, total: number) => {
-  if (total <= 0) return [] as { product: string; amount: number }[];
+const exposureBreakdown = (
+  customerId: string,
+  total: number,
+  products: { id: string; name: string }[]
+) => {
+  if (total <= 0 || products.length === 0) return [] as { product: string; amount: number }[];
   let seed = 0;
   for (let i = 0; i < customerId.length; i++) seed = (seed * 31 + customerId.charCodeAt(i)) >>> 0;
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 0xffffffff;
   };
-  const count = 2 + Math.floor(rand() * Math.min(3, seedProducts.length - 1));
-  const picks: typeof seedProducts = [];
-  const pool = [...seedProducts];
+  const count = 2 + Math.floor(rand() * Math.min(3, Math.max(1, products.length - 1)));
+  const picks: typeof products = [];
+  const pool = [...products];
   for (let i = 0; i < count && pool.length; i++) {
     picks.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
   }
@@ -52,7 +59,6 @@ const exposureBreakdown = (customerId: string, total: number) => {
     product: p.name,
     amount: Math.round((weights[i] / sum) * total),
   }));
-  // fix rounding drift
   const drift = total - rows.reduce((a, r) => a + r.amount, 0);
   if (rows.length) rows[0].amount += drift;
   return rows;
@@ -61,14 +67,29 @@ const exposureBreakdown = (customerId: string, total: number) => {
 const CustomersList = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const customers = listCustomers().filter((c) => {
+  const { data: peoplePage, isLoading: peopleLoading } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage, isLoading: companiesLoading } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 100 });
+
+  const products = useMemo(
+    () => (productsPage?.items ?? []).map(mapApiProduct),
+    [productsPage?.items]
+  );
+
+  const customers = useMemo(() => {
+    const all = mergeCustomers(peoplePage?.items, companiesPage?.items);
     const q = query.toLowerCase();
-    return (
-      fullName(c).toLowerCase().includes(q) ||
-      c.personalId.toLowerCase().includes(q) ||
-      (c.email ?? "").toLowerCase().includes(q)
+    if (!q) return all;
+    return all.filter(
+      (c) =>
+        fullName(c).toLowerCase().includes(q) ||
+        c.personalId.toLowerCase().includes(q) ||
+        (c.nipt ?? "").toLowerCase().includes(q) ||
+        (c.email ?? "").toLowerCase().includes(q)
     );
-  });
+  }, [peoplePage?.items, companiesPage?.items, query]);
+
+  const isLoading = peopleLoading || companiesLoading;
 
   return (
     <AppShell>
@@ -101,7 +122,9 @@ const CustomersList = () => {
               className="pl-9 h-9"
             />
           </div>
-          <div className="text-xs text-muted-foreground">{customers.length} customer(s)</div>
+          <div className="text-xs text-muted-foreground">
+            {isLoading ? "Loading…" : `${customers.length} customer(s)`}
+          </div>
         </div>
 
         <Table>
@@ -120,13 +143,23 @@ const CustomersList = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {isLoading && (
+              <TableRow>
+                <td colSpan={10} className="p-8 text-center text-muted-foreground text-sm">Loading customers…</td>
+              </TableRow>
+            )}
+            {!isLoading && customers.length === 0 && (
+              <TableRow>
+                <td colSpan={10} className="p-8 text-center text-muted-foreground text-sm">No customers found.</td>
+              </TableRow>
+            )}
             {customers.map((c) => {
               const isCompany = c.customerType === "Company";
               const avatarInitials = isCompany
                 ? (c.companyName ?? "C").slice(0, 2).toUpperCase()
                 : initials(c.firstName, c.lastName);
               return (
-              <TableRow key={c.id} className="hover:bg-accent-soft/40 cursor-pointer" onClick={() => navigate(`/customers/${c.id}`)}>
+              <TableRow key={c.id} className="hover:bg-accent-soft/40 cursor-pointer" onClick={() => navigate(customerPath(c.id, c.customerType))}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
                     <Avatar className="h-8 w-8">
@@ -168,7 +201,7 @@ const CustomersList = () => {
                             Exposure by Product
                           </div>
                           <div className="space-y-1.5">
-                            {exposureBreakdown(c.id, c.totalExposure).map((r) => (
+                            {exposureBreakdown(c.id, c.totalExposure, products).map((r) => (
                               <div key={r.product} className="flex items-center justify-between gap-3 text-sm">
                                 <span className="truncate text-foreground">{r.product}</span>
                                 <span className="font-medium tabular-nums">{fmtMoney(r.amount)}</span>
@@ -189,10 +222,10 @@ const CustomersList = () => {
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-1">
                     <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
-                      <Link to={`/customers/${c.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Link>
+                      <Link to={customerPath(c.id, c.customerType)}><Eye className="h-3.5 w-3.5 mr-1" /> View</Link>
                     </Button>
                     <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
-                      <Link to={`/customers/${c.id}/edit`}><Pencil className="h-3.5 w-3.5 mr-1" /> Edit</Link>
+                      <Link to={customerPath(c.id, c.customerType, { edit: true })}><Pencil className="h-3.5 w-3.5 mr-1" /> Edit</Link>
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-accent hover:text-accent hover:bg-accent-soft">
                       <FileText className="h-3.5 w-3.5 mr-1" /> New Offer

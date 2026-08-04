@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,71 +12,87 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-type Item = {
-  ref: string;
-  type: "Customer KYC" | "Medical Report" | "Policy Issuance" | "Payment Refund";
-  subject: string;
-  submitted: string;
-  priority: "Low" | "Normal" | "High" | "Urgent";
-};
-
-const items: Item[] = [
-  { ref: "REV-3041", type: "Customer KYC", subject: "Markus Weber", submitted: "2h ago", priority: "High" },
-  { ref: "REV-3040", type: "Medical Report", subject: "Helena Novak — Endowment 15Y", submitted: "4h ago", priority: "Normal" },
-  { ref: "REV-3039", type: "Policy Issuance", subject: "POL-2026-1188", submitted: "Yesterday", priority: "Urgent" },
-  { ref: "REV-3038", type: "Payment Refund", subject: "PAY-22014 · € 480.00", submitted: "Yesterday", priority: "Normal" },
-  { ref: "REV-3037", type: "Customer KYC", subject: "Sofia Romano", submitted: "2 days ago", priority: "Low" },
-];
-
-const priorityClass: Record<Item["priority"], string> = {
-  Low: "bg-muted text-muted-foreground",
-  Normal: "bg-accent-soft text-accent-soft-foreground",
-  High: "bg-warning/20 text-warning-foreground",
-  Urgent: "bg-destructive/10 text-destructive",
-};
+import { useListOffers } from "@/api/offers";
+import { mapApiOffer } from "@/api/adapters/offers";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { mergeCustomers } from "@/api/adapters/customers";
+import { fullName } from "@/data/customers";
 
 const PendingReviewTable = () => {
+  const { data: offersPage, isLoading } = useListOffers({ pageNumber: 1, pageSize: 50 });
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  
+  const items = useMemo(
+    () =>
+      (offersPage?.items ?? [])
+        .map(mapApiOffer)
+        .filter((o) => o.status === "Pending Review" || o.status === "Quoted")
+        .slice(0, 5),
+    [offersPage?.items]
+  );
+
   return (
     <Card className="shadow-card border-border overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-warning" />
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Pending Manual Review</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">12 items awaiting underwriter action</p>
+            <h3 className="text-sm font-semibold text-foreground">Pending Review</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Offers awaiting underwriter action</p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" className="text-accent hover:text-accent hover:bg-accent-soft">
-          Open queue
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/offers">View all</Link>
         </Button>
       </div>
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Ref</TableHead>
-            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Type</TableHead>
-            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Subject</TableHead>
-            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Submitted</TableHead>
-            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Priority</TableHead>
-            <TableHead />
+            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Offer</TableHead>
+            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Holder</TableHead>
+            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Created</TableHead>
+            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((it) => (
-            <TableRow key={it.ref} className="hover:bg-accent-soft/40">
-              <TableCell className="font-mono text-xs text-accent">{it.ref}</TableCell>
-              <TableCell className="text-muted-foreground">{it.type}</TableCell>
-              <TableCell className="font-medium">{it.subject}</TableCell>
-              <TableCell className="text-muted-foreground">{it.submitted}</TableCell>
-              <TableCell>
-                <Badge className={`font-medium border-0 ${priorityClass[it.priority]}`}>{it.priority}</Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                <Button size="sm" variant="outline" className="h-7 text-xs">Review</Button>
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center py-8 text-sm text-muted-foreground">
+                Loading…
               </TableCell>
             </TableRow>
-          ))}
+          ) : items.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center py-8 text-sm text-muted-foreground">
+                Nothing pending review.
+              </TableCell>
+            </TableRow>
+          ) : (
+            items.map((o) => {
+              const holder = customers.find((c) => c.id === o.policyHolderId);
+              return (
+                <TableRow key={o.id}>
+                  <TableCell>
+                    <Link to={`/offers/${o.id}`} className="font-mono text-xs text-primary hover:underline">
+                      {o.number}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm">{holder ? fullName(holder) : "—"}</TableCell>
+                  <TableCell className="text-xs font-mono text-muted-foreground">{o.createdDate}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{o.status}</Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
         </TableBody>
       </Table>
     </Card>

@@ -63,6 +63,7 @@ export type Customer = {
   f5Location?: string; // F5 location code
   address?: string;
   city?: string;       // company only
+  postalCode?: string; // company address
   country?: string;    // company only
   phone?: string;
   email?: string;

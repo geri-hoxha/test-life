@@ -17,10 +17,14 @@ import {
   Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
-  listProducts, ProductStatus, PAYMENT_MODELS, BANK_PARTNERS,
-  listProductGroups, addProductGroup, deleteProductGroup, isBuiltInProductGroup,
-
+  ProductStatus, PAYMENT_MODELS, BANK_PARTNERS,
 } from "@/data/products";
+import {
+  useListProductGroups, useCreateProductGroup, useDeleteProductGroup,
+} from "@/api/product-groups";
+import {
+  useListProducts, mapApiProduct,
+} from "@/api/products";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -41,39 +45,98 @@ const ProductsList = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [groupsVersion, setGroupsVersion] = useState(0);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   useEffect(() => { setPage(1); }, [query, pageSize, activeCode, bankFilter]);
   const [ngEnglish, setNgEnglish] = useState("");
   const [ngLabel, setNgLabel] = useState("");
   const [ngCode, setNgCode] = useState("");
 
-  const allProducts = listProducts();
+  const { data: groupsPage, isLoading: groupsLoading } = useListProductGroups({ pageNumber: 1, pageSize: 100 });
+  const { data: productsPage, isLoading: productsLoading } = useListProducts({ pageNumber: 1, pageSize: 500 });
+  const createGroup = useCreateProductGroup();
+  const deleteGroup = useDeleteProductGroup();
+
+  const allProducts = useMemo(
+    () => (productsPage?.items ?? []).map(mapApiProduct),
+    [productsPage?.items]
+  );
 
   const groups = useMemo(() => {
-    const defs = listProductGroups();
+    const defs = groupsPage?.items ?? [];
     return defs.map((g) => {
-      const items = allProducts.filter((p) => {
-        const pg = defs.find((x) => x.value === p.productGroup);
-        return pg?.code === g.code;
-      });
-      return { ...g, items };
+      const id = g.id ?? "";
+      const name = g.name ?? "—";
+      // Prefer API fields when available; fall back until backend adds them.
+      const english = g.english?.trim() || name;
+      const label = g.label?.trim() || name;
+      const code = g.code?.trim() || id;
+      const items = allProducts.filter((p) => p.productGroupId === id);
+      return { id, value: id, code, label, english, items };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allProducts, groupsVersion]);
+  }, [allProducts, groupsPage?.items]);
 
-  const activeGroup = activeCode ? groups.find((g) => g.code === activeCode) : null;
+  const activeGroup = activeCode
+    ? groups.find((g) => g.code === activeCode || g.id === activeCode)
+    : null;
+
+  // While a group route is open and data is still fetching, avoid falling through to the grid.
+  if (activeCode && groupsLoading) {
+    return (
+      <AppShell>
+        <PageHeader
+          breadcrumbs={[{ label: "Products", to: "/products" }, { label: "…" }]}
+          title="Loading…"
+          description="Fetching product group."
+        />
+      </AppShell>
+    );
+  }
+
+  if (activeCode && !groupsLoading && !activeGroup) {
+    return (
+      <AppShell>
+        <PageHeader
+          breadcrumbs={[{ label: "Products", to: "/products" }, { label: "Not found" }]}
+          title="Product group not found"
+          description={`No group matches “${activeCode}”.`}
+          actions={
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/products")}>
+              <ArrowLeft className="h-4 w-4" /> All groups
+            </Button>
+          }
+        />
+      </AppShell>
+    );
+  }
 
   const handleCreateGroup = () => {
-    if (!ngEnglish.trim() || !ngCode.trim()) {
-      toast({ title: "Missing fields", description: "English name and code are required.", variant: "destructive" });
+    if (!ngEnglish.trim()) {
+      toast({ title: "Missing fields", description: "English name is required.", variant: "destructive" });
       return;
     }
-    addProductGroup({ english: ngEnglish.trim(), label: ngLabel.trim() || ngEnglish.trim(), code: ngCode.trim() });
-    toast({ title: "Product group created", description: `${ngEnglish} (${ngCode})` });
-    setNgEnglish(""); setNgLabel(""); setNgCode("");
-    setNewGroupOpen(false);
-    setGroupsVersion((v) => v + 1);
+    // API currently accepts only `name`. Extra fields are typed for when the API adds them.
+    createGroup.mutate(
+      { name: ngEnglish.trim() },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Product group created",
+            description: ngCode.trim()
+              ? `${ngEnglish} (${ngCode}) — code/label will sync when the API supports them.`
+              : ngEnglish,
+          });
+          setNgEnglish(""); setNgLabel(""); setNgCode("");
+          setNewGroupOpen(false);
+        },
+        onError: (err) => {
+          toast({
+            title: "Failed to create group",
+            description: err instanceof Error ? err.message : "Request failed",
+            variant: "destructive",
+          });
+        },
+      }
+    );
   };
 
   // ---- Group grid view ----
@@ -96,11 +159,17 @@ const ProductsList = () => {
 
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {groupsLoading && (
+            <p className="text-sm text-muted-foreground col-span-full">Loading product groups…</p>
+          )}
+          {!groupsLoading && groups.length === 0 && (
+            <p className="text-sm text-muted-foreground col-span-full">No product groups yet.</p>
+          )}
           {groups.map((g) => (
             <Card
-              key={g.code}
+              key={g.id || g.code}
               className="shadow-card border-border hover:shadow-md hover:border-accent/40 transition-all cursor-pointer group"
-              onClick={() => navigate(`/products/groups/${g.code}`)}
+              onClick={() => navigate(`/products/groups/${encodeURIComponent(g.code)}`)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
@@ -117,27 +186,32 @@ const ProductsList = () => {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Badge variant="outline" className="font-mono text-[10px]">{g.code}</Badge>
-                    {!isBuiltInProductGroup(g.code) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (g.items.length > 0) {
-                            toast({ title: "Cannot delete", description: `${g.english} has ${g.items.length} product(s).`, variant: "destructive" });
-                            return;
-                          }
-                          if (deleteProductGroup(g.code)) {
-                            toast({ title: "Product group deleted", description: g.english });
-                            setGroupsVersion((v) => v + 1);
-                          }
-                        }}
-                        title="Delete group"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      disabled={deleteGroup.isPending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!g.id) return;
+                        if (g.items.length > 0) {
+                          toast({ title: "Cannot delete", description: `${g.english} has ${g.items.length} product(s).`, variant: "destructive" });
+                          return;
+                        }
+                        deleteGroup.mutate(g.id, {
+                          onSuccess: () => toast({ title: "Product group deleted", description: g.english }),
+                          onError: (err) =>
+                            toast({
+                              title: "Failed to delete",
+                              description: err instanceof Error ? err.message : "Request failed",
+                              variant: "destructive",
+                            }),
+                        });
+                      }}
+                      title="Delete group"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -160,7 +234,7 @@ const ProductsList = () => {
             <DialogHeader>
               <DialogTitle>Create product group</DialogTitle>
               <DialogDescription>
-                Groups organise products by insurance product code (e.g. 05, 07).
+                Groups organise products by insurance family. Code and Albanian label will be stored by the API in a later release.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-2">
@@ -170,16 +244,22 @@ const ProductsList = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="ng-label">Albanian label</Label>
-                <Input id="ng-label" value={ngLabel} onChange={(e) => setNgLabel(e.target.value)} placeholder="e.g. Sigurim i Jetes" />
+                <Input id="ng-label" value={ngLabel} onChange={(e) => setNgLabel(e.target.value)} placeholder="e.g. Sigurim i Jetes (coming soon)" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="ng-code">Insurance product code *</Label>
-                <Input id="ng-code" value={ngCode} onChange={(e) => setNgCode(e.target.value)} placeholder="e.g. 11" />
+                <Label htmlFor="ng-code">Insurance product code</Label>
+                <Input id="ng-code" value={ngCode} onChange={(e) => setNgCode(e.target.value)} placeholder="e.g. 11 (coming soon)" />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setNewGroupOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateGroup} className="bg-accent hover:bg-accent/90 text-accent-foreground">Create group</Button>
+              <Button
+                onClick={handleCreateGroup}
+                disabled={createGroup.isPending}
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                {createGroup.isPending ? "Creating…" : "Create group"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -220,7 +300,7 @@ const ProductsList = () => {
               <ArrowLeft className="h-4 w-4" /> All groups
             </Button>
             <Button asChild size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link to="/products/new">
+              <Link to={`/products/new?groupId=${encodeURIComponent(activeGroup.id)}`}>
                 <Plus className="h-4 w-4" /> Create Product
               </Link>
             </Button>
@@ -266,7 +346,9 @@ const ProductsList = () => {
             </Button>
           )}
         </div>
-        <div className="text-xs text-muted-foreground">{filtered.length} product(s)</div>
+        <div className="text-xs text-muted-foreground">
+          {productsLoading ? "Loading products…" : `${filtered.length} product(s)`}
+        </div>
       </div>
 
       <Card className="shadow-card border-border overflow-hidden">

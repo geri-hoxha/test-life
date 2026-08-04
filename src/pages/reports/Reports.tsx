@@ -40,10 +40,16 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { listOffers, OfferStatus } from "@/data/offers";
-import { listPolicies } from "@/data/policies";
-import { listProducts } from "@/data/products";
-import { listCustomers, fullName, getCustomer } from "@/data/customers";
+import { OfferStatus } from "@/data/offers";
+import { fullName } from "@/data/customers";
+import { useListOffers } from "@/api/offers";
+import { useListPolicies } from "@/api/policies";
+import { useListProducts, mapApiProduct } from "@/api/products";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { mapApiOffer } from "@/api/adapters/offers";
+import { mapApiPolicy } from "@/api/adapters/policies";
+import { customerPath, mergeCustomers } from "@/api/adapters/customers";
 
 const fmtMoney = (v: number, ccy = "EUR") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 0 }).format(v);
@@ -58,10 +64,29 @@ const STATUS_COLORS: Record<OfferStatus, string> = {
 };
 
 const Reports = () => {
-  const offers = useMemo(() => listOffers(), []);
-  const policies = useMemo(() => listPolicies(), []);
-  const products = useMemo(() => listProducts(), []);
-  const customers = useMemo(() => listCustomers(), []);
+  const { data: offersPage } = useListOffers({ pageNumber: 1, pageSize: 200 });
+  const { data: policiesPage } = useListPolicies({ pageNumber: 1, pageSize: 200 });
+  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+
+  const offers = useMemo(
+    () => (offersPage?.items ?? []).map(mapApiOffer),
+    [offersPage?.items]
+  );
+  const policies = useMemo(
+    () => (policiesPage?.items ?? []).map(mapApiPolicy),
+    [policiesPage?.items]
+  );
+  const products = useMemo(
+    () => (productsPage?.items ?? []).map(mapApiProduct),
+    [productsPage?.items]
+  );
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
 
   // Offers by Status
   const offersByStatus = useMemo(() => {
@@ -105,11 +130,11 @@ const Reports = () => {
 
   // Customer exposure — sum of policy premiums + active offer premiums per customer (as policy holder)
   const exposure = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; policies: number; offers: number; total: number }>();
+    const map = new Map<string, { id: string; name: string; customerType: "Individual" | "Company"; policies: number; offers: number; total: number }>();
     const add = (cid: string, amount: number, isPolicy: boolean) => {
-      const c = getCustomer(cid);
+      const c = getCustomerLocal(cid);
       if (!c) return;
-      const cur = map.get(cid) ?? { id: cid, name: fullName(c), policies: 0, offers: 0, total: 0 };
+      const cur = map.get(cid) ?? { id: cid, name: fullName(c), customerType: c.customerType, policies: 0, offers: 0, total: 0 };
       if (isPolicy) cur.policies += amount; else cur.offers += amount;
       cur.total += amount;
       map.set(cid, cur);
@@ -246,7 +271,7 @@ const Reports = () => {
                   {policiesThisMonth.length === 0 ? (
                     <TableRow><TableCell colSpan={4} className="text-center py-6 text-sm text-muted-foreground">No policies issued this month.</TableCell></TableRow>
                   ) : policiesThisMonth.map((p) => {
-                    const ph = getCustomer(p.policyHolderId);
+                    const ph = getCustomerLocal(p.policyHolderId);
                     return (
                       <TableRow key={p.id}>
                         <TableCell><Link to={`/policies/${p.id}`} className="font-mono text-xs text-primary hover:underline">{p.number}</Link></TableCell>
@@ -282,7 +307,7 @@ const Reports = () => {
                   {pendingReview.length === 0 ? (
                     <TableRow><TableCell colSpan={4} className="text-center py-6 text-sm text-muted-foreground">No offers awaiting review. </TableCell></TableRow>
                   ) : pendingReview.map((o) => {
-                    const ph = getCustomer(o.policyHolderId);
+                    const ph = getCustomerLocal(o.policyHolderId);
                     return (
                       <TableRow key={o.id}>
                         <TableCell><Link to={`/offers/${o.id}`} className="font-mono text-xs text-primary hover:underline">{o.number}</Link></TableCell>
@@ -321,7 +346,7 @@ const Reports = () => {
                 {expiring.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">No policies expiring in the next year.</TableCell></TableRow>
                 ) : expiring.map((p) => {
-                  const ph = getCustomer(p.policyHolderId);
+                  const ph = getCustomerLocal(p.policyHolderId);
                   const days = Math.ceil((new Date(p.endDate).getTime() - now.getTime()) / 86400000);
                   return (
                     <TableRow key={p.id}>
@@ -372,7 +397,7 @@ const Reports = () => {
                   <TableRow><TableCell colSpan={4} className="text-center py-6 text-sm text-muted-foreground">No exposure recorded yet.</TableCell></TableRow>
                 ) : exposure.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell><Link to={`/customers/${r.id}`} className="text-primary hover:underline">{r.name}</Link></TableCell>
+                    <TableCell><Link to={customerPath(r.id, r.customerType)} className="text-primary hover:underline">{r.name}</Link></TableCell>
                     <TableCell className="text-right font-mono">{fmtMoney(r.policies)}</TableCell>
                     <TableCell className="text-right font-mono">{fmtMoney(r.offers)}</TableCell>
                     <TableCell className="text-right font-mono font-semibold">{fmtMoney(r.total)}</TableCell>

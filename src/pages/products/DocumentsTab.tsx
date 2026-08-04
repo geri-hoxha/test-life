@@ -6,9 +6,6 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -17,14 +14,25 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, MoreHorizontal, Pencil, Trash2, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
-import { listVersions } from "@/data/productVersions";
 import {
   ProductDocument, DocumentAppliesWhen,
-  listDocuments, upsertDocument, deleteDocument,
 } from "@/data/documents";
 import DocumentDialog from "./DocumentDialog";
+import {
+  useGetProduct,
+  useAddProductDocumentType,
+  useRemoveProductDocumentType,
+} from "@/api/products";
+import {
+  useListDocumentTypes,
+  useCreateDocumentType,
+  useUpdateDocumentType,
+} from "@/api/document-types";
+import { mapProductDocumentType } from "@/api/adapters/document-types";
 
 type Props = { productId: string };
+
+const VERSION_NA = "N/A";
 
 const appliesBadge = (a: DocumentAppliesWhen) => {
   switch (a) {
@@ -39,17 +47,33 @@ const fmtMoney = (n?: number) =>
   n && n > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n) : "—";
 
 const DocumentsTab = ({ productId }: Props) => {
-  const versions = useMemo(() => listVersions(productId), [productId]);
-  const defaultVersion = versions.find((v) => v.status === "Active")?.id ?? versions[0]?.id ?? "";
+  const { data: apiProduct, isLoading: productLoading } = useGetProduct(productId);
+  const { data: typesPage, isLoading: typesLoading } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
+  const createDocumentType = useCreateDocumentType();
+  const updateDocumentType = useUpdateDocumentType();
+  const addProductDocumentType = useAddProductDocumentType();
+  const removeProductDocumentType = useRemoveProductDocumentType();
 
-  const [versionId, setVersionId] = useState(defaultVersion);
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick((t) => t + 1);
+  const typesById = useMemo(
+    () => Object.fromEntries((typesPage?.items ?? []).map((t) => [t.id ?? "", t])),
+    [typesPage?.items]
+  );
 
-  const docs = useMemo(() => {
-    void tick;
-    return versionId ? listDocuments(productId, versionId) : [];
-  }, [productId, versionId, tick]);
+  const entryById = useMemo(
+    () =>
+      Object.fromEntries(
+        (apiProduct?.productDocumentTypes ?? []).map((e) => [String(e.id ?? ""), e])
+      ),
+    [apiProduct?.productDocumentTypes]
+  );
+
+  const docs = useMemo(
+    () =>
+      (apiProduct?.productDocumentTypes ?? []).map((entry) =>
+        mapProductDocumentType(productId, entry, typesById[entry.documentTypeId ?? ""])
+      ),
+    [apiProduct?.productDocumentTypes, typesById, productId]
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductDocument | null>(null);
@@ -58,24 +82,63 @@ const DocumentsTab = ({ productId }: Props) => {
   const openNew = () => { setEditing(null); setDialogOpen(true); };
   const openEdit = (d: ProductDocument) => { setEditing(d); setDialogOpen(true); };
 
-  const handleSave = (d: ProductDocument) => {
-    upsertDocument(d);
-    refresh();
-    toast.success(editing ? "Document updated" : "Document added");
+  const handleSave = async (d: ProductDocument) => {
+    try {
+      if (editing) {
+        const entry = entryById[editing.id];
+        const documentTypeId = entry?.documentTypeId;
+        if (documentTypeId) {
+          await updateDocumentType.mutateAsync({
+            id: documentTypeId,
+            body: {
+              name: d.name,
+              description: d.notes ?? "",
+            },
+          });
+        }
+        toast.success("Document updated");
+        toast.info("Required-for and applies-when rules will sync when the API supports full updates");
+      } else {
+        const created = await createDocumentType.mutateAsync({
+          name: d.name,
+          description: d.notes ?? d.name,
+        });
+        if (!created.id) throw new Error("Document type created without id");
+        await addProductDocumentType.mutateAsync({
+          productId,
+          body: {
+            documentTypeId: created.id,
+            alwaysRequired: d.isMandatory || d.appliesWhen === "Always",
+            insuredAmountOver:
+              d.appliesWhen === "Sum insured above threshold" ? (d.thresholdAmount ?? null) : null,
+            isPep: d.appliesWhen === "PEP detected" ? true : null,
+          },
+        });
+        toast.success("Document added");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save document");
+    }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteId) return;
-    deleteDocument(deleteId);
-    setDeleteId(null);
-    refresh();
-    toast.success("Document removed");
+    try {
+      await removeProductDocumentType.mutateAsync({
+        productId,
+        documentTypeEntryId: deleteId,
+      });
+      setDeleteId(null);
+      toast.success("Document removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove document");
+    }
   };
 
-  if (versions.length === 0) {
+  if (productLoading || typesLoading) {
     return (
       <Card className="p-10 text-center shadow-card border-border border-dashed">
-        <p className="text-sm text-muted-foreground">Create a product version first to define documents.</p>
+        <p className="text-sm text-muted-foreground">Loading documents…</p>
       </Card>
     );
   }
@@ -85,30 +148,18 @@ const DocumentsTab = ({ productId }: Props) => {
 
   return (
     <>
-      {/* Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-        <div className="hidden items-center gap-3 flex-wrap">
-          <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Version</span>
-          <Select value={versionId} onValueChange={setVersionId}>
-            <SelectTrigger className="w-[280px] h-9">
-              <SelectValue placeholder="Select version" />
-            </SelectTrigger>
-            <SelectContent>
-              {versions.map((v) => (
-                <SelectItem key={v.id} value={v.id}>
-                  <span className="font-mono text-xs text-accent mr-2">{v.number}</span>
-                  {v.name} <span className="ml-2 text-xs text-muted-foreground">· {v.status}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-xl">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Document requirements use the document-types API. Versioning is not available yet (shown as {VERSION_NA}).
+          </span>
         </div>
         <Button size="sm" onClick={openNew} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
           <Plus className="h-4 w-4" /> Add Document
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Card className="p-4 shadow-card border-border">
           <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Total documents</div>
@@ -124,7 +175,6 @@ const DocumentsTab = ({ productId }: Props) => {
         </Card>
       </div>
 
-      {/* Table */}
       <Card className="shadow-card border-border overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
@@ -212,7 +262,9 @@ const DocumentsTab = ({ productId }: Props) => {
                           <Pencil className="h-4 w-4 mr-2" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => { upsertDocument({ ...d, isMandatory: !d.isMandatory }); refresh(); toast.success("Updated"); }}
+                          onClick={() =>
+                            toast.info("Toggle mandatory will be available when product document-type updates are supported")
+                          }
                         >
                           Mark as {d.isMandatory ? "optional" : "mandatory"}
                         </DropdownMenuItem>
@@ -230,15 +282,15 @@ const DocumentsTab = ({ productId }: Props) => {
         </Table>
       </Card>
 
-      {dialogOpen && versionId && (
+      {dialogOpen && (
         <DocumentDialog
           key={editing?.id ?? "new"}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           productId={productId}
-          versionId={versionId}
+          versionId={VERSION_NA}
           initial={editing}
-          onSave={handleSave}
+          onSave={(d) => void handleSave(d)}
         />
       )}
 
@@ -247,12 +299,15 @@ const DocumentsTab = ({ productId }: Props) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this document?</AlertDialogTitle>
             <AlertDialogDescription>
-              The document will no longer be requested for new applications on this version.
+              The document will no longer be requested for new applications on this product.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={() => void confirmDelete()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Remove
             </AlertDialogAction>
           </AlertDialogFooter>

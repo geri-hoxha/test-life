@@ -29,16 +29,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck, FileSpreadsheet } from "lucide-react";
-import { seedProducts } from "@/data/products";
-import { listVersions, getActiveVersions } from "@/data/productVersions";
-import { listTemplates } from "@/data/templates";
-import { listCustomers, fullName, ageFromDob, getCustomer } from "@/data/customers";
+// import { listVersions, getActiveVersions } from "@/data/productVersions";
+import { fullName, ageFromDob } from "@/data/customers";
 import {
   Beneficiary,
-  newOfferId,
   PaymentMode,
-  upsertOffer,
 } from "@/data/offers";
+import { useListProducts, mapApiProduct } from "@/api/products";
+import { useListProductGroups } from "@/api/product-groups";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { mergeCustomers } from "@/api/adapters/customers";
+import {
+  useCreateOffer,
+  useAddOfferParticipant,
+  useAddOfferInsuredPerson,
+  useAddOfferLoanDisbursement,
+  useCalculateOfferSchedules,
+} from "@/api/offers";
 import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
 import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
 import type { Gender as RuleGender } from "@/data/premiumRules";
@@ -87,15 +95,45 @@ const SectionNav = () => (
 
 const CreateOffer = () => {
   const navigate = useNavigate();
+  const createOffer = useCreateOffer();
+  const addParticipant = useAddOfferParticipant();
+  const addInsured = useAddOfferInsuredPerson();
+  const addLoan = useAddOfferLoanDisbursement();
+  const calculateSchedules = useCalculateOfferSchedules();
 
   // Step 1
+  const [productGroupId, setProductGroupId] = useState("");
   const [productId, setProductId] = useState("");
-  const [versionId, setVersionId] = useState("");
-  const [templateId, setTemplateId] = useState("");
+  const [versionId, setVersionId] = useState("N/A");
   const [currency, setCurrency] = useState("");
 
   // Step 2
-  const customers = useMemo(() => listCustomers(), []);
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+  const { data: productGroupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
+  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  const productGroups = useMemo(
+    () => (productGroupsPage?.items ?? []).filter((g) => g.id),
+    [productGroupsPage?.items]
+  );
+  const products = useMemo(
+    () => (productsPage?.items ?? []).map(mapApiProduct),
+    [productsPage?.items]
+  );
+  const productsInGroup = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          p.productGroupId === productGroupId &&
+          (p.status === "Active" || p.status === "Draft")
+      ),
+    [products, productGroupId]
+  );
+  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
   const [policyHolderId, setPolicyHolderId] = useState("");
   const [payerId, setPayerId] = useState("");
   const [insuredId, setInsuredId] = useState("");
@@ -175,15 +213,14 @@ const CreateOffer = () => {
   const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
 
   // Derived
-  const product = seedProducts.find((p) => p.id === productId);
-  const versions = productId ? getActiveVersions(productId) : [];
-  const allVersions = productId ? listVersions(productId) : [];
-  const version = allVersions.find((v) => v.id === versionId);
-  const templates = productId && versionId ? listTemplates(productId, versionId).filter((t) => t.isActive) : [];
-  const template = templates.find((t) => t.id === templateId);
-  const allowedCurrencies = template?.allowedCurrencies ?? [];
+  const productGroup = productGroups.find((g) => g.id === productGroupId);
+  const product = products.find((p) => p.id === productId);
+  // Product Version — hidden for now
+  // const versions = productId ? getActiveVersions(productId) : [];
+  // const allVersions = productId ? listVersions(productId) : [];
+  // const version = allVersions.find((v) => v.id === versionId);
 
-  const insured = insuredId ? getCustomer(insuredId) : undefined;
+  const insured = insuredId ? getCustomerLocal(insuredId) : undefined;
   const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
   const insuredGender: RuleGender = insured?.gender === "Female" ? "Female" : insured?.gender === "Male" ? "Male" : "Any";
 
@@ -200,22 +237,22 @@ const CreateOffer = () => {
   const beneficiariesValid = beneficiaries.length === 0 || beneficiaryTotal === 100;
 
   // Handlers
+  const onProductGroupChange = (id: string) => {
+    setProductGroupId(id);
+    setProductId("");
+    setVersionId("N/A");
+    setCurrency("");
+  };
   const onProductChange = (id: string) => {
     setProductId(id);
-    setVersionId("");
-    setTemplateId("");
-    setCurrency("");
+    setVersionId("N/A");
+    const p = products.find((x) => x.id === id);
+    setCurrency(p?.currencies[0] ?? "");
   };
-  const onVersionChange = (id: string) => {
-    setVersionId(id);
-    setTemplateId("");
-    setCurrency("");
-  };
-  const onTemplateChange = (id: string) => {
-    setTemplateId(id);
-    const t = listTemplates(productId, versionId).find((x) => x.id === id);
-    setCurrency(t?.defaultCurrency ?? "");
-  };
+  // Product Version — hidden for now
+  // const onVersionChange = (id: string) => {
+  //   setVersionId(id);
+  // };
 
   const addBeneficiary = () => {
     setBeneficiaries((prev) => [
@@ -230,57 +267,102 @@ const CreateOffer = () => {
     setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
   };
 
-  // Validation
-  const productOk = !!(productId && versionId && templateId && currency);
+  // Validation — version not yet on API; product group + product + currency are required.
+  const productOk = !!(productGroupId && productId && currency);
   const peopleOk = !!(policyHolderId && payerId && insuredId)
     && (beneficiaries.length === 0 || (beneficiariesValid && beneficiaries.every((b) => b.customerId && b.percentage > 0)));
   const canSave = productOk && peopleOk;
+  const saving =
+    createOffer.isPending ||
+    addParticipant.isPending ||
+    addInsured.isPending ||
+    addLoan.isPending ||
+    calculateSchedules.isPending;
 
-  const handleSave = (intent: "Draft" | "Submit" | "Approve") => {
+  const handleSave = async (intent: "Draft" | "Submit" | "Approve") => {
     if (!canSave) {
       toast.error("Complete required fields before saving");
       return;
     }
-    let status: "Draft" | "Quoted" | "Pending Review" | "Approved" = "Draft";
-    if (intent === "Draft") {
-      status = "Draft";
-    } else {
-      const computed = overallStatus(verificationChecks);
-      if (computed === "Pending Review") status = "Pending Review";
-      else status = intent === "Approve" ? "Approved" : "Quoted";
-    }
 
-    const { id, number } = newOfferId();
-    upsertOffer({
-      id,
-      number,
-      productId,
-      versionId,
-      templateId,
-      currency,
-      policyHolderId,
-      payerId,
-      insuredId,
-      beneficiaries,
-      startDate,
-      endDate,
-      termYears,
-      paymentMode,
-      loan: hasLoan
-        ? {
-            amount: Number(loanAmount) || 0,
-            interestRate: Number(interestRate) || 0,
-            loanTermYears: Number(loanTermYears) || 0,
-            remainingYears: Number(remainingYears) || 0,
-            outstandingBalance: Number(outstandingBalance) || 0,
-          }
-        : undefined,
-      premium: premiumResult?.grossPremium ?? 0,
-      status,
-      createdDate: new Date().toISOString().slice(0, 10),
-    });
-    toast.success(`Offer ${number} saved as ${status}`);
-    navigate("/offers");
+    try {
+      const created = await createOffer.mutateAsync({ productId, currency });
+      const offerId = created.id;
+      if (!offerId) throw new Error("Offer created without id");
+
+      const holder = getCustomerLocal(policyHolderId);
+      const payer = getCustomerLocal(payerId);
+      const insuredPerson = getCustomerLocal(insuredId);
+
+      await addParticipant.mutateAsync({
+        offerId,
+        body: {
+          partyId: policyHolderId,
+          partyType: holder?.customerType === "Company" ? "company" : "person",
+          role: "policyHolder",
+          isLeader: true,
+        },
+      });
+
+      if (payerId !== policyHolderId) {
+        await addParticipant.mutateAsync({
+          offerId,
+          body: {
+            partyId: payerId,
+            partyType: payer?.customerType === "Company" ? "company" : "person",
+            role: "invoiced",
+          },
+        });
+      }
+
+      for (const b of beneficiaries.filter((x) => x.customerId)) {
+        const bc = getCustomerLocal(b.customerId);
+        await addParticipant.mutateAsync({
+          offerId,
+          body: {
+            partyId: b.customerId,
+            partyType: bc?.customerType === "Company" ? "company" : "person",
+            role: "beneficiary",
+            share: b.percentage,
+          },
+        });
+      }
+
+      if (insuredPerson?.customerType === "Individual") {
+        await addInsured.mutateAsync({
+          offerId,
+          body: {
+            personId: insuredId,
+          },
+        });
+      }
+
+      if (hasLoan) {
+        await addLoan.mutateAsync({
+          offerId,
+          body: {
+            year: Number(startDate.slice(0, 4)) || new Date().getFullYear(),
+            periodStart: startDate || undefined,
+            periodEnd: endDate || undefined,
+            remainingLoanAmount: Number(outstandingBalance) || Number(loanAmount) || 0,
+          },
+        });
+      }
+
+      // Calculate schedules when submitting/approving (API may also work for draft).
+      if (intent !== "Draft") {
+        try {
+          await calculateSchedules.mutateAsync(offerId);
+        } catch {
+          // Schedule calculation may fail until more fields exist — keep offer.
+        }
+      }
+
+      toast.success(`Offer ${offerId} saved`);
+      navigate(`/offers/${offerId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create offer");
+    }
   };
 
   return (
@@ -307,24 +389,42 @@ const CreateOffer = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Product Selection</CardTitle>
-              <CardDescription>Pick a product, an active version, and the package to base the offer on.</CardDescription>
+              <CardDescription>Pick a product group and a package (product) to base the offer on.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label>Product</Label>
-                <Select value={productId} onValueChange={onProductChange}>
-                  <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                <Select value={productGroupId} onValueChange={onProductGroupChange}>
+                  <SelectTrigger><SelectValue placeholder="Select product group" /></SelectTrigger>
                   <SelectContent>
-                    {seedProducts.filter((p) => p.status === "Active").map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    {productGroups.map((g) => (
+                      <SelectItem key={g.id!} value={g.id!}>
+                        {g.english?.trim() || g.label?.trim() || g.name || g.id}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
+                <Label>Template / Package</Label>
+                <Select value={productId} onValueChange={onProductChange} disabled={!productGroupId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={productGroupId ? "Select package" : "Pick product group first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productsInGroup.length === 0 ? (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No packages for this product group.</div>
+                    ) : productsInGroup.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Product Version — hidden for now
+              <div>
                 <Label>Product Version (Active only)</Label>
                 <Select value={versionId} onValueChange={onVersionChange} disabled={!productId}>
-                  <SelectTrigger><SelectValue placeholder={productId ? "Select version" : "Pick product first"} /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={productId ? "Select version" : "Pick package first"} /></SelectTrigger>
                   <SelectContent>
                     {versions.length === 0 ? (
                       <div className="px-2 py-1.5 text-xs text-muted-foreground">No active versions for this product.</div>
@@ -334,42 +434,35 @@ const CreateOffer = () => {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div>
-                <Label>Template / Package</Label>
-                <Select value={templateId} onValueChange={onTemplateChange} disabled={!versionId}>
-                  <SelectTrigger><SelectValue placeholder={versionId ? "Select package" : "Pick version first"} /></SelectTrigger>
-                  <SelectContent>
-                    {templates.length === 0 ? (
-                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No active packages for this version.</div>
-                    ) : templates.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              */}
 
               <div>
                 <Label>Currency</Label>
-                <Select value={currency} onValueChange={setCurrency} disabled={!templateId}>
-                  <SelectTrigger><SelectValue placeholder={templateId ? "Select currency" : "Pick package first"} /></SelectTrigger>
+                <Select value={currency} onValueChange={setCurrency} disabled={!productId}>
+                  <SelectTrigger><SelectValue placeholder={productId ? "Select currency" : "Pick package first"} /></SelectTrigger>
                   <SelectContent>
-                    {allowedCurrencies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {(product?.currencies?.length ? product.currencies : ["EUR", "ALL", "USD"]).map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {template && (
+                {product && product.currencies.length > 0 && (
                   <div className="text-[11px] text-muted-foreground mt-1.5">
-                    Available: {allowedCurrencies.map((c) => (
+                    Available: {product.currencies.map((c) => (
                       <Badge key={c} variant="outline" className="mr-1 font-normal">{c}</Badge>
                     ))}
                   </div>
                 )}
               </div>
 
-              {template && (
+              {product && (
                 <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 text-sm">
-                  <div className="font-medium">{product?.name} · {version?.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{template.description}</div>
+                  <div className="font-medium">
+                    {productGroup?.name ?? "—"} · {product.name}
+                  </div>
+                  {product.description ? (
+                    <div className="text-xs text-muted-foreground mt-0.5">{product.description}</div>
+                  ) : null}
                 </div>
               )}
             </CardContent>
@@ -625,7 +718,7 @@ const CreateOffer = () => {
           <PremiumCalculation
             productId={productId}
             versionId={versionId}
-            templateId={templateId}
+            templateId="N/A"
             currency={currency}
             insuredAge={insuredAge}
             insuredGender={insuredGender}
@@ -651,7 +744,7 @@ const CreateOffer = () => {
           <VerificationStep
             productId={productId}
             versionId={versionId}
-            templateId={templateId}
+            templateId="N/A"
             currency={currency}
             policyHolderId={policyHolderId}
             insuredId={insuredId}

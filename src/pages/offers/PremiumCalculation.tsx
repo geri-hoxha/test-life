@@ -131,14 +131,25 @@ const PremiumCalculation = ({
   loan,
   onResultChange,
 }: Props) => {
-  const template: Template | undefined = listTemplates(productId, versionId).find((t) => t.id === templateId);
-  const coverages = useMemo(() => listCoverages(productId, versionId), [productId, versionId]);
+  // Version is optional for now — treat placeholder / empty as unset.
+  const effectiveVersionId = versionId && versionId !== "N/A" ? versionId : undefined;
+  const template: Template | undefined = effectiveVersionId
+    ? listTemplates(productId, effectiveVersionId).find((t) => t.id === templateId)
+    : undefined;
+  const coverages = useMemo(
+    () => listCoverages(productId, effectiveVersionId),
+    [productId, effectiveVersionId]
+  );
 
   const mandatory = coverages.filter(
-    (c) => c.coverageType === "Mandatory" && template?.includedCoverageIds.includes(c.id)
+    (c) =>
+      c.coverageType === "Mandatory" &&
+      (!template || template.includedCoverageIds.includes(c.id))
   );
   const allRiders = coverages.filter(
-    (c) => c.coverageType === "Optional Rider" && template?.optionalRiderIds.includes(c.id)
+    (c) =>
+      c.coverageType === "Optional Rider" &&
+      (!template || template.optionalRiderIds.includes(c.id))
   );
 
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
@@ -183,7 +194,7 @@ const PremiumCalculation = ({
   let subtotal = mandatoryTotal + ridersTotal;
 
   // Reference: age/gender rule applied (informational)
-  const baseRule = getPremiumRule(productId, versionId);
+  const baseRule = getPremiumRule(productId, effectiveVersionId ?? "N/A");
   const ruleHit =
     baseRule.rateTable.find(
       (r) => insuredAge >= r.ageFrom && insuredAge <= r.ageTo && (r.gender === "Any" || r.gender === insuredGender)
@@ -376,11 +387,11 @@ const PremiumCalculation = ({
     setSelectedRiders((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  if (!template) {
+  if (!productId || !currency) {
     return (
       <Card>
         <CardContent className="py-12 text-center text-sm text-muted-foreground">
-          Select a product, version and template in the previous steps to compute the premium.
+          Select a product and currency in the previous steps to compute the premium.
         </CardContent>
       </Card>
     );

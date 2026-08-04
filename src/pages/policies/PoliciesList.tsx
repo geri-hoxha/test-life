@@ -27,9 +27,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Eye, Search, ShieldCheck } from "lucide-react";
-import { listPolicies, policyStatusColor, PolicyStatus } from "@/data/policies";
-import { seedProducts } from "@/data/products";
-import { getCustomer, fullName } from "@/data/customers";
+import { policyStatusColor, PolicyStatus } from "@/data/policies";
+import { fullName } from "@/data/customers";
+import { useListPolicies } from "@/api/policies";
+import { mapApiPolicy } from "@/api/adapters/policies";
+import { useListProducts, mapApiProduct } from "@/api/products";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { mergeCustomers } from "@/api/adapters/customers";
 
 const STATUSES: PolicyStatus[] = ["Active", "Pending Payment", "Cancelled", "Expired", "Lapsed"];
 
@@ -37,13 +42,29 @@ const PoliciesList = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const policies = useMemo(() => listPolicies(), []);
-  const productMap = useMemo(() => Object.fromEntries(seedProducts.map((p) => [p.id, p])), []);
+  const { data: policiesPage, isLoading } = useListPolicies({ pageNumber: 1, pageSize: 200 });
+  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+
+  const policies = useMemo(
+    () => (policiesPage?.items ?? []).map(mapApiPolicy),
+    [policiesPage?.items]
+  );
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+  const productMap = useMemo(
+    () => Object.fromEntries((productsPage?.items ?? []).map(mapApiProduct).map((p) => [p.id, p])),
+    [productsPage?.items]
+  );
 
   const filtered = policies.filter((p) => {
     if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
     if (!q.trim()) return true;
-    const holder = getCustomer(p.policyHolderId);
+    const holder = getCustomerLocal(p.policyHolderId);
     const haystack = [p.number, holder ? fullName(holder) : "", productMap[p.productId]?.name ?? ""].join(" ").toLowerCase();
     return haystack.includes(q.toLowerCase());
   });
@@ -113,10 +134,12 @@ const PoliciesList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">Loading policies…</TableCell></TableRow>
+                ) : filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">No policies match the current filters.</TableCell></TableRow>
                 ) : filtered.map((p) => {
-                  const ph = getCustomer(p.policyHolderId);
+                  const ph = getCustomerLocal(p.policyHolderId);
                   const product = productMap[p.productId];
                   return (
                     <TableRow key={p.id} className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/policies/${p.id}`)}>

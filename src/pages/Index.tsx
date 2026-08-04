@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import AppShell from "@/components/layout/AppShell";
 import KpiCard from "@/components/dashboard/KpiCard";
 import RecentOffersTable from "@/components/dashboard/RecentOffersTable";
@@ -6,10 +7,38 @@ import QuickStart from "@/components/dashboard/QuickStart";
 import { Package, FileText, ShieldCheck, AlertCircle, Euro } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Download, Calendar } from "lucide-react";
-import { seedProducts } from "@/data/products";
 import { matrixTemplates } from "@/data/permissions";
+import { useListProducts } from "@/api/products";
+import { useListOffers } from "@/api/offers";
+import { useListPolicies } from "@/api/policies";
+import { mapApiOffer } from "@/api/adapters/offers";
+import { mapApiPolicy } from "@/api/adapters/policies";
 
 const Index = () => {
+  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const { data: offersPage } = useListOffers({ pageNumber: 1, pageSize: 200 });
+  const { data: policiesPage } = useListPolicies({ pageNumber: 1, pageSize: 200 });
+
+  const productCount = productsPage?.totalCount ?? productsPage?.items?.length ?? 0;
+  const offers = useMemo(
+    () => (offersPage?.items ?? []).map(mapApiOffer),
+    [offersPage?.items]
+  );
+  const policies = useMemo(
+    () => (policiesPage?.items ?? []).map(mapApiPolicy),
+    [policiesPage?.items]
+  );
+
+  const draftOffers = offers.filter((o) => o.status === "Draft").length;
+  const pendingReview = offers.filter((o) => o.status === "Pending Review").length;
+  const issuedPolicies = policies.length;
+  const premiumThisMonth = useMemo(() => {
+    const ym = new Date().toISOString().slice(0, 7);
+    return policies
+      .filter((p) => p.issueDate.startsWith(ym))
+      .reduce((sum, p) => sum + p.premium, 0);
+  }, [policies]);
+
   return (
     <AppShell>
       {/* Page header */}
@@ -39,11 +68,19 @@ const Index = () => {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <KpiCard label="Sellable Products / Templates" value={`${seedProducts.length} / ${matrixTemplates.length}`} icon={Package} />
-        <KpiCard label="Draft Offers" value="38" delta="+12%" trend="up" hint="this week" icon={FileText} />
-        <KpiCard label="Issued Policies" value="1,284" delta="+46" trend="up" hint="MTD" icon={ShieldCheck} />
-        <KpiCard label="Pending Verification" value="12" delta="-3" trend="down" hint="vs yesterday" icon={AlertCircle} />
-        <KpiCard label="Premium This Month" value="€ 482K" delta="+8.4%" trend="up" hint="vs March" icon={Euro} />
+        <KpiCard label="Sellable Products / Templates" value={`${productCount} / ${matrixTemplates.length}`} icon={Package} />
+        <KpiCard label="Draft Offers" value={String(draftOffers)} icon={FileText} />
+        <KpiCard label="Issued Policies" value={String(issuedPolicies)} icon={ShieldCheck} />
+        <KpiCard label="Pending Verification" value={String(pendingReview)} icon={AlertCircle} />
+        <KpiCard
+          label="Premium This Month"
+          value={new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "EUR",
+            maximumFractionDigits: 0,
+          }).format(premiumThisMonth)}
+          icon={Euro}
+        />
       </div>
 
       {/* Tables */}

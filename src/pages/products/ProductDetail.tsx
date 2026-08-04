@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
@@ -15,8 +15,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
-  getProduct, updateProductFlags, updateProduct, ProductStatus, Product,
-  PRODUCT_GROUPS, POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
+  ProductStatus, Product,
+  POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
   PREMIUM_PAYMENT_TYPES, PACKET_PAYMENT_TYPES, PACKET_RENEWAL_TYPES,
   PACKET_LOAN_TYPES, LOAN_PRODUCT_TYPES, ACTUARIAL_CODES,
   PAYMENT_MODELS, listTariffs, listProductCoverages, getPremiumTable,
@@ -26,6 +26,7 @@ import {
   ProductSetupDetails, ProductPaymentDetails, ProductLoanDetails,
   ProductInternalDetails, ProductExternalDetails, PaymentModel,
 } from "@/data/products";
+import { useGetProduct, useUpdateProduct, mapApiProduct, type MappedProduct } from "@/api/products";
 import { Check, AlertCircle, ScrollText, Save, X, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
@@ -66,27 +67,51 @@ type EditableFields = {
 
 const ProductDetail = () => {
   const { id } = useParams();
-  const product = id ? getProduct(id) : undefined;
+  const { data: apiProduct, isLoading, isError } = useGetProduct(id ?? "", { enabled: Boolean(id) });
+  const updateProductMutation = useUpdateProduct();
 
-  const [flags, setFlags] = useState<Product["flags"] | null>(product?.flags ?? null);
-  const [fields, setFields] = useState<EditableFields | null>(
-    product
-      ? {
-          name: product.name,
-          code: product.code,
-          status: product.status,
-          type: product.type,
-          description: product.description,
-          currencies: [...product.currencies],
-          requiredDocuments: [...product.requiredDocuments],
-          agentCommissionPct: parseFloat((product.agentCommission * 100).toFixed(6)).toString(),
-          bankCommissionPct: parseFloat((product.bankCommission * 100).toFixed(6)).toString(),
-        }
-      : null
+  const product = useMemo(
+    () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
+    [apiProduct]
   );
+
+  const [flags, setFlags] = useState<Product["flags"] | null>(null);
+  const [fields, setFields] = useState<EditableFields | null>(null);
   const [newDoc, setNewDoc] = useState("");
 
-  if (!product || !flags || !fields) {
+  useEffect(() => {
+    if (!product) {
+      setFlags(null);
+      setFields(null);
+      return;
+    }
+    setFlags({ ...product.flags });
+    setFields({
+      name: product.name,
+      code: product.code,
+      status: product.status,
+      type: product.type,
+      description: product.description,
+      currencies: [...product.currencies],
+      requiredDocuments: [...product.requiredDocuments],
+      agentCommissionPct: parseFloat((product.agentCommission * 100).toFixed(6)).toString(),
+      bankCommissionPct: parseFloat((product.bankCommission * 100).toFixed(6)).toString(),
+    });
+  }, [product]);
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <PageHeader
+          breadcrumbs={[{ label: "Products", to: "/products" }, { label: "…" }]}
+          title="Loading…"
+          description="Fetching product."
+        />
+      </AppShell>
+    );
+  }
+
+  if (isError || !product || !flags || !fields) {
     return (
       <AppShell>
         <PageHeader
@@ -117,18 +142,24 @@ const ProductDetail = () => {
     setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
 
   const saveFlags = () => {
-    updateProductFlags(product.id, flags);
-    toast.success("Verification rules saved");
+    toast.message("Verification rules are not persisted yet — API support coming later.");
   };
 
   const saveFields = () => {
-    const { agentCommissionPct, bankCommissionPct, ...rest } = fields;
-    updateProduct(product.id, {
-      ...rest,
-      agentCommission: (parseFloat(agentCommissionPct) || 0) / 100,
-      bankCommission: (parseFloat(bankCommissionPct) || 0) / 100,
-    });
-    toast.success("Product details saved");
+    updateProductMutation.mutate(
+      {
+        id: product.id,
+        body: {
+          name: fields.name.trim(),
+          supportedCurrencies: fields.currencies,
+          coverageText: fields.description.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => toast.success("Product details saved"),
+        onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to save"),
+      }
+    );
   };
 
   const toggleCurrency = (c: string) =>
@@ -520,11 +551,11 @@ const defaultSetup: ProductSetupDetails = {
   isObsolete: false, apiSubject: false, apiStraight: false,
 };
 
-const SetupTab = ({ product }: { product: Product }) => {
+const SetupTab = ({ product }: { product: MappedProduct }) => {
   const initial = product.setupDetails ?? defaultSetup;
   const [s, setS] = useState<ProductSetupDetails>(initial);
   const dirty = JSON.stringify(s) !== JSON.stringify(initial);
-  const save = () => { updateProduct(product.id, { setupDetails: s }); toast.success("Setup details saved"); };
+  const save = () => { toast.message("Setup details are not persisted yet — API support coming later."); };
   return (
     <SectionShell title="Setup details" onSave={save} dirty={dirty}>
       <Field label="Legacy packet ID">
@@ -553,14 +584,15 @@ const defaultPayment: ProductPaymentDetails = {
   premiumPaymentType: "NotApplicable", packetPaymentType: "NotApplicable", renewalType: "NotApplicable",
 };
 
-const PaymentTab = ({ product }: { product: Product }) => {
+const PaymentTab = ({ product }: { product: MappedProduct }) => {
   const initial = product.paymentDetails ?? defaultPayment;
   const [p, setP] = useState<ProductPaymentDetails>(initial);
-  const [model, setModel] = useState<PaymentModel | undefined>(product.paymentModel);
+  const [model, setModel] = useState<PaymentModel | undefined>(
+    product.paymentModel as PaymentModel | undefined
+  );
   const dirty = JSON.stringify(p) !== JSON.stringify(initial) || model !== product.paymentModel;
   const save = () => {
-    updateProduct(product.id, { paymentDetails: p, paymentModel: model });
-    toast.success("Payment details saved");
+    toast.message("Payment details are not persisted yet — API support coming later.");
   };
   const applyModel = (v: PaymentModel) => {
     setModel(v);
@@ -603,11 +635,11 @@ const PaymentTab = ({ product }: { product: Product }) => {
 
 const defaultLoan: ProductLoanDetails = { packetLoanType: "NotApplicable", loanProductType: "NotApplicable" };
 
-const LoanTab = ({ product }: { product: Product }) => {
+const LoanTab = ({ product }: { product: MappedProduct }) => {
   const initial = product.loanDetails ?? defaultLoan;
   const [l, setL] = useState<ProductLoanDetails>(initial);
   const dirty = JSON.stringify(l) !== JSON.stringify(initial);
-  const save = () => { updateProduct(product.id, { loanDetails: l }); toast.success("Loan details saved"); };
+  const save = () => { toast.message("Loan details are not persisted yet — API support coming later."); };
   return (
     <SectionShell title="Loan details" onSave={save} dirty={dirty}>
       <Field label="Packet loan type">
@@ -620,7 +652,7 @@ const LoanTab = ({ product }: { product: Product }) => {
   );
 };
 
-const PremiumTableTab = ({ product }: { product: Product }) => {
+const PremiumTableTab = ({ product }: { product: MappedProduct }) => {
   const tables = listPremiumTables();
   const [selectedId, setSelectedId] = useState<string>(product.premiumTableId ?? "");
   const [tick, setTick] = useState(0); // force re-render after item edits
@@ -644,7 +676,7 @@ const PremiumTableTab = ({ product }: { product: Product }) => {
     JSON.stringify(items) !== JSON.stringify(selected.items)
   );
 
-  const saveLink = () => { updateProduct(product.id, { premiumTableId: selectedId }); toast.success("Premium table linked"); };
+  const saveLink = () => { toast.message("Premium table link is not persisted yet — API support coming later."); };
   const saveTable = () => {
     if (!selected) return;
     updatePremiumTable(selected.id, { name, items });
@@ -767,7 +799,7 @@ const blankTariff = (productId: string): Omit<Tariff, "id"> => ({
   formula: "premium = coefficient × sum_insured", notes: "",
 });
 
-const TariffsTab = ({ product }: { product: Product }) => {
+const TariffsTab = ({ product }: { product: MappedProduct }) => {
   const [tick, setTick] = useState(0);
   const ts = listTariffs(product.id);
   const refresh = () => setTick((n) => n + 1);
@@ -825,11 +857,13 @@ const TariffEditor = ({ tariff, onChange }: { tariff: Tariff; onChange: () => vo
 };
 
 const defaultInternal: ProductInternalDetails = { coveragePrintableText: "", packetFinType: null };
-const InternalTab = ({ product }: { product: Product }) => {
+const InternalTab = ({ product }: { product: MappedProduct }) => {
   const initial = product.internalDetails ?? defaultInternal;
   const [i, setI] = useState<ProductInternalDetails>(initial);
   const dirty = JSON.stringify(i) !== JSON.stringify(initial);
-  const save = () => { updateProduct(product.id, { internalDetails: i }); toast.success("Internal details saved"); };
+  const save = () => {
+    toast.message("Use Overview → Save to persist coverage text. Other internal fields are coming later.");
+  };
   return (
     <SectionShell title="Internal details" onSave={save} dirty={dirty}>
       <div className="md:col-span-2">
@@ -844,11 +878,11 @@ const InternalTab = ({ product }: { product: Product }) => {
 const defaultExternal: ProductExternalDetails = {
   sapProductCode: "", sapChannelCode: "", f5ProductCode: "", actuarialProductCode: "RegularPersonal",
 };
-const ExternalTab = ({ product }: { product: Product }) => {
+const ExternalTab = ({ product }: { product: MappedProduct }) => {
   const initial = product.externalDetails ?? defaultExternal;
   const [e, setE] = useState<ProductExternalDetails>(initial);
   const dirty = JSON.stringify(e) !== JSON.stringify(initial);
-  const save = () => { updateProduct(product.id, { externalDetails: e }); toast.success("External details saved"); };
+  const save = () => { toast.message("External details are not persisted yet — API support coming later."); };
   return (
     <SectionShell title="External details" onSave={save} dirty={dirty}>
       <Field label="SAP product code"><Input value={e.sapProductCode} onChange={(ev) => setE({ ...e, sapProductCode: ev.target.value })} className="font-mono" /></Field>

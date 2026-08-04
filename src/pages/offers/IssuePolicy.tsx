@@ -31,15 +31,19 @@ import {
   FileCheck2,
   ClipboardCheck,
 } from "lucide-react";
-import { getOffer, setOfferStatus } from "@/data/offers";
-import { seedProducts } from "@/data/products";
+import { getOffer } from "@/data/offers";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
-import { getCustomer, fullName } from "@/data/customers";
+import { fullName } from "@/data/customers";
 import { listDocuments } from "@/data/documents";
-import { newPolicyId, upsertPolicy } from "@/data/policies";
 import { computeVerification, overallStatus } from "./VerificationStep";
 import { toast } from "sonner";
+import { useGetOffer, useIssuePolicy } from "@/api/offers";
+import { mapApiOffer } from "@/api/adapters/offers";
+import { useGetProduct, mapApiProduct } from "@/api/products";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { mergeCustomers } from "@/api/adapters/customers";
 
 type Step = 1 | 2;
 
@@ -90,12 +94,48 @@ const StepHeader = ({ step }: { step: Step }) => {
 const IssuePolicy = () => {
   const { offerId } = useParams();
   const navigate = useNavigate();
-  const offer = offerId ? getOffer(offerId) : undefined;
+
+  const { data: apiOffer, isLoading } = useGetOffer(offerId ?? "", { enabled: Boolean(offerId) });
+  const issuePolicy = useIssuePolicy();
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+
+  const offer = useMemo(() => {
+    if (apiOffer) return mapApiOffer(apiOffer);
+    return offerId ? getOffer(offerId) : undefined;
+  }, [apiOffer, offerId]);
+
+  const scheduleYear = String(
+    apiOffer?.schedules?.[0]?.year ??
+      (offer?.startDate ? Number(offer.startDate.slice(0, 4)) : new Date().getFullYear())
+  );
+
+  const { data: apiProduct } = useGetProduct(offer?.productId ?? "", {
+    enabled: Boolean(offer?.productId),
+  });
+  const product = useMemo(
+    () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
+    [apiProduct]
+  );
 
   const [step, setStep] = useState<Step>(1);
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [confirmed, setConfirmed] = useState(false);
-  const generated = useMemo(() => newPolicyId(), []);
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="text-center py-20">
+          <h1 className="text-xl font-semibold">Loading offer…</h1>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!offer) {
     return (
@@ -108,12 +148,11 @@ const IssuePolicy = () => {
     );
   }
 
-  const product = seedProducts.find((p) => p.id === offer.productId);
   const version = listVersions(offer.productId).find((v) => v.id === offer.versionId);
   const template = listTemplates(offer.productId, offer.versionId).find((t) => t.id === offer.templateId);
-  const holder = getCustomer(offer.policyHolderId);
-  const insured = getCustomer(offer.insuredId);
-  const payer = getCustomer(offer.payerId);
+  const holder = getCustomerLocal(offer.policyHolderId);
+  const insured = getCustomerLocal(offer.insuredId);
+  const payer = getCustomerLocal(offer.payerId);
   const docs = listDocuments(offer.productId, offer.versionId);
   const mandatoryDocs = docs.filter((d) => d.isMandatory);
 
@@ -164,7 +203,7 @@ const IssuePolicy = () => {
 
   const isAlreadyIssued = offer.status === "Issued";
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!confirmed) {
       toast.error("Please confirm the issuance checkbox");
       return;
@@ -174,30 +213,18 @@ const IssuePolicy = () => {
       return;
     }
 
-    upsertPolicy({
-      id: generated.id,
-      number: generated.number,
-      offerId: offer.id,
-      productId: offer.productId,
-      versionId: offer.versionId,
-      templateId: offer.templateId,
-      currency: offer.currency,
-      policyHolderId: offer.policyHolderId,
-      payerId: offer.payerId,
-      insuredId: offer.insuredId,
-      beneficiaries: offer.beneficiaries,
-      startDate: offer.startDate,
-      endDate: offer.endDate,
-      termYears: offer.termYears,
-      paymentMode: offer.paymentMode,
-      premium: offer.premium,
-      status: "Active",
-      issueDate,
-      issuedBy: "Erin Hoxha",
-    });
-    setOfferStatus(offer.id, "Issued");
-    toast.success(`Policy ${generated.number} issued successfully`);
-    navigate(`/policies/${generated.id}`);
+    try {
+      const policy = await issuePolicy.mutateAsync({
+        offerId: offer.id,
+        year: scheduleYear,
+        body: {},
+      });
+      const policyId = policy.id ?? offer.id;
+      toast.success(`Policy ${policyId} issued successfully`);
+      navigate(`/policies/${policyId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to issue policy");
+    }
   };
 
   return (
@@ -312,7 +339,7 @@ const IssuePolicy = () => {
                       {offer.beneficiaries.length === 0 ? (
                         <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-4">No beneficiaries</TableCell></TableRow>
                       ) : offer.beneficiaries.map((b) => {
-                        const c = getCustomer(b.customerId);
+                        const c = getCustomerLocal(b.customerId);
                         return (
                           <TableRow key={b.id}>
                             <TableCell>{c ? fullName(c) : "—"}</TableCell>
@@ -387,8 +414,14 @@ const IssuePolicy = () => {
               <CardDescription>Auto-assigned on confirmation. These cannot be changed afterwards.</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field label="Policy Number" value={<span className="font-mono text-base text-primary">{generated.number}</span>} />
-              <Field label="Internal ID" value={<span className="font-mono text-xs">{generated.id}</span>} />
+              <Field
+                label="Policy Number"
+                value={<span className="font-mono text-base text-primary text-muted-foreground">Assigned on issue</span>}
+              />
+              <Field
+                label="Schedule Year"
+                value={<span className="font-mono text-xs">{scheduleYear}</span>}
+              />
               <div>
                 <Label htmlFor="issue-date">Issue Date</Label>
                 <Input
@@ -397,6 +430,9 @@ const IssuePolicy = () => {
                   value={issueDate}
                   onChange={(e) => setIssueDate(e.target.value)}
                 />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Issue date is not yet sent to the API (coming later).
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -450,7 +486,11 @@ const IssuePolicy = () => {
             Continue to Confirmation <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={handleConfirm} disabled={!confirmed || isAlreadyIssued} className="gap-2">
+          <Button
+            onClick={() => void handleConfirm()}
+            disabled={!confirmed || isAlreadyIssued || issuePolicy.isPending}
+            className="gap-2"
+          >
             <FileCheck2 className="h-4 w-4" /> Confirm and Issue Policy
           </Button>
         )}

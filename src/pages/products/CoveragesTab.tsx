@@ -6,9 +6,6 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -17,13 +14,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, MoreHorizontal, Pencil, Trash2, Shield, ShieldPlus, Info } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Coverage, listCoverages, upsertCoverage, deleteCoverage,
-} from "@/data/coverages";
-import { listVersions } from "@/data/productVersions";
+import { Coverage } from "@/data/coverages";
 import CoverageDialog from "./CoverageDialog";
+import { useGetProduct, useAddProductCoverage, useRemoveProductCoverage } from "@/api/products";
+import { useListCoverages, useCreateCoverage, useUpdateCoverage } from "@/api/coverages";
+import { mapProductCoverage } from "@/api/adapters/coverages";
 
 type Props = { productId: string };
+
+const VERSION_NA = "N/A";
 
 const fmtMoney = (n: number) =>
   n === 0 ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -40,20 +39,25 @@ const premiumDisplay = (c: Coverage) => {
 };
 
 const CoveragesTab = ({ productId }: Props) => {
-  const versions = useMemo(() => listVersions(productId), [productId]);
-  const defaultVersion =
-    versions.find((v) => v.status === "Active")?.id ??
-    versions[0]?.id ??
-    "";
+  const { data: apiProduct, isLoading: productLoading } = useGetProduct(productId);
+  const { data: catalogPage, isLoading: catalogLoading } = useListCoverages({ pageNumber: 1, pageSize: 200 });
+  const createCoverageMut = useCreateCoverage();
+  const updateCoverageMut = useUpdateCoverage();
+  const addProductCoverage = useAddProductCoverage();
+  const removeProductCoverage = useRemoveProductCoverage();
 
-  const [versionId, setVersionId] = useState<string>(defaultVersion);
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick((t) => t + 1);
+  const catalogById = useMemo(
+    () => Object.fromEntries((catalogPage?.items ?? []).map((c) => [c.id ?? "", c])),
+    [catalogPage?.items]
+  );
 
-  const coverages = useMemo(() => {
-    void tick;
-    return versionId ? listCoverages(productId, versionId) : [];
-  }, [productId, versionId, tick]);
+  const coverages = useMemo(
+    () =>
+      (apiProduct?.coverages ?? []).map((entry) =>
+        mapProductCoverage(productId, entry, catalogById[entry.coverageId ?? ""])
+      ),
+    [apiProduct?.coverages, catalogById, productId]
+  );
 
   const mandatory = coverages.filter((c) => c.coverageType === "Mandatory");
   const riders = coverages.filter((c) => c.coverageType === "Optional Rider");
@@ -65,26 +69,57 @@ const CoveragesTab = ({ productId }: Props) => {
   const openNew = () => { setEditing(null); setDialogOpen(true); };
   const openEdit = (c: Coverage) => { setEditing(c); setDialogOpen(true); };
 
-  const handleSave = (c: Coverage) => {
-    upsertCoverage(c);
-    refresh();
-    toast.success(editing ? `Coverage ${c.code} updated` : `Coverage ${c.code} created`);
+  const handleSave = async (c: Coverage) => {
+    try {
+      if (editing) {
+        const catalogId = editing.code !== "N/A" ? editing.code : undefined;
+        if (catalogId) {
+          await updateCoverageMut.mutateAsync({
+            id: catalogId,
+            body: { name: c.name, description: c.description ?? "" },
+          });
+        }
+        toast.success(`Coverage ${c.name} updated`);
+        toast.info("Sum insured, premium, and commission fields will sync when the API supports them");
+      } else {
+        const created = await createCoverageMut.mutateAsync({
+          name: c.name,
+          description: c.description ?? "",
+        });
+        if (!created.id) throw new Error("Coverage created without id");
+        await addProductCoverage.mutateAsync({
+          productId,
+          body: {
+            coverageId: created.id,
+            isMandatory: c.coverageType === "Mandatory",
+          },
+        });
+        toast.success(`Coverage ${c.name} created`);
+        toast.info("Extra coverage fields are kept locally until the API supports them");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save coverage");
+    }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteId) return;
-    deleteCoverage(deleteId);
-    setDeleteId(null);
-    refresh();
-    toast.success("Coverage deleted");
+    try {
+      await removeProductCoverage.mutateAsync({
+        productId,
+        coverageEntryId: deleteId,
+      });
+      setDeleteId(null);
+      toast.success("Coverage removed from product");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove coverage");
+    }
   };
 
-  if (versions.length === 0) {
+  if (productLoading || catalogLoading) {
     return (
       <Card className="p-10 text-center shadow-card border-border border-dashed">
-        <p className="text-sm text-muted-foreground">
-          Create a product version first to define coverages.
-        </p>
+        <p className="text-sm text-muted-foreground">Loading coverages…</p>
       </Card>
     );
   }
@@ -164,11 +199,9 @@ const CoveragesTab = ({ productId }: Props) => {
                             <Pencil className="h-4 w-4 mr-2" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => {
-                              upsertCoverage({ ...c, isActive: !c.isActive });
-                              refresh();
-                              toast.success(c.isActive ? "Coverage deactivated" : "Coverage activated");
-                            }}
+                            onClick={() =>
+                              toast.info("Coverage activate/deactivate will be available when the API supports it")
+                            }
                           >
                             {c.isActive ? "Deactivate" : "Activate"}
                           </DropdownMenuItem>
@@ -195,66 +228,43 @@ const CoveragesTab = ({ productId }: Props) => {
   return (
     <>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-        <div className="hidden items-center gap-3">
-          <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Version</span>
-          <Select value={versionId} onValueChange={setVersionId}>
-            <SelectTrigger className="w-[280px] h-9">
-              <SelectValue placeholder="Select version" />
-            </SelectTrigger>
-            <SelectContent>
-              {versions.map((v) => (
-                <SelectItem key={v.id} value={v.id}>
-                  <span className="font-mono text-xs text-accent mr-2">{v.number}</span>
-                  {v.name}
-                  <span className="ml-2 text-xs text-muted-foreground">· {v.status}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-xl">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Coverages are linked from the product API. Versioning is not available yet (shown as {VERSION_NA}).
+          </span>
         </div>
-        <Button size="sm" onClick={openNew} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!versionId}>
+        <Button size="sm" onClick={openNew} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
           <Plus className="h-4 w-4" /> Add Coverage
         </Button>
       </div>
 
-      {coverages.length === 0 && (
-        <Card className="p-3 mb-4 border-border bg-accent-soft/40 flex items-start gap-2 shadow-none">
-          <Info className="h-4 w-4 mt-0.5 text-accent shrink-0" />
-          <span className="text-xs text-accent-soft-foreground">
-            No coverages yet for this version. Add a mandatory coverage to get started.
-          </span>
-        </Card>
-      )}
-
-      <div className="space-y-6">
-        {renderGroup("Mandatory Coverages", Shield, mandatory, "No mandatory coverages defined.")}
-        {renderGroup("Optional Riders", ShieldPlus, riders, "No optional riders defined.")}
+      <div className="space-y-5">
+        {renderGroup("Mandatory coverages", Shield, mandatory, "No mandatory coverages yet.")}
+        {renderGroup("Optional riders", ShieldPlus, riders, "No optional riders yet.")}
       </div>
 
-      {dialogOpen && versionId && (
-        <CoverageDialog
-          key={editing?.id ?? "new"}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          productId={productId}
-          versionId={versionId}
-          initial={editing}
-          onSave={handleSave}
-        />
-      )}
+      <CoverageDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        productId={productId}
+        versionId={VERSION_NA}
+        initial={editing}
+        onSave={(c) => void handleSave(c)}
+      />
 
-      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+      <AlertDialog open={Boolean(deleteId)} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this coverage?</AlertDialogTitle>
+            <AlertDialogTitle>Remove coverage?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the coverage from this product version. Existing offers and policies are not affected.
+              This will remove the coverage from this product. Existing offers and policies are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={() => void confirmDelete()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete

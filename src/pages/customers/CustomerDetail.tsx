@@ -1,4 +1,5 @@
-import { Link, useParams } from "react-router-dom";
+import { useMemo } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
@@ -10,8 +11,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Pencil, FileText, Mail, Phone, MapPin, Briefcase, Calendar, BadgeCheck, ShieldCheck, FileSignature, Plus, AlertCircle } from "lucide-react";
-import { ageFromDob, fullName, getCustomer, PEPStatus } from "@/data/customers";
+import { Pencil, FileText, MapPin, Briefcase, Calendar, BadgeCheck, ShieldCheck, FileSignature, Plus, AlertCircle } from "lucide-react";
+import { ageFromDob, fullName, PEPStatus } from "@/data/customers";
+import { useGetPerson } from "@/api/people";
+import { useGetCompany } from "@/api/companies";
+import {
+  customerPath,
+  mapCompanyToCustomer,
+  mapPersonToCustomer,
+  parseCustomerPartyType,
+} from "@/api/adapters/customers";
 
 const pepClass: Record<PEPStatus, string> = {
   Yes: "bg-warning/20 text-warning-foreground",
@@ -52,7 +61,46 @@ const initials = (first: string, last: string) =>
 
 const CustomerDetail = () => {
   const { id } = useParams();
-  const customer = id ? getCustomer(id) : undefined;
+  const [searchParams] = useSearchParams();
+  const partyType = parseCustomerPartyType(searchParams.get("type"));
+
+  // People and companies use different GET endpoints — only call the matching one.
+  const personQ = useGetPerson(id ?? "", {
+    enabled: Boolean(id) && (partyType === "person" || partyType === null),
+  });
+  const companyQ = useGetCompany(id ?? "", {
+    enabled:
+      Boolean(id) &&
+      (partyType === "company" ||
+        (partyType === null && personQ.isFetched && personQ.isError)),
+  });
+
+  const customer = useMemo(() => {
+    if (partyType !== "company" && personQ.data) return mapPersonToCustomer(personQ.data);
+    if (partyType !== "person" && companyQ.data) return mapCompanyToCustomer(companyQ.data);
+    return undefined;
+  }, [partyType, personQ.data, companyQ.data]);
+
+  const isLoading =
+    partyType === "company"
+      ? companyQ.isLoading
+      : partyType === "person"
+        ? personQ.isLoading
+        : personQ.isLoading ||
+          (personQ.isError && !companyQ.isFetched) ||
+          companyQ.isLoading;
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <PageHeader
+          breadcrumbs={[{ label: "Customers", to: "/customers" }, { label: "…" }]}
+          title="Loading…"
+          description="Fetching customer."
+        />
+      </AppShell>
+    );
+  }
 
   if (!customer) {
     return (
@@ -69,18 +117,23 @@ const CustomerDetail = () => {
     );
   }
 
-  const age = ageFromDob(customer.dateOfBirth);
+  const isCompany = customer.customerType === "Company";
+  const age = customer.dateOfBirth ? ageFromDob(customer.dateOfBirth) : null;
 
   return (
     <AppShell>
       <PageHeader
         breadcrumbs={[{ label: "Customers", to: "/customers" }, { label: fullName(customer) }]}
         title={fullName(customer)}
-        description={`${customer.id} · Customer since ${format(parseISO(customer.createdDate), "MMM yyyy")}`}
+        description={
+          customer.createdDate
+            ? `${customer.id} · Customer since ${format(parseISO(customer.createdDate), "MMM yyyy")}`
+            : customer.id
+        }
         actions={
           <>
             <Button variant="outline" asChild className="gap-2">
-              <Link to={`/customers/${customer.id}/edit`}><Pencil className="h-4 w-4" /> Edit</Link>
+              <Link to={customerPath(customer.id, customer.customerType, { edit: true })}><Pencil className="h-4 w-4" /> Edit</Link>
             </Button>
             <Button className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
               <FileText className="h-4 w-4" /> New Offer
@@ -94,26 +147,46 @@ const CustomerDetail = () => {
         <div className="flex items-start gap-5 flex-wrap">
           <Avatar className="h-16 w-16">
             <AvatarFallback className="bg-gradient-accent text-accent-foreground text-lg font-semibold">
-              {initials(customer.firstName, customer.lastName)}
+              {isCompany
+                ? (customer.companyName ?? "C").slice(0, 2).toUpperCase()
+                : initials(customer.firstName, customer.lastName)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-[200px]">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-semibold">{fullName(customer)}</h2>
-              <Badge className={`border-0 ${pepClass[customer.pepStatus]}`}>PEP: {customer.pepStatus}</Badge>
+              <Badge variant="outline" className={isCompany ? "border-accent/40 text-accent" : "border-border text-muted-foreground"}>
+                {isCompany ? "Company" : "Individual"}
+              </Badge>
+              {!isCompany && (
+                <Badge className={`border-0 ${pepClass[customer.pepStatus]}`}>PEP: {customer.pepStatus}</Badge>
+              )}
               {customer.totalExposure > 0 && (
                 <Badge variant="outline" className="font-mono">Exposure {fmtMoney(customer.totalExposure)}</Badge>
               )}
             </div>
             <div className="text-sm text-muted-foreground mt-1">
-              {customer.gender} · {age} years old · {customer.occupation || "Occupation not specified"}
+              {isCompany
+                ? [customer.companyType, customer.nipt].filter(Boolean).join(" · ") || "Company"
+                : [customer.gender, age != null ? `${age} years old` : null].filter(Boolean).join(" · ")}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground"><Phone className="h-4 w-4" /> {customer.phone || "—"}</div>
-            <div className="flex items-center gap-2 text-muted-foreground"><Mail className="h-4 w-4" /> {customer.email || "—"}</div>
-            <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {customer.city || "—"}{customer.country ? `, ${customer.country}` : ""}</div>
-            <div className="flex items-center gap-2 text-muted-foreground"><BadgeCheck className="h-4 w-4" /> <span className="font-mono">{customer.personalId}</span></div>
+            {isCompany ? (
+              <>
+                <div className="flex items-center gap-2 text-muted-foreground"><BadgeCheck className="h-4 w-4" /> <span className="font-mono">{customer.nipt || "—"}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> {customer.companyType || "—"}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {customer.country || "—"}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {[customer.address, customer.city, customer.postalCode].filter(Boolean).join(", ") || "—"}</div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-muted-foreground"><BadgeCheck className="h-4 w-4" /> <span className="font-mono">{customer.personalId || "—"}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {customer.ssnIssuingCountry || customer.country || "—"}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="h-4 w-4" /> {customer.dateOfBirth ? format(parseISO(customer.dateOfBirth), "MMM dd, yyyy") : "—"}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><ShieldCheck className="h-4 w-4" /> PEP: {customer.pepStatus}</div>
+              </>
+            )}
           </div>
         </div>
       </Card>
@@ -132,12 +205,25 @@ const CustomerDetail = () => {
             <Card className="p-5 shadow-card border-border md:col-span-2">
               <h3 className="text-sm font-semibold text-foreground mb-3">Profile details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 divide-y md:divide-y-0 divide-border">
-                <Field icon={BadgeCheck} label="Personal ID" value={<span className="font-mono">{customer.personalId}</span>} />
-                <Field icon={Calendar} label="Date of Birth" value={customer.dateOfBirth ? `${format(parseISO(customer.dateOfBirth), "PPP")} (${age} y/o)` : "—"} />
-                <Field icon={Briefcase} label="Occupation" value={customer.occupation} />
-                <Field icon={MapPin} label="Address" value={[customer.address, customer.city, customer.country].filter(Boolean).join(", ")} />
-                <Field icon={Phone} label="Phone" value={customer.phone} />
-                <Field icon={Mail} label="Email" value={customer.email} />
+                {isCompany ? (
+                  <>
+                    <Field icon={BadgeCheck} label="Registration no. / NIPT" value={<span className="font-mono">{customer.nipt}</span>} />
+                    <Field icon={Briefcase} label="Company type" value={customer.companyType} />
+                    <Field icon={MapPin} label="Country" value={customer.country} />
+                    <Field
+                      icon={MapPin}
+                      label="Main address"
+                      value={[customer.address, customer.city, customer.postalCode].filter(Boolean).join(", ") || undefined}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Field icon={BadgeCheck} label="Personal ID" value={<span className="font-mono">{customer.personalId}</span>} />
+                    <Field icon={MapPin} label="Country" value={customer.ssnIssuingCountry || customer.country} />
+                    <Field icon={Calendar} label="Date of Birth" value={customer.dateOfBirth ? `${format(parseISO(customer.dateOfBirth), "PPP")}${age != null ? ` (${age} y/o)` : ""}` : "—"} />
+                    <Field icon={ShieldCheck} label="Gender" value={customer.gender} />
+                  </>
+                )}
               </div>
               {customer.notes && (
                 <>
@@ -154,10 +240,12 @@ const CustomerDetail = () => {
                 <AlertCircle className="h-4 w-4 text-warning" /> Compliance
               </h3>
               <div className="space-y-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">PEP Status</div>
-                  <Badge className={`mt-1 border-0 ${pepClass[customer.pepStatus]}`}>{customer.pepStatus}</Badge>
-                </div>
+                {!isCompany && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">PEP Status</div>
+                    <Badge className={`mt-1 border-0 ${pepClass[customer.pepStatus]}`}>{customer.pepStatus}</Badge>
+                  </div>
+                )}
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total Exposure</div>
                   <div className="text-2xl font-semibold mt-1">

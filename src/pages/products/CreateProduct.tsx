@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -19,14 +19,15 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  addProduct, ProductStatus,
-  PRODUCT_GROUPS, POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
+  ProductStatus,
+  POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
   PREMIUM_PAYMENT_TYPES, PACKET_PAYMENT_TYPES, PACKET_RENEWAL_TYPES,
   PACKET_LOAN_TYPES, LOAN_PRODUCT_TYPES, ACTUARIAL_CODES, BANK_PARTNERS,
   PAYMENT_MODELS, PaymentModel,
   listPremiumTables, addPremiumTable, PremiumTableItem,
-  addTariff, addProductCoverage,
 } from "@/data/products";
+import { useListProductGroups } from "@/api/product-groups";
+import { useCreateProduct } from "@/api/products";
 import { toast } from "sonner";
 import { Plus, Trash2, X } from "lucide-react";
 
@@ -74,6 +75,12 @@ const blankCoverage = (): DraftCoverage => ({
 
 const CreateProduct = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const presetGroupId = searchParams.get("groupId") ?? "";
+
+  const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 100 });
+  const createProduct = useCreateProduct();
+  const apiGroups = groupsPage?.items ?? [];
 
   // Basic
   const [name, setName] = useState("");
@@ -81,10 +88,18 @@ const CreateProduct = () => {
   const [description, setDescription] = useState("");
   const type = "Life Insurance";
   const [status, setStatus] = useState<ProductStatus>("Draft");
-  const [productGroup, setProductGroup] = useState<string>("GroupLife");
+  const [productGroup, setProductGroup] = useState<string>(presetGroupId);
   const [currencies, setCurrencies] = useState<string[]>(["EUR"]);
   const [agentCommissionPct, setAgentCommissionPct] = useState("0");
   const [bankCommissionPct, setBankCommissionPct] = useState("0");
+
+  useEffect(() => {
+    if (presetGroupId) setProductGroup(presetGroupId);
+  }, [presetGroupId]);
+
+  useEffect(() => {
+    if (!productGroup && apiGroups[0]?.id) setProductGroup(apiGroups[0].id);
+  }, [apiGroups, productGroup]);
 
   // Premium table
   const [tables, setTables] = useState(() => listPremiumTables());
@@ -189,63 +204,29 @@ const CreateProduct = () => {
   };
 
   const handleSave = () => {
-    if (!name || !code) { toast.error("Name and code are required"); return; }
-    const created = addProduct({
-      name, code, description, type, status,
-      currencies, requiredDocuments: docs, flags,
-      agentCommission: (parseFloat(agentCommissionPct) || 0) / 100,
-      bankCommission: (parseFloat(bankCommissionPct) || 0) / 100,
-      bankPartnerCode,
-      productGroup: productGroup as any,
-      paymentModel,
-      premiumTableId,
-      setupDetails: {
-        legacyPacketId: parseInt(legacyPacketId, 10) || 0,
-        bankPartnerCode, policyType, insuranceAmountType,
-        legacyTariffId: parseInt(legacyTariffId, 10) || 0,
-        maxTenorMonths: parseInt(maxTenorMonths, 10) || 0,
-        isObsolete, apiSubject, apiStraight,
-      },
-      paymentDetails: { premiumPaymentType, packetPaymentType, renewalType },
-      loanDetails: { packetLoanType, loanProductType },
-      internalDetails: {
-        coveragePrintableText,
-        packetFinType: packetFinType === "" ? null : parseInt(packetFinType, 10) || null,
-      },
-      externalDetails: { sapProductCode, sapChannelCode, f5ProductCode, actuarialProductCode },
-    });
+    if (!name.trim()) { toast.error("Product name is required"); return; }
+    if (!productGroup) { toast.error("Product family is required"); return; }
+    if (currencies.length === 0) { toast.error("Select at least one currency"); return; }
 
-    // Persist tariffs & coverages tied to product id
-    tariffs.filter((t) => t.name.trim()).forEach((t) =>
-      addTariff({
-        productId: created.id,
-        name: t.name,
-        legacyTariffId: parseInt(t.legacyTariffId, 10) || 0,
-        tariffType: t.tariffType,
-        currency: t.currency,
-        effectiveFrom: t.effectiveFrom,
-        effectiveTo: t.effectiveTo,
-        isActive: t.isActive,
-        minPremium: parseFloat(t.minPremium) || 0,
-        maxPremium: parseFloat(t.maxPremium) || 0,
-        fixedPremium: parseFloat(t.fixedPremium) || 0,
-        fixedMonthlyPremium: parseFloat(t.fixedMonthlyPremium) || 0,
-        fixedAnnualPremium: parseFloat(t.fixedAnnualPremium) || 0,
-        formula: t.formula,
-        notes: t.notes,
-      })
+    // API currently accepts name, productGroupId, supportedCurrencies, coverageText.
+    createProduct.mutate(
+      {
+        name: name.trim(),
+        productGroupId: productGroup,
+        supportedCurrencies: currencies,
+        coverageText: coveragePrintableText.trim() || description.trim() || undefined,
+      },
+      {
+        onSuccess: (created) => {
+          toast.success(`Product ${created.name ?? name} created`);
+          if (created.id) navigate(`/products/${created.id}`);
+          else navigate("/products");
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "Failed to create product");
+        },
+      }
     );
-    coverages.filter((c) => c.name.trim()).forEach((c) =>
-      addProductCoverage({
-        productId: created.id,
-        name: c.name, description: c.description,
-        legacyCoverageId: parseInt(c.legacyCoverageId, 10) || 0,
-        isMandatory: c.isMandatory,
-      })
-    );
-
-    toast.success(`Product ${created.code} created`);
-    navigate(`/products/${created.id}`);
   };
 
   return (
@@ -257,8 +238,12 @@ const CreateProduct = () => {
         actions={
           <>
             <Button variant="outline" asChild><Link to="/products">Cancel</Link></Button>
-            <Button onClick={handleSave} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              Save Product
+            <Button
+              onClick={handleSave}
+              disabled={createProduct.isPending}
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              {createProduct.isPending ? "Saving…" : "Save Product"}
             </Button>
           </>
         }
@@ -275,18 +260,19 @@ const CreateProduct = () => {
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. ISP A_Mortgage Standard 07" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="code">Product code *</Label>
-                <Input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="e.g. 75" className="font-mono" />
+                <Label htmlFor="code">Product code</Label>
+                <Input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Coming soon from API" className="font-mono" />
               </div>
               <div className="space-y-1.5">
-                <Label>Product family</Label>
+                <Label>Product family *</Label>
                 <Select value={productGroup} onValueChange={setProductGroup}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select group" /></SelectTrigger>
                   <SelectContent>
-                    {PRODUCT_GROUPS.map((g) => (
-                      <SelectItem key={g.value} value={g.value}>
-                        <span className="font-mono text-xs text-muted-foreground mr-2">{g.code}</span>
-                        {g.english} — {g.label}
+                    {apiGroups.map((g) => (
+                      <SelectItem key={g.id} value={g.id ?? ""}>
+                        <span className="font-mono text-xs text-muted-foreground mr-2">{g.code?.trim() || "—"}</span>
+                        {g.english?.trim() || g.name || "—"}
+                        {g.label?.trim() && g.label !== g.name ? ` — ${g.label}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

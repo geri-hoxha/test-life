@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, ShieldCheck, FileText, CreditCard, Calendar, Users, History, Files } from "lucide-react";
 import { getPolicy, policyStatusColor } from "@/data/policies";
-import { seedProducts } from "@/data/products";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
-import { getCustomer, fullName, ageFromDob } from "@/data/customers";
+import { fullName, ageFromDob } from "@/data/customers";
 import PremiumBreakdownPanel from "@/components/premium/PremiumBreakdownPanel";
+import { useGetPolicy } from "@/api/policies";
+import { mapApiPolicy } from "@/api/adapters/policies";
+import { useGetProduct, mapApiProduct } from "@/api/products";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { customerPath, mergeCustomers } from "@/api/adapters/customers";
 
 const fmtMoney = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(v);
@@ -39,7 +45,38 @@ const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
 const PolicyDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const policy = id ? getPolicy(id) : undefined;
+
+  const { data: apiPolicy, isLoading } = useGetPolicy(id ?? "", { enabled: Boolean(id) });
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+
+  const policy = useMemo(() => {
+    if (apiPolicy) return mapApiPolicy(apiPolicy);
+    return id ? getPolicy(id) : undefined;
+  }, [apiPolicy, id]);
+
+  const { data: apiProduct } = useGetProduct(policy?.productId ?? "", {
+    enabled: Boolean(policy?.productId),
+  });
+  const product = useMemo(
+    () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
+    [apiProduct]
+  );
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="text-center py-20">
+          <h1 className="text-xl font-semibold">Loading policy…</h1>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!policy) {
     return (
@@ -52,12 +89,11 @@ const PolicyDetail = () => {
     );
   }
 
-  const product = seedProducts.find((p) => p.id === policy.productId);
   const version = listVersions(policy.productId).find((v) => v.id === policy.versionId);
   const template = listTemplates(policy.productId, policy.versionId).find((t) => t.id === policy.templateId);
-  const holder = getCustomer(policy.policyHolderId);
-  const insured = getCustomer(policy.insuredId);
-  const payer = getCustomer(policy.payerId);
+  const holder = getCustomerLocal(policy.policyHolderId);
+  const insured = getCustomerLocal(policy.insuredId);
+  const payer = getCustomerLocal(policy.payerId);
 
 
   // Mock payments — first year recorded if Active
@@ -142,9 +178,9 @@ const PolicyDetail = () => {
             <Card>
               <CardHeader><CardTitle className="text-base">Parties</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <Field label="Policy Holder" value={holder ? <Link to={`/customers/${holder.id}`} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"} />
-                <Field label="Insured Person" value={insured ? <Link to={`/customers/${insured.id}`} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"} />
-                <Field label="Payer" value={payer ? <Link to={`/customers/${payer.id}`} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"} />
+                <Field label="Policy Holder" value={holder ? <Link to={customerPath(holder.id, holder.customerType)} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"} />
+                <Field label="Insured Person" value={insured ? <Link to={customerPath(insured.id, insured.customerType)} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"} />
+                <Field label="Payer" value={payer ? <Link to={customerPath(payer.id, payer.customerType)} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"} />
               </CardContent>
             </Card>
           </div>
@@ -256,10 +292,10 @@ const PolicyDetail = () => {
                     {policy.beneficiaries.length === 0 ? (
                       <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No beneficiaries</TableCell></TableRow>
                     ) : policy.beneficiaries.map((b) => {
-                      const c = getCustomer(b.customerId);
+                      const c = getCustomerLocal(b.customerId);
                       return (
                         <TableRow key={b.id}>
-                          <TableCell>{c ? <Link to={`/customers/${c.id}`} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}</TableCell>
+                          <TableCell>{c ? <Link to={customerPath(c.id, c.customerType)} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}</TableCell>
                           <TableCell>{b.relationship}</TableCell>
                           <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
                         </TableRow>

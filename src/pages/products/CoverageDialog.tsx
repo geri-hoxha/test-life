@@ -26,7 +26,7 @@ type Props = {
 const blank = (productId: string, versionId: string): Coverage => ({
   id: newCoverageId(),
   productId, versionId,
-  name: "", code: "", description: "",
+  name: "", code: "N/A", description: "",
   coverageType: "Mandatory",
   sumInsuredType: "Fixed",
   defaultSumInsured: 0, minSumInsured: 0, maxSumInsured: 0,

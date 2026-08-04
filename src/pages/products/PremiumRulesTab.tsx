@@ -13,14 +13,21 @@ import {
 } from "@/components/ui/table";
 import { Plus, Trash2, Calculator, Save, Sparkles, Info } from "lucide-react";
 import { toast } from "sonner";
-import { listVersions } from "@/data/productVersions";
 import {
   PremiumRule, PremiumRuleType, RateRow, RateType, Gender,
   getPremiumRule, savePremiumRule, calculatePremium, newRowId,
 } from "@/data/premiumRules";
-import { getProduct } from "@/data/products";
+import { useGetProduct, mapApiProduct } from "@/api/products";
+import {
+  useListRatingTables,
+  useCreateRatingTable,
+  useUpdateRatingTable,
+  useAddRatingTableRule,
+} from "@/api/rating-tables";
 
 type Props = { productId: string };
+
+const VERSION_NA = "N/A";
 
 const RULE_TYPES: PremiumRuleType[] = [
   "Fixed premium",
@@ -48,21 +55,26 @@ const usesRateTable = (t: PremiumRuleType) =>
   t === "Age-based rate" || t === "Gender-based rate" || t === "Age + Gender rate table";
 
 const PremiumRulesTab = ({ productId }: Props) => {
-  const product = getProduct(productId);
-  const versions = useMemo(() => listVersions(productId), [productId]);
-  const defaultVersion =
-    versions.find((v) => v.status === "Active")?.id ?? versions[0]?.id ?? "";
-
-  const [versionId, setVersionId] = useState(defaultVersion);
-  const [rule, setRule] = useState<PremiumRule>(() =>
-    versionId ? { ...getPremiumRule(productId, versionId) } : { productId, versionId: "", ruleType: "Fixed premium", rateTable: [] }
+  const { data: apiProduct, isLoading: productLoading } = useGetProduct(productId);
+  const product = useMemo(
+    () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
+    [apiProduct]
   );
+  const { data: tablesPage, isLoading: tablesLoading } = useListRatingTables({
+    pageNumber: 1,
+    pageSize: 200,
+  });
+  const createRatingTable = useCreateRatingTable();
+  const updateRatingTable = useUpdateRatingTable();
+  const addRatingTableRule = useAddRatingTableRule();
 
-  // Reload rule when version changes
-  const switchVersion = (v: string) => {
-    setVersionId(v);
-    setRule({ ...getPremiumRule(productId, v) });
-  };
+  const ratingTables = tablesPage?.items ?? [];
+  const [ratingTableId, setRatingTableId] = useState<string>("N/A");
+
+  const [rule, setRule] = useState<PremiumRule>(() => ({
+    ...getPremiumRule(productId, VERSION_NA),
+    versionId: VERSION_NA,
+  }));
 
   const setField = <K extends keyof PremiumRule>(k: K, v: PremiumRule[K]) =>
     setRule((r) => ({ ...r, [k]: v }));
@@ -82,9 +94,47 @@ const PremiumRulesTab = ({ productId }: Props) => {
   const removeRow = (id: string) =>
     setRule((r) => ({ ...r, rateTable: r.rateTable.filter((row) => row.id !== id) }));
 
-  const handleSave = () => {
-    savePremiumRule(rule);
-    toast.success("Premium rule saved");
+  const handleSave = async () => {
+    // Keep local preview store for fields the API does not model yet.
+    savePremiumRule({ ...rule, versionId: VERSION_NA });
+
+    try {
+      let tableId = ratingTableId !== "N/A" ? ratingTableId : undefined;
+      const tableName = `${product?.name ?? productId} · Premium`;
+
+      if (!tableId) {
+        const created = await createRatingTable.mutateAsync({ name: tableName });
+        if (!created.id) throw new Error("Rating table created without id");
+        tableId = created.id;
+        setRatingTableId(tableId);
+      } else {
+        await updateRatingTable.mutateAsync({ id: tableId, body: { name: tableName } });
+      }
+
+      if (usesRateTable(rule.ruleType)) {
+        for (const row of rule.rateTable) {
+          const gender =
+            row.gender === "Female" ? "female" : row.gender === "Male" ? "male" : undefined;
+          await addRatingTableRule.mutateAsync({
+            ratingTableId: tableId,
+            body: {
+              minAge: row.ageFrom,
+              maxAge: row.ageTo,
+              gender,
+              isFlat: row.rateType === "Fixed",
+              flatValue: row.rateType === "Fixed" ? row.rate : 0,
+              flatValueCurrency: "EUR",
+              percentageValue: row.rateType === "Percentage" ? row.rate : 0,
+            },
+          });
+        }
+      }
+
+      toast.success("Premium rule saved");
+      toast.info("Product premium-table linking will be available when the API supports it");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save rating table");
+    }
   };
 
   // Preview state
@@ -121,12 +171,10 @@ const PremiumRulesTab = ({ productId }: Props) => {
   const avgAnnual = totalOverTerm / yearly.length;
   const lastYear = yearly[yearly.length - 1];
 
-  if (versions.length === 0) {
+  if (productLoading || tablesLoading) {
     return (
       <Card className="p-10 text-center shadow-card border-border border-dashed">
-        <p className="text-sm text-muted-foreground">
-          Create a product version first to define premium rules.
-        </p>
+        <p className="text-sm text-muted-foreground">Loading premium rules…</p>
       </Card>
     );
   }
@@ -135,23 +183,27 @@ const PremiumRulesTab = ({ productId }: Props) => {
     <div className="space-y-6">
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="hidden items-center gap-3">
-          <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Version</span>
-          <Select value={versionId} onValueChange={switchVersion}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Rating table</span>
+          <Select value={ratingTableId} onValueChange={setRatingTableId}>
             <SelectTrigger className="w-[280px] h-9">
-              <SelectValue placeholder="Select version" />
+              <SelectValue placeholder="N/A" />
             </SelectTrigger>
             <SelectContent>
-              {versions.map((v) => (
-                <SelectItem key={v.id} value={v.id}>
-                  <span className="font-mono text-xs text-accent mr-2">{v.number}</span>
-                  {v.name} <span className="ml-2 text-xs text-muted-foreground">· {v.status}</span>
+              <SelectItem value="N/A">N/A (create on save)</SelectItem>
+              {ratingTables.map((t) => (
+                <SelectItem key={t.id} value={t.id ?? ""}>
+                  {t.name ?? t.id}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <Button size="sm" onClick={handleSave} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+        <Button
+          size="sm"
+          onClick={() => void handleSave()}
+          className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+        >
           <Save className="h-4 w-4" /> Save Premium Rule
         </Button>
       </div>

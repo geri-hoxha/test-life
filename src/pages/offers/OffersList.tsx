@@ -33,9 +33,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Eye, Edit, Send, MoreHorizontal, Plus, Search, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
-import { listOffers, statusColor, OfferStatus } from "@/data/offers";
-import { getCustomer, fullName } from "@/data/customers";
-import { seedProducts } from "@/data/products";
+import { statusColor, OfferStatus } from "@/data/offers";
+import { fullName } from "@/data/customers";
+import { useListOffers } from "@/api/offers";
+import { mapApiOffer } from "@/api/adapters/offers";
+import { useListProducts, mapApiProduct } from "@/api/products";
+import { useListPeople } from "@/api/people";
+import { useListCompanies } from "@/api/companies";
+import { mergeCustomers } from "@/api/adapters/customers";
 import { listTemplates } from "@/data/templates";
 import { computeVerification, overallStatus } from "./VerificationStep";
 import { toast } from "sonner";
@@ -46,20 +51,36 @@ const OffersList = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const offers = useMemo(() => listOffers(), []);
+  const { data: offersPage, isLoading } = useListOffers({ pageNumber: 1, pageSize: 200 });
+  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
 
-  const productMap = useMemo(() => Object.fromEntries(seedProducts.map((p) => [p.id, p])), []);
+  const offers = useMemo(
+    () => (offersPage?.items ?? []).map(mapApiOffer),
+    [offersPage?.items]
+  );
+  const customers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [peoplePage?.items, companiesPage?.items]
+  );
+  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+
+  const productMap = useMemo(
+    () => Object.fromEntries((productsPage?.items ?? []).map(mapApiProduct).map((p) => [p.id, p])),
+    [productsPage?.items]
+  );
 
   const templateMap = useMemo(() => {
     const m: Record<string, string> = {};
-    seedProducts.forEach((p) => listTemplates(p.id).forEach((t) => (m[t.id] = t.name)));
+    Object.values(productMap).forEach((p) => listTemplates(p.id).forEach((t) => (m[t.id] = t.name)));
     return m;
-  }, []);
+  }, [productMap]);
 
   const filtered = offers.filter((o) => {
     if (statusFilter !== "ALL" && o.status !== statusFilter) return false;
     if (!q.trim()) return true;
-    const ph = getCustomer(o.policyHolderId);
+    const ph = getCustomerLocal(o.policyHolderId);
     const haystack = [
       o.number,
       ph ? fullName(ph) : "",
@@ -159,7 +180,7 @@ const OffersList = () => {
                   </TableRow>
                 ) : (
                   filtered.map((o) => {
-                    const ph = getCustomer(o.policyHolderId);
+                    const ph = getCustomerLocal(o.policyHolderId);
                     const product = productMap[o.productId];
                     const checks = computeVerification({
                       productId: o.productId,
