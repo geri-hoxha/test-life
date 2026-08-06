@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -25,16 +26,20 @@ type Props = {
 };
 
 type FormState = {
+  source: "existing" | "new";
   coverageId: string;
   name: string;
+  description: string;
   ratingTableId: string;
   ratingTableMultiplier: number;
   isMandatory: boolean;
 };
 
 const blankForm = (): FormState => ({
+  source: "existing",
   coverageId: "",
   name: "",
+  description: "",
   ratingTableId: "",
   ratingTableMultiplier: 1,
   isMandatory: true,
@@ -49,7 +54,7 @@ const CoverageDialog = ({
   onSave,
 }: Props) => {
   const [form, setForm] = useState<FormState>(blankForm());
-  const { data: catalogPage } = useListCoverages({ pageNumber: 1, pageSize: 200 });
+  const { data: catalogPage, isLoading: catalogLoading } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: tablesPage } = useListRatingTables({ pageNumber: 1, pageSize: 200 });
   const ratingTables = tablesPage?.items ?? [];
 
@@ -69,14 +74,20 @@ const CoverageDialog = ({
     const found = availableCoverages.find((x) => x.id === coverageId);
     setForm((s) => ({
       ...s,
+      source: "existing",
       coverageId,
       name: found?.name?.trim() || s.name,
+      description: found?.description ?? "",
     }));
   };
 
   const handleSave = () => {
-    if (!form.coverageId) {
+    if (form.source === "existing" && !form.coverageId) {
       toast.error("Select a coverage");
+      return;
+    }
+    if (form.source === "new" && !form.name.trim()) {
+      toast.error("Coverage name is required");
       return;
     }
     if (!form.ratingTableId) {
@@ -87,9 +98,9 @@ const CoverageDialog = ({
       id: newCoverageId(),
       productId,
       versionId,
-      name: form.name || form.coverageId,
-      code: form.coverageId,
-      description: "",
+      name: form.source === "new" ? form.name.trim() : (form.name || form.coverageId),
+      code: form.source === "existing" ? form.coverageId : "N/A",
+      description: form.description.trim() || undefined,
       coverageType: form.isMandatory ? "Mandatory" : "Optional Rider",
       sumInsuredType: "Fixed",
       defaultSumInsured: 0,
@@ -107,34 +118,109 @@ const CoverageDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Link coverage</DialogTitle>
+          <DialogTitle>Add coverage</DialogTitle>
           <DialogDescription>
-            Attach an existing coverage to this product.
+            Select an existing coverage, or create a new one with name and description.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label>Coverage *</Label>
-            <Select value={form.coverageId || undefined} onValueChange={pickCoverage}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select coverage…" />
-              </SelectTrigger>
+            <Label>Source</Label>
+            <Select
+              value={form.source}
+              onValueChange={(v) =>
+                setForm((s) => ({
+                  ...blankForm(),
+                  source: v as "existing" | "new",
+                  ratingTableId: s.ratingTableId,
+                  ratingTableMultiplier: s.ratingTableMultiplier,
+                  isMandatory: s.isMandatory,
+                }))
+              }
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {availableCoverages.length === 0 ? (
-                  <SelectItem value="__none" disabled>No coverages available</SelectItem>
-                ) : (
-                  availableCoverages.map((cov) => (
-                    <SelectItem key={cov.id} value={cov.id ?? ""}>
-                      {cov.name ?? cov.id}
-                    </SelectItem>
-                  ))
-                )}
+                <SelectItem value="existing">Existing coverage</SelectItem>
+                <SelectItem value="new">Create new coverage</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {form.source === "existing" ? (
+            <div className="space-y-1.5">
+              <Label>Coverage *</Label>
+              <div className="rounded-md border border-border">
+                <div className="max-h-48 overflow-y-auto divide-y divide-border">
+                  {catalogLoading && (
+                    <p className="text-xs text-muted-foreground p-3">Loading coverages…</p>
+                  )}
+                  {!catalogLoading && availableCoverages.length === 0 && (
+                    <p className="text-xs text-muted-foreground p-3">
+                      No coverages available. Switch to Create new coverage.
+                    </p>
+                  )}
+                  {availableCoverages.map((cov) => {
+                    const id = cov.id ?? "";
+                    const selected = form.coverageId === id;
+                    return (
+                      <label
+                        key={id}
+                        className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-accent-soft/40 ${
+                          selected ? "bg-accent-soft/50" : ""
+                        }`}
+                      >
+                        <Checkbox
+                          className="mt-0.5"
+                          checked={selected}
+                          onCheckedChange={(v) => {
+                            if (v) pickCoverage(id);
+                            else {
+                              setForm((s) => ({
+                                ...s,
+                                coverageId: "",
+                                name: "",
+                                description: "",
+                              }));
+                            }
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{cov.name ?? id}</div>
+                          {cov.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{cov.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="cov-name">Name *</Label>
+                <Input
+                  id="cov-name"
+                  value={form.name}
+                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                  placeholder="Death, Disability…"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cov-desc">Description</Label>
+                <Input
+                  id="cov-desc"
+                  value={form.description}
+                  onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                  placeholder="What does this coverage pay out?"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Rating table *</Label>

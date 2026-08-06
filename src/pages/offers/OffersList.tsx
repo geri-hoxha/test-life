@@ -32,17 +32,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Eye, Edit, Send, MoreHorizontal, Plus, Search, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
-import { statusColor, OfferStatus, offerStatusToApi } from "@/data/offers";
-import { fullName } from "@/data/customers";
+import { Eye, Edit, Send, MoreHorizontal, Plus, Search } from "lucide-react";
+import { statusColor, OfferStatus, offerStatusToApi, type Offer } from "@/data/offers";
 import { useListOffers } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useListProducts, mapApiProduct } from "@/api/products";
-import { useListPeople } from "@/api/people";
-import { useListCompanies } from "@/api/companies";
-import { mergeCustomers } from "@/api/adapters/customers";
-import { listTemplates } from "@/data/templates";
-import { computeVerification, overallStatus } from "./VerificationStep";
 import { toast } from "sonner";
 
 const STATUSES: OfferStatus[] = [
@@ -54,49 +48,52 @@ const STATUSES: OfferStatus[] = [
   "Expired",
 ];
 
+const policyHolderName = (o: Offer) =>
+  o.participants.find((p) => p.role === "policyHolder")?.displayName?.trim() || null;
+
+const insuredName = (o: Offer) => {
+  const person = o.insuredPersons[0];
+  if (!person) return null;
+  const name = [person.firstName, person.lastName].filter(Boolean).join(" ").trim();
+  return name || person.personalIdentifier || null;
+};
+
+const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
+
 const OffersList = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const { data: offersPage, isLoading } = useListOffers({
     pageNumber: 1,
-    pageSize: 200,
+    pageSize: 100,
     ...(statusFilter !== "ALL" ? { status: offerStatusToApi[statusFilter as OfferStatus] } : {}),
   });
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
-  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
-  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
 
   const offers = useMemo(
     () => (offersPage?.items ?? []).map(mapApiOffer),
     [offersPage?.items]
   );
-  const customers = useMemo(
-    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
-    [peoplePage?.items, companiesPage?.items]
-  );
-  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
 
   const productMap = useMemo(
     () => Object.fromEntries((productsPage?.items ?? []).map(mapApiProduct).map((p) => [p.id, p])),
     [productsPage?.items]
   );
 
-  const templateMap = useMemo(() => {
-    const m: Record<string, string> = {};
-    Object.values(productMap).forEach((p) => listTemplates(p.id).forEach((t) => (m[t.id] = t.name)));
-    return m;
-  }, [productMap]);
-
   const filtered = offers.filter((o) => {
     if (!q.trim()) return true;
-    const ph = getCustomerLocal(o.policyHolderId);
     const haystack = [
-      o.number,
-      ph ? fullName(ph) : "",
+      o.id,
+      policyHolderName(o) ?? "",
+      insuredName(o) ?? "",
       productMap[o.productId]?.name ?? "",
-      templateMap[o.templateId] ?? "",
-    ].join(" ").toLowerCase();
+      o.productId,
+      o.currency,
+      o.status,
+    ]
+      .join(" ")
+      .toLowerCase();
     return haystack.includes(q.toLowerCase());
   });
 
@@ -104,6 +101,8 @@ const OffersList = () => {
     acc[s] = offers.filter((o) => o.status === s).length;
     return acc;
   }, {} as Record<OfferStatus, number>);
+
+  const totalCount = offersPage?.totalCount ?? offers.length;
 
   return (
     <AppShell>
@@ -123,7 +122,6 @@ const OffersList = () => {
         </Button>
       </div>
 
-      {/* Status KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
         {STATUSES.map((s) => (
           <Card key={s}>
@@ -142,13 +140,17 @@ const OffersList = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
               <CardTitle className="text-base">All Offers</CardTitle>
-              <CardDescription>{filtered.length} of {offers.length} offers</CardDescription>
+              <CardDescription>
+                {isLoading
+                  ? "Loading…"
+                  : `${filtered.length} shown · ${totalCount} total`}
+              </CardDescription>
             </div>
             <div className="flex gap-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search offer, customer, product…"
+                  placeholder="Search offer, holder, product…"
                   className="pl-8 h-9 w-[260px]"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -171,84 +173,76 @@ const OffersList = () => {
                 <TableRow>
                   <TableHead>Offer #</TableHead>
                   <TableHead>Policy Holder</TableHead>
+                  <TableHead>Insured</TableHead>
                   <TableHead>Product</TableHead>
-                  <TableHead>Template</TableHead>
                   <TableHead>Currency</TableHead>
                   <TableHead className="text-right">Premium</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Checks</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-[140px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
+                      Loading offers…
+                    </TableCell>
+                  </TableRow>
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
                       No offers match the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((o) => {
-                    const ph = getCustomerLocal(o.policyHolderId);
+                    const holderParticipant = o.participants.find((p) => p.role === "policyHolder");
+                    const holder = holderParticipant?.displayName?.trim() || null;
+                    const insured = insuredName(o);
                     const product = productMap[o.productId];
-                    const checks = computeVerification({
-                      productId: o.productId,
-                      versionId: o.versionId,
-                      templateId: o.templateId,
-                      currency: o.currency,
-                      policyHolderId: o.policyHolderId,
-                      insuredId: o.insuredId,
-                      premium: null,
-                      loanOutstanding: o.loan?.outstandingBalance,
-                    });
-                    const review = checks.filter((c) => c.result === "Requires Review").length;
-                    const warn = checks.filter((c) => c.result === "Warning").length;
-                    const passed = checks.filter((c) => c.result === "Passed").length;
-                    const verifStatus = overallStatus(checks);
-                    const allPassed = review === 0 && warn === 0;
+                    const hasSchedule = o.schedules.length > 0;
                     return (
                       <TableRow key={o.id}>
                         <TableCell>
-                          <Link to={`/offers/${o.id}`} className="font-mono text-xs font-medium text-primary hover:underline">
-                            {o.number}
+                          <Link
+                            to={`/offers/${o.id}`}
+                            className="font-mono text-xs font-medium text-primary hover:underline"
+                            title={o.id}
+                          >
+                            {shortId(o.id)}
                           </Link>
                         </TableCell>
-                        <TableCell>{ph ? fullName(ph) : <span className="text-muted-foreground">—</span>}</TableCell>
+                        <TableCell>
+                          {holder ? (
+                            <div className="min-w-0">
+                              <div className="text-sm truncate">{holder}</div>
+                              {holderParticipant?.uniqueIdentifier && (
+                                <div className="text-[11px] text-muted-foreground font-mono">
+                                  {holderParticipant.uniqueIdentifier}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {insured ?? <span className="text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-sm">{product?.name ?? o.productId}</TableCell>
-                        <TableCell className="text-sm">{templateMap[o.templateId] ?? o.templateId}</TableCell>
                         <TableCell><Badge variant="outline">{o.currency}</Badge></TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {o.premium > 0
-                            ? new Intl.NumberFormat("en-US", { style: "currency", currency: o.currency }).format(o.premium)
+                          {hasSchedule
+                            ? new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency: o.currency,
+                              }).format(o.premium)
                             : "—"}
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColor[o.status]}`}>
                             {o.status}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
-                              allPassed
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                                : verifStatus === "Pending Review"
-                                ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                            title={`${passed} passed · ${warn} warnings · ${review} require review`}
-                          >
-                            {allPassed ? (
-                              <ShieldCheck className="h-3 w-3" />
-                            ) : verifStatus === "Pending Review" ? (
-                              <ShieldAlert className="h-3 w-3" />
-                            ) : (
-                              <AlertTriangle className="h-3 w-3" />
-                            )}
-                            {allPassed
-                              ? `Passed (${passed}/${checks.length})`
-                              : `${review + warn} of ${checks.length} open`}
                           </span>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono">{o.createdDate}</TableCell>
@@ -273,11 +267,11 @@ const OffersList = () => {
                                 <DropdownMenuItem onClick={() => navigate(`/offers/${o.id}`)}>
                                   <Eye className="h-4 w-4 mr-2" />View
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => toast.info(`Edit ${o.number}`)}>
+                                <DropdownMenuItem onClick={() => toast.info(`Edit ${o.id}`)}>
                                   <Edit className="h-4 w-4 mr-2" />Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => toast.success(`${o.number} sent for issuance`)}
+                                  onClick={() => toast.success(`${shortId(o.id)} sent for issuance`)}
                                   disabled={
                                     o.status === "Bound" ||
                                     o.status === "Cancelled" ||

@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Coverage } from "@/data/coverages";
 import CoverageDialog from "./CoverageDialog";
 import { useGetProduct, useAddProductCoverage, useRemoveProductCoverage } from "@/api/products";
-import { useListCoverages } from "@/api/coverages";
+import { useListCoverages, useCreateCoverage } from "@/api/coverages";
 import { useListRatingTables } from "@/api/rating-tables";
 import { mapProductCoverage } from "@/api/adapters/coverages";
 
@@ -27,6 +27,7 @@ const CoveragesTab = ({ productId }: Props) => {
   const { data: tablesPage, isLoading: tablesLoading } = useListRatingTables({ pageNumber: 1, pageSize: 200 });
   const addProductCoverage = useAddProductCoverage();
   const removeProductCoverage = useRemoveProductCoverage();
+  const createCoverageMut = useCreateCoverage();
 
   const catalogById = useMemo(
     () => Object.fromEntries((catalogPage?.items ?? []).map((c) => [c.id ?? "", c])),
@@ -66,15 +67,24 @@ const CoveragesTab = ({ productId }: Props) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handleSave = async (c: Coverage) => {
-    if (!c.ratingTableId || !c.code || c.code === "N/A") {
-      toast.error("Coverage and rating table are required");
+    if (!c.ratingTableId) {
+      toast.error("Rating table is required");
       return;
     }
     try {
+      let coverageId = c.code !== "N/A" ? c.code : undefined;
+      if (!coverageId) {
+        const created = await createCoverageMut.mutateAsync({
+          name: c.name.trim(),
+          description: c.description?.trim() || undefined,
+        });
+        if (!created.id) throw new Error("Coverage created without id");
+        coverageId = created.id;
+      }
       await addProductCoverage.mutateAsync({
         productId,
         body: {
-          coverageId: c.code,
+          coverageId,
           ratingTableId: c.ratingTableId,
           ratingTableMultiplier: c.ratingTableMultiplier ?? 1,
           isMandatory: c.coverageType === "Mandatory",
@@ -180,7 +190,7 @@ const CoveragesTab = ({ productId }: Props) => {
         <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-xl">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
-            Link an existing coverage with a rating table and multiplier. To change a link, remove it and add again.
+            Link an existing coverage or create a new one ({`{ name, description }`}), then assign a rating table.
           </span>
         </div>
         <Button size="sm" onClick={() => setDialogOpen(true)} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">

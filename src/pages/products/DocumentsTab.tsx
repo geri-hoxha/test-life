@@ -22,7 +22,12 @@ import {
 } from "@/api/products";
 import {
   useListDocumentTypes,
+  useCreateDocumentType,
 } from "@/api/document-types";
+import {
+  createDocument,
+  buildCreateDocumentFormData,
+} from "@/api/documents";
 import { mapProductDocumentType } from "@/api/adapters/document-types";
 
 type Props = { productId: string };
@@ -59,6 +64,7 @@ const DocumentsTab = ({ productId }: Props) => {
   const { data: typesPage, isLoading: typesLoading } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
   const addProductDocumentType = useAddProductDocumentType();
   const removeProductDocumentType = useRemoveProductDocumentType();
+  const createDocumentTypeMut = useCreateDocumentType();
 
   const typesById = useMemo(
     () => Object.fromEntries((typesPage?.items ?? []).map((t) => [t.id ?? "", t])),
@@ -83,12 +89,27 @@ const DocumentsTab = ({ productId }: Props) => {
     [apiProduct?.productDocumentTypes]
   );
 
-  const handleSave = async (d: ProductDocument) => {
+  const handleSave = async (
+    d: ProductDocument & { description?: string; templateFile?: File | null }
+  ) => {
     try {
-      const documentTypeId = d.documentTypeId;
+      let documentTypeId = d.documentTypeId;
       if (!documentTypeId) {
-        toast.error("Document type is required");
-        return;
+        let templateDocumentId = d.templateDocumentId || null;
+        if (d.templateFile) {
+          const uploaded = await createDocument(
+            buildCreateDocumentFormData(d.templateFile, d.templateFile.name)
+          );
+          if (!uploaded.id) throw new Error("Failed to upload template document");
+          templateDocumentId = uploaded.id;
+        }
+        const created = await createDocumentTypeMut.mutateAsync({
+          name: d.name.trim(),
+          description: (d.description ?? d.name).trim() || d.name.trim(),
+          templateDocumentId,
+        });
+        if (!created.id) throw new Error("Document type created without id");
+        documentTypeId = created.id;
       }
       await addProductDocumentType.mutateAsync({
         productId,

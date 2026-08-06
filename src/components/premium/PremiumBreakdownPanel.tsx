@@ -58,10 +58,18 @@ const PremiumBreakdownPanel = ({ data }: { data: PremiumBreakdownInput }) => {
 
   const reporting = data.reportingCurrency ?? "EUR";
   const showFx = data.currency !== reporting;
-  const fx = showFx ? data.fxRate ?? getLatestRate(data.currency, reporting)?.rate : undefined;
-  const fxSource = showFx
-    ? data.fxSource ?? getLatestRate(data.currency, reporting)?.source ?? "Latest automatic rate"
+  // Prefer currency→reporting. If caller passed EUR→currency (offer calc), invert it.
+  const lookedUp = showFx ? getLatestRate(data.currency, reporting)?.rate : undefined;
+  const lookedUpSource = showFx ? getLatestRate(data.currency, reporting)?.source : undefined;
+  let fx = showFx ? lookedUp ?? data.fxRate : undefined;
+  let fxSource = showFx
+    ? lookedUpSource ?? data.fxSource ?? "Latest automatic rate"
     : undefined;
+  // data.fxRate from offer premium is EUR→offerCurrency; convert back when no direct pair.
+  if (showFx && !lookedUp && data.fxRate && data.fxRate > 0) {
+    fx = 1 / data.fxRate;
+    fxSource = data.fxSource ?? "Derived from EUR→currency rate";
+  }
   const grossInReporting = showFx && fx ? gross * fx : undefined;
 
   return (

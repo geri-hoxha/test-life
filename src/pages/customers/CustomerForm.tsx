@@ -54,12 +54,20 @@ const blank = (): Customer => ({
   createdDate: new Date().toISOString().slice(0, 10),
 });
 
-const CustomerForm = () => {
+export type CustomerFormProps = {
+  /** Render without AppShell — for use inside a dialog. */
+  embedded?: boolean;
+  onSuccess?: (created: { id: string; customerType: CustomerType }) => void;
+  onCancel?: () => void;
+};
+
+const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormProps = {}) => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const isEdit = Boolean(id);
-  const partyType = parseCustomerPartyType(searchParams.get("type"));
+  // Embedded create modal never edits by route params.
+  const isEdit = !embedded && Boolean(id);
+  const partyType = embedded ? null : parseCustomerPartyType(searchParams.get("type"));
 
   const personQ = useGetPerson(id ?? "", {
     enabled: isEdit && (partyType === "person" || partyType === null),
@@ -98,6 +106,15 @@ const CustomerForm = () => {
     updateCompany.isPending ||
     addCompanyAddress.isPending;
 
+  const finishCreate = (createdId: string, customerType: CustomerType) => {
+    toast.success(isEdit ? "Customer updated" : "Customer created");
+    if (onSuccess) {
+      onSuccess({ id: createdId, customerType });
+      return;
+    }
+    navigate(customerPath(createdId, customerType === "Company" ? "company" : "person"));
+  };
+
   const handleSave = () => {
     const result = customerSchema.safeParse(c);
     if (!result.success) {
@@ -111,8 +128,7 @@ const CustomerForm = () => {
           { id: c.id, body: customerToUpdatePerson(c) },
           {
             onSuccess: (res) => {
-              toast.success("Customer updated");
-              navigate(customerPath(res.id ?? c.id, "person"));
+              finishCreate(res.id ?? c.id, "Individual");
             },
             onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update"),
           }
@@ -120,8 +136,11 @@ const CustomerForm = () => {
       } else {
         createPerson.mutate(customerToCreatePerson(c), {
           onSuccess: (res) => {
-            toast.success("Customer created");
-            navigate(customerPath(res.id!, "person"));
+            if (!res.id) {
+              toast.error("Customer created without id");
+              return;
+            }
+            finishCreate(res.id, "Individual");
           },
           onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to create"),
         });
@@ -135,8 +154,7 @@ const CustomerForm = () => {
         { id: c.id, body: customerToUpdateCompany(c) },
         {
           onSuccess: (res) => {
-            toast.success("Customer updated");
-            navigate(customerPath(res.id ?? c.id, "company"));
+            finishCreate(res.id ?? c.id, "Company");
           },
           onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update"),
         }
@@ -145,9 +163,13 @@ const CustomerForm = () => {
       createCompany.mutate(customerToCreateCompany(c), {
         onSuccess: (res) => {
           const companyId = res.id;
+          if (!companyId) {
+            toast.error("Customer created without id");
+            return;
+          }
           const street = c.address?.trim();
           const city = c.city?.trim();
-          if (companyId && street && city && c.country && c.country !== NA) {
+          if (street && city && c.country && c.country !== NA) {
             addCompanyAddress.mutate(
               {
                 companyId,
@@ -160,14 +182,12 @@ const CustomerForm = () => {
               },
               {
                 onSettled: () => {
-                  toast.success("Customer created");
-                  navigate(customerPath(companyId, "company"));
+                  finishCreate(companyId, "Company");
                 },
               }
             );
           } else {
-            toast.success("Customer created");
-            navigate(customerPath(companyId!, "company"));
+            finishCreate(companyId, "Company");
           }
         },
         onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to create"),
@@ -187,6 +207,9 @@ const CustomerForm = () => {
           companyQ.isLoading);
 
   if (isLoadingExisting) {
+    if (embedded) {
+      return <div className="py-8 text-sm text-muted-foreground text-center">Loading…</div>;
+    }
     return (
       <AppShell>
         <PageHeader
@@ -205,31 +228,9 @@ const CustomerForm = () => {
     ? (isCompany ? `Edit ${c.companyName || ""}`.trim() : `Edit ${c.firstName} ${c.lastName}`.trim())
     : "New Customer";
 
-  return (
-    <AppShell>
-      <PageHeader
-        breadcrumbs={[
-          { label: "Customers", to: "/customers" },
-          { label: isEdit ? "Edit" : "New" },
-        ]}
-        title={headerTitle}
-        description={isEdit ? "Update the customer's profile and contact details." : "Onboard a new individual or company client."}
-        actions={
-          <>
-            <Button variant="outline" asChild><Link to={isEdit && c.id ? customerPath(c.id, c.customerType) : "/customers"}>Cancel</Link></Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground"
-            >
-              {saving ? "Saving…" : isEdit ? "Save changes" : "Create customer"}
-            </Button>
-          </>
-        }
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+  const formBody = (
+      <div className={cn("grid grid-cols-1 gap-6", embedded ? "lg:grid-cols-1" : "lg:grid-cols-3")}>
+        <div className={cn("space-y-6", !embedded && "lg:col-span-2")}>
           {/* Customer type switch */}
           <Card className="p-4 shadow-card border-border">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Customer type</Label>
@@ -475,6 +476,53 @@ const CustomerForm = () => {
           </Card>
         </div>
       </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        {formBody}
+        <div className="flex items-center justify-end gap-2 sticky bottom-0 bg-background pt-2 border-t">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-accent hover:bg-accent/90 text-accent-foreground"
+          >
+            {saving ? "Saving…" : "Create customer"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <AppShell>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Customers", to: "/customers" },
+          { label: isEdit ? "Edit" : "New" },
+        ]}
+        title={headerTitle}
+        description={isEdit ? "Update the customer's profile and contact details." : "Onboard a new individual or company client."}
+        actions={
+          <>
+            <Button variant="outline" asChild><Link to={isEdit && c.id ? customerPath(c.id, c.customerType) : "/customers"}>Cancel</Link></Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              {saving ? "Saving…" : isEdit ? "Save changes" : "Create customer"}
+            </Button>
+          </>
+        }
+      />
+
+      {formBody}
     </AppShell>
   );
 };

@@ -1,3 +1,5 @@
+import { convert as convertFx } from "@/data/fxRates";
+
 export type PremiumRuleType =
   | "Fixed premium"
   | "Percentage of insured amount"
@@ -79,17 +81,16 @@ export const savePremiumRule = (rule: PremiumRule) => {
 
 export const newRowId = () => `RR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`;
 
-// FX rates → EUR base for the demo
-const FX: Record<string, number> = { EUR: 1, USD: 1.0842, ALL: 0.0102 };
-
 export const calculatePremium = (
   rule: PremiumRule,
   input: { age: number; gender: Gender; sumInsured: number; currency: string; loanBalance?: number }
 ): { amount: number; explanation: string; matched?: RateRow } => {
   const { age, gender, sumInsured, currency, loanBalance } = input;
-  const fx = FX[currency] ?? 1;
 
-  const conv = (eur: number) => eur / fx; // amount in selected currency
+  const conv = (eur: number) => {
+    const { amount, rate } = convertFx(eur, "EUR", currency);
+    return isFinite(amount) ? amount : eur * (isFinite(rate) ? rate : 1);
+  };
 
   switch (rule.ruleType) {
     case "Fixed premium": {

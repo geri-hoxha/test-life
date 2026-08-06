@@ -1,11 +1,14 @@
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import { format, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Card,
   CardContent,
@@ -21,6 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -28,9 +38,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Check, Plus, Trash2, Users, Package, Calendar, Calculator, ShieldCheck, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, CalendarIcon, Check, Loader2, Plus, Trash2, Users, Package, Calendar as CalendarNavIcon, Calculator, ShieldCheck, FileSpreadsheet } from "lucide-react";
+import { cn } from "@/lib/utils";
 // import { listVersions, getActiveVersions } from "@/data/productVersions";
-import { fullName, ageFromDob } from "@/data/customers";
+import { ageFromDob } from "@/data/customers";
 import {
   Beneficiary,
   PaymentMode,
@@ -47,6 +58,8 @@ import {
   useAddOfferLoanDisbursement,
   useCalculateOfferSchedules,
 } from "@/api/offers";
+import { CustomerCombobox } from "@/components/CustomerCombobox";
+import CustomerForm from "@/pages/customers/CustomerForm";
 import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
 import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
 import type { Gender as RuleGender } from "@/data/premiumRules";
@@ -63,15 +76,52 @@ const PAYMENT_MODES: PaymentMode[] = [
   "Pagesa me prim te paracaktuar, kjo eshte e velfshme per sigurimin e jetes se kombinuar Protect, Sigurimi i jetes se kombinuar ISP",
 ];
 
-const RELATIONSHIPS = ["Spouse", "Child", "Parent", "Sibling", "Partner", "Bank", "Other"];
-
 const SECTIONS = [
   { id: "product", label: "Product", icon: Package },
   { id: "people", label: "People", icon: Users },
-  { id: "dates", label: "Dates", icon: Calendar },
+  { id: "dates", label: "Dates", icon: CalendarNavIcon },
   { id: "premium", label: "Premium", icon: Calculator },
   { id: "verification", label: "Verification", icon: ShieldCheck },
 ] as const;
+
+/** One loan-disbursement per Loan Term year. Year and remaining balance come from the loop. */
+const buildLoanDisbursements = (opts: {
+  startDate: string;
+  loanTermYears: number;
+  principal: number;
+}) => {
+  const term = Math.max(0, Math.floor(opts.loanTermYears));
+  if (term === 0 || !opts.startDate) return [];
+
+  const start = parseISO(opts.startDate);
+  const principal = Math.max(0, opts.principal);
+
+  const rows: {
+    year: number;
+    periodStart: string;
+    periodEnd: string;
+    remainingLoanAmount: number;
+  }[] = [];
+
+  for (let i = 0; i < term; i++) {
+    const periodStartDate = new Date(start);
+    periodStartDate.setFullYear(start.getFullYear() + i);
+    const periodEndDate = new Date(start);
+    periodEndDate.setFullYear(start.getFullYear() + i + 1);
+    // Declining balance: year 0 = full principal, last year = principal / term
+    const remainingLoanAmount =
+      Math.round(((principal * (term - i)) / term) * 100) / 100;
+
+    rows.push({
+      year: periodStartDate.getFullYear(),
+      periodStart: format(periodStartDate, "yyyy-MM-dd"),
+      periodEnd: format(periodEndDate, "yyyy-MM-dd"),
+      remainingLoanAmount,
+    });
+  }
+
+  return rows;
+};
 
 const SectionNav = () => (
   <div className="sticky top-16 z-20 -mx-2 mb-6 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
@@ -145,6 +195,11 @@ const CreateOffer = () => {
   const [payerId, setPayerId] = useState("");
   const [insuredId, setInsuredId] = useState("");
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [loanDisburseProgress, setLoanDisburseProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   // Step 3
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
@@ -264,7 +319,7 @@ const CreateOffer = () => {
   const addBeneficiary = () => {
     setBeneficiaries((prev) => [
       ...prev,
-      { id: `b-${Date.now()}`, customerId: "", relationship: "Spouse", percentage: 0 },
+      { id: `b-${Date.now()}`, customerId: "", relationship: "", percentage: 0 },
     ]);
   };
   const updateBeneficiary = (id: string, patch: Partial<Beneficiary>) => {
@@ -285,9 +340,11 @@ const CreateOffer = () => {
     addParticipant.isPending ||
     addInsured.isPending ||
     addLoan.isPending ||
-    calculateSchedules.isPending;
+    calculateSchedules.isPending ||
+    loanDisburseProgress !== null;
 
   const handleSave = async (_intent: "Draft" | "Submit" | "Approve") => {
+    if (saving) return;
     if (!canSave) {
       toast.error("Complete required fields before saving");
       return;
@@ -342,31 +399,65 @@ const CreateOffer = () => {
       });
 
       if (hasLoan) {
-        await addLoan.mutateAsync({
-          offerId,
-          body: {
-            year: Number(startDate.slice(0, 4)) || new Date().getFullYear(),
-            periodStart: startDate || undefined,
-            periodEnd: endDate || undefined,
-            remainingLoanAmount: Number(outstandingBalance) || Number(loanAmount) || 0,
-          },
+        const termYears = Number(loanTermYears) || 0;
+        const principal =
+          Number(outstandingBalance) || Number(loanAmount) || 0;
+        // Loop count = Loan Term (Years)
+        const disbursements = buildLoanDisbursements({
+          startDate,
+          loanTermYears: termYears,
+          principal,
         });
 
-        // Schedules only apply when the offer has a loan, after loan-disbursements.
-        await calculateSchedules.mutateAsync(offerId);
+        if (disbursements.length > 0) {
+          setLoanDisburseProgress({ current: 0, total: disbursements.length });
+          try {
+            for (let i = 0; i < disbursements.length; i++) {
+              const row = disbursements[i];
+              setLoanDisburseProgress({ current: i + 1, total: disbursements.length });
+              await addLoan.mutateAsync({
+                offerId,
+                body: {
+                  year: row.year,
+                  periodStart: row.periodStart,
+                  periodEnd: row.periodEnd,
+                  remainingLoanAmount: row.remainingLoanAmount,
+                },
+              });
+            }
+
+            // Schedules only apply when the offer has a loan, after loan-disbursements.
+            await calculateSchedules.mutateAsync(offerId);
+          } finally {
+            setLoanDisburseProgress(null);
+          }
+        }
       }
 
       toast.success(`Offer ${offerId} saved`);
       navigate(`/offers/${offerId}`);
     } catch (err) {
+      setLoanDisburseProgress(null);
       toast.error(err instanceof Error ? err.message : "Failed to create offer");
     }
   };
 
   return (
     <AppShell>
+      {loanDisburseProgress && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-lg border bg-card px-8 py-6 shadow-lg">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="text-sm font-medium">Creating loan disbursements…</div>
+            <div className="text-xs text-muted-foreground font-mono">
+              {loanDisburseProgress.current} / {loanDisburseProgress.total}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/offers")} className="gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/offers")} className="gap-2" disabled={saving}>
           <ArrowLeft className="h-4 w-4" /> Back to Offers
         </Button>
       </div>
@@ -476,29 +567,29 @@ const CreateOffer = () => {
             <CardContent className="grid gap-4 md:grid-cols-3">
               <div>
                 <Label>Policy Holder</Label>
-                <Select value={policyHolderId} onValueChange={setPolicyHolderId}>
-                  <SelectTrigger><SelectValue placeholder="Select holder" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <CustomerCombobox
+                  customers={customers}
+                  value={policyHolderId}
+                  onValueChange={setPolicyHolderId}
+                  placeholder="Select holder"
+                />
                 <Button
                   variant="link"
                   size="sm"
                   className="px-0 h-7 text-xs"
-                  onClick={() => navigate("/customers/new")}
+                  onClick={() => setCreateCustomerOpen(true)}
                 >
                   + Create new customer
                 </Button>
               </div>
               <div>
                 <Label>Invoice Recipient / Payer</Label>
-                <Select value={payerId} onValueChange={setPayerId}>
-                  <SelectTrigger><SelectValue placeholder="Select payer" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <CustomerCombobox
+                  customers={customers}
+                  value={payerId}
+                  onValueChange={setPayerId}
+                  placeholder="Select payer"
+                />
                 {policyHolderId && (
                   <Button
                     variant="link" size="sm" className="px-0 h-7 text-xs"
@@ -510,17 +601,12 @@ const CreateOffer = () => {
               </div>
               <div>
                 <Label>Insured Person</Label>
-                <Select
+                <CustomerCombobox
+                  customers={peopleOnly}
                   value={insuredId}
                   onValueChange={setInsuredId}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select insured person" /></SelectTrigger>
-                  <SelectContent>
-                    {peopleOnly.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select insured person"
+                />
                 {policyHolderId && getCustomerLocal(policyHolderId)?.customerType === "Individual" && (
                   <Button
                     variant="link" size="sm" className="px-0 h-7 text-xs"
@@ -551,7 +637,6 @@ const CreateOffer = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Customer</TableHead>
-                      <TableHead className="w-[180px]">Relationship</TableHead>
                       <TableHead className="w-[140px]">Percentage</TableHead>
                       <TableHead className="w-[60px]" />
                     </TableRow>
@@ -559,27 +644,20 @@ const CreateOffer = () => {
                   <TableBody>
                     {beneficiaries.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
+                        <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">
                           No beneficiaries added yet.
                         </TableCell>
                       </TableRow>
                     ) : beneficiaries.map((b) => (
                       <TableRow key={b.id}>
                         <TableCell>
-                          <Select value={b.customerId} onValueChange={(v) => updateBeneficiary(b.id, { customerId: v })}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                            <SelectContent>
-                              {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Select value={b.relationship} onValueChange={(v) => updateBeneficiary(b.id, { relationship: v })}>
-                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {RELATIONSHIPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          <CustomerCombobox
+                            customers={customers}
+                            value={b.customerId}
+                            onValueChange={(v) => updateBeneficiary(b.id, { customerId: v })}
+                            placeholder="Select customer"
+                            triggerClassName="h-9"
+                          />
                         </TableCell>
                         <TableCell>
                           <div className="relative">
@@ -625,11 +703,56 @@ const CreateOffer = () => {
             <CardContent className="grid gap-4 md:grid-cols-3">
               <div>
                 <Label>Start Date</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(parseISO(startDate), "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate ? parseISO(startDate) : undefined}
+                      onSelect={(d) => setStartDate(d ? format(d, "yyyy-MM-dd") : "")}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label>End Date</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(parseISO(endDate), "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate ? parseISO(endDate) : undefined}
+                      onSelect={(d) => setEndDate(d ? format(d, "yyyy-MM-dd") : "")}
+                      disabled={(date) => (startDate ? date < parseISO(startDate) : false)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
                 <div className="text-[11px] text-muted-foreground mt-1">Term: {termYears} years</div>
               </div>
               <div>
@@ -764,15 +887,38 @@ const CreateOffer = () => {
           {canSave ? "Ready to save." : "Complete product, parties and beneficiaries to enable submission."}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => handleSave("Draft")}>Save as Draft</Button>
-          <Button variant="outline" onClick={() => handleSave("Approve")} disabled={!canSave}>
+          <Button variant="outline" onClick={() => handleSave("Draft")} disabled={saving}>
+            {saving ? "Saving…" : "Save as Draft"}
+          </Button>
+          <Button variant="outline" onClick={() => handleSave("Approve")} disabled={!canSave || saving}>
             Approve & Save
           </Button>
-          <Button onClick={() => handleSave("Submit")} disabled={!canSave} className="gap-2">
+          <Button onClick={() => handleSave("Submit")} disabled={!canSave || saving} className="gap-2">
             <Check className="h-4 w-4" /> Submit Offer
           </Button>
         </div>
       </div>
+
+      <Dialog open={createCustomerOpen} onOpenChange={setCreateCustomerOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Customer</DialogTitle>
+            <DialogDescription>
+              Create a customer and select them as the policy holder.
+            </DialogDescription>
+          </DialogHeader>
+          {createCustomerOpen && (
+            <CustomerForm
+              embedded
+              onCancel={() => setCreateCustomerOpen(false)}
+              onSuccess={({ id }) => {
+                setCreateCustomerOpen(false);
+                setPolicyHolderId(id);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 };

@@ -15,6 +15,7 @@ import {
   newDocumentId,
 } from "@/data/documents";
 import { useListDocumentTypes } from "@/api/document-types";
+import { useListDocuments } from "@/api/documents";
 
 type Props = {
   open: boolean;
@@ -22,7 +23,7 @@ type Props = {
   productId: string;
   versionId: string;
   linkedDocumentTypeIds?: string[];
-  onSave: (d: ProductDocument) => void;
+  onSave: (d: ProductDocument & { description?: string; templateFile?: File | null }) => void;
 };
 
 const blank = (productId: string, versionId: string): ProductDocument => ({
@@ -42,9 +43,15 @@ const blank = (productId: string, versionId: string): ProductDocument => ({
 });
 
 const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocumentTypeIds = [], onSave }: Props) => {
+  const [source, setSource] = useState<"existing" | "new">("existing");
   const [d, setD] = useState<ProductDocument>(blank(productId, versionId));
+  const [description, setDescription] = useState("");
   const [documentTypeId, setDocumentTypeId] = useState<string>("");
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+
   const { data: typesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
+  const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
+
   const catalog = useMemo(() => {
     const linked = new Set(linkedDocumentTypeIds);
     return (typesPage?.items ?? []).filter((t) => {
@@ -53,9 +60,14 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
     });
   }, [typesPage?.items, linkedDocumentTypeIds]);
 
+  const templateDocuments = documentsPage?.items ?? [];
+
   useEffect(() => {
     setD(blank(productId, versionId));
     setDocumentTypeId("");
+    setDescription("");
+    setTemplateFile(null);
+    setSource("existing");
   }, [productId, versionId, open]);
 
   const set = <K extends keyof ProductDocument>(k: K, v: ProductDocument[K]) =>
@@ -67,52 +79,148 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
     setD((s) => ({
       ...s,
       name: found?.name?.trim() || s.name,
+      templateDocumentId: found?.templateDocumentId ?? null,
     }));
   };
 
   const handleSave = () => {
-    if (!documentTypeId) {
-      toast.error("Select a document type");
-      return;
+    if (source === "existing") {
+      if (!documentTypeId) {
+        toast.error("Select a document type");
+        return;
+      }
+      onSave({
+        ...d,
+        documentTypeId,
+        isMandatory: Boolean(d.isMandatory),
+        appliesWhen: Boolean(d.isMandatory) ? "Always" : "Conditional",
+        thresholdAmount: d.insuredAmountOver ?? undefined,
+      });
+    } else {
+      if (!d.name.trim()) {
+        toast.error("Name is required");
+        return;
+      }
+      onSave({
+        ...d,
+        documentTypeId: undefined,
+        description: description.trim() || d.name.trim(),
+        templateDocumentId: templateFile ? null : (d.templateDocumentId || null),
+        templateFile,
+        isMandatory: Boolean(d.isMandatory),
+        appliesWhen: Boolean(d.isMandatory) ? "Always" : "Conditional",
+        thresholdAmount: d.insuredAmountOver ?? undefined,
+      });
     }
-    onSave({
-      ...d,
-      documentTypeId,
-      isMandatory: Boolean(d.isMandatory),
-      appliesWhen: Boolean(d.isMandatory) ? "Always" : "Conditional",
-      thresholdAmount: d.insuredAmountOver ?? undefined,
-    });
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Link document type</DialogTitle>
+          <DialogTitle>Add required document</DialogTitle>
           <DialogDescription>
-            Attach an existing document type with API requirement rules.
+            Link an existing document type, or create a new one with an optional template.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
           <div className="space-y-1.5">
-            <Label>Document type *</Label>
-            <Select value={documentTypeId || undefined} onValueChange={pickExisting}>
-              <SelectTrigger><SelectValue placeholder="Select document type…" /></SelectTrigger>
+            <Label>Source</Label>
+            <Select
+              value={source}
+              onValueChange={(v) => {
+                setSource(v as "existing" | "new");
+                setDocumentTypeId("");
+                setTemplateFile(null);
+                setD((s) => ({ ...s, name: "", templateDocumentId: null }));
+                setDescription("");
+              }}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {catalog.length === 0 ? (
-                  <SelectItem value="__none" disabled>No document types available</SelectItem>
-                ) : (
-                  catalog.map((t) => (
-                    <SelectItem key={t.id} value={t.id ?? ""}>
-                      {t.name ?? t.id}
-                    </SelectItem>
-                  ))
-                )}
+                <SelectItem value="existing">Existing document type</SelectItem>
+                <SelectItem value="new">Create new document type</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {source === "existing" ? (
+            <div className="space-y-1.5">
+              <Label>Document type *</Label>
+              <Select value={documentTypeId || undefined} onValueChange={pickExisting}>
+                <SelectTrigger><SelectValue placeholder="Select document type…" /></SelectTrigger>
+                <SelectContent>
+                  {catalog.length === 0 ? (
+                    <SelectItem value="__none" disabled>No document types available</SelectItem>
+                  ) : (
+                    catalog.map((t) => (
+                      <SelectItem key={t.id} value={t.id ?? ""}>
+                        {t.name ?? t.id}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="dt-name">Name *</Label>
+                <Input
+                  id="dt-name"
+                  value={d.name}
+                  onChange={(e) => set("name", e.target.value)}
+                  placeholder="ID Card / Passport"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="dt-desc">Description</Label>
+                <Input
+                  id="dt-desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional — defaults to name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Template document</Label>
+                <Select
+                  value={d.templateDocumentId || "none"}
+                  onValueChange={(v) => {
+                    set("templateDocumentId", v === "none" ? null : v);
+                    setTemplateFile(null);
+                  }}
+                  disabled={Boolean(templateFile)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select existing document…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {templateDocuments.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id ?? ""}>
+                        {doc.originalFileName ?? doc.storedFileName ?? doc.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Or upload template</Label>
+                <Input
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setTemplateFile(file);
+                    if (file) set("templateDocumentId", null);
+                  }}
+                />
+                {templateFile && (
+                  <p className="text-xs text-muted-foreground truncate">Will upload: {templateFile.name}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* API requirement rules */}
           <div className="rounded-md border border-border p-4 space-y-4">
@@ -162,17 +270,15 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
                   className="font-mono"
                 />
               </div>
-           
             </div>
-               <div className="space-y-1.5">
-                <Label className="block">PEP</Label>
-                <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
-                  <span className="text-sm">{d.isPep ? "Required for PEP" : "Not PEP-specific"}</span>
-                  <Switch checked={Boolean(d.isPep)} onCheckedChange={(v) => set("isPep", v)} />
-                </label>
-              </div>
+            <div className="space-y-1.5">
+              <Label className="block">PEP</Label>
+              <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                <span className="text-sm">{d.isPep ? "Required for PEP" : "Not PEP-specific"}</span>
+                <Switch checked={Boolean(d.isPep)} onCheckedChange={(v) => set("isPep", v)} />
+              </label>
+            </div>
           </div>
-
         </div>
 
         <DialogFooter>

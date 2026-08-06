@@ -34,7 +34,12 @@ import {
 } from "@/api/products";
 import { useListCoverages, createCoverage } from "@/api/coverages";
 import { useListRatingTables } from "@/api/rating-tables";
-import { useListDocumentTypes } from "@/api/document-types";
+import { useListDocumentTypes, createDocumentType } from "@/api/document-types";
+import {
+  useListDocuments,
+  createDocument,
+  buildCreateDocumentFormData,
+} from "@/api/documents";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -93,8 +98,13 @@ const blankCoverage = (overrides?: Partial<DraftCoverage>): DraftCoverage => ({
 });
 
 type DraftDocRequirement = {
+  source: "new" | "existing";
   documentTypeId: string;
   name: string;
+  description: string;
+  templateDocumentId: string;
+  /** Pending upload; sent to POST /api/documents before creating the document type. */
+  templateFile: File | null;
   alwaysRequired: boolean;
   insuredAmountOver: string;
   totalExposureOver: string;
@@ -102,8 +112,12 @@ type DraftDocRequirement = {
   isPep: boolean;
 };
 const blankDocRequirement = (overrides?: Partial<DraftDocRequirement>): DraftDocRequirement => ({
+  source: "new",
   documentTypeId: "",
   name: "",
+  description: "",
+  templateDocumentId: "",
+  templateFile: null,
   alwaysRequired: true,
   insuredAmountOver: "1",
   totalExposureOver: "1",
@@ -121,11 +135,13 @@ const CreateProduct = () => {
   const { data: coveragesPage, isLoading: coveragesLoading } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: ratingTablesPage } = useListRatingTables({ pageNumber: 1, pageSize: 200 });
   const { data: documentTypesPage, isLoading: documentTypesLoading } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
+  const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
   const createProduct = useCreateProduct();
   const apiGroups = groupsPage?.items ?? [];
   const coverageCatalog = coveragesPage?.items ?? [];
   const ratingTables = ratingTablesPage?.items ?? [];
   const documentTypeCatalog = documentTypesPage?.items ?? [];
+  const templateDocuments = documentsPage?.items ?? [];
   const [saving, setSaving] = useState(false);
 
   // Basic
@@ -261,7 +277,12 @@ const CreateProduct = () => {
   const [docRequirements, setDocRequirements] = useState<DraftDocRequirement[]>([]);
   const setDocReqField = (idx: number, patch: Partial<DraftDocRequirement>) =>
     setDocRequirements((ds) => ds.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
-  const selectedDocTypeIds = new Set(docRequirements.map((d) => d.documentTypeId).filter(Boolean));
+  const selectedDocTypeIds = new Set(
+    docRequirements.filter((d) => d.source === "existing" && d.documentTypeId).map((d) => d.documentTypeId)
+  );
+  const newDocRequirements = docRequirements
+    .map((d, idx) => ({ d, idx }))
+    .filter(({ d }) => d.source === "new");
 
   const toggleDocumentType = (docType: (typeof documentTypeCatalog)[number], checked: boolean) => {
     const id = docType.id ?? "";
@@ -270,12 +291,17 @@ const CreateProduct = () => {
       setDocRequirements((ds) => [
         ...ds,
         blankDocRequirement({
+          source: "existing",
           documentTypeId: id,
           name: docType.name?.trim() || id,
+          description: docType.description ?? "",
+          templateDocumentId: docType.templateDocumentId ?? "",
         }),
       ]);
     } else {
-      setDocRequirements((ds) => ds.filter((d) => d.documentTypeId !== id));
+      setDocRequirements((ds) =>
+        ds.filter((d) => !(d.source === "existing" && d.documentTypeId === id))
+      );
     }
   };
 
@@ -297,6 +323,13 @@ const CreateProduct = () => {
     for (const c of coverageDrafts) {
       if (!c.ratingTableId) {
         toast.error(`Coverage "${c.name || c.coverageId}" needs a rating table`);
+        return;
+      }
+    }
+
+    for (const d of docRequirements) {
+      if (d.source === "new" && !d.name.trim()) {
+        toast.error("New document type needs a name");
         return;
       }
     }
@@ -330,9 +363,26 @@ const CreateProduct = () => {
       }
 
       for (const d of docRequirements) {
-        if (!d.documentTypeId) continue;
+        let documentTypeId = d.source === "existing" ? d.documentTypeId : undefined;
+        if (!documentTypeId) {
+          let templateDocumentId = d.templateDocumentId || null;
+          if (d.templateFile) {
+            const uploaded = await createDocument(
+              buildCreateDocumentFormData(d.templateFile, d.templateFile.name)
+            );
+            if (!uploaded.id) throw new Error(`Failed to upload template for "${d.name}"`);
+            templateDocumentId = uploaded.id;
+          }
+          const dt = await createDocumentType({
+            name: d.name.trim(),
+            description: d.description.trim() || d.name.trim(),
+            templateDocumentId,
+          });
+          if (!dt.id) throw new Error(`Document type "${d.name}" created without id`);
+          documentTypeId = dt.id;
+        }
         await addProductDocumentType(created.id, {
-          documentTypeId: d.documentTypeId,
+          documentTypeId,
           alwaysRequired: d.alwaysRequired,
           insuredAmountOver: d.insuredAmountOver === "" ? null : Number(d.insuredAmountOver),
           totalExposureOver: d.totalExposureOver === "" ? null : Number(d.totalExposureOver),
@@ -702,7 +752,7 @@ const CreateProduct = () => {
             <div className="flex items-start justify-between mb-4 gap-3">
               <SectionTitle
                 title="Coverages"
-                desc="Select coverages from the catalog and assign a rating table. Saved after the product is created."
+                desc="Select from the catalog or create a new coverage. Saved after the product is created."
               />
               <Button
                 type="button"
@@ -716,14 +766,14 @@ const CreateProduct = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-md border border-border">
+              <div className="rounded-md border border-border overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
                   <p className="text-xs font-medium text-muted-foreground">All coverages</p>
                   <Badge variant="secondary" className="text-[10px]">
                     {selectedExistingIds.size} selected
                   </Badge>
                 </div>
-                <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                <div className="max-h-64 overflow-y-auto overscroll-contain divide-y divide-border">
                   {coveragesLoading && (
                     <p className="text-xs text-muted-foreground p-3">Loading coverages…</p>
                   )}
@@ -867,96 +917,239 @@ const CreateProduct = () => {
 
           {/* Required documents — linked after product create via /products/{id}/document-types */}
           <Card className="p-6 shadow-card border-border">
-            <SectionTitle
-              title="Required documents"
-              desc="Select document types to require. Saved after the product is created."
-            />
-            <div className="rounded-md border border-border">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground">All document types</p>
-                <Badge variant="secondary" className="text-[10px]">
-                  {selectedDocTypeIds.size} selected
-                </Badge>
+            <div className="flex items-start justify-between mb-4 gap-3">
+              <SectionTitle
+                title="Required documents"
+                desc="Select document types from the catalog, or create a new one with an optional template. Saved after the product is created."
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDocRequirements((ds) => [...ds, blankDocRequirement()])}
+                className="gap-1"
+              >
+                <Plus className="h-4 w-4" /> Create new
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-md border border-border">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
+                  <p className="text-xs font-medium text-muted-foreground">All document types</p>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {selectedDocTypeIds.size} selected
+                  </Badge>
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                  {documentTypesLoading && (
+                    <p className="text-xs text-muted-foreground p-3">Loading document types…</p>
+                  )}
+                  {!documentTypesLoading && documentTypeCatalog.length === 0 && (
+                    <p className="text-xs text-muted-foreground p-3">
+                      No document types in the catalog yet. Use Create new, or add them later on the product detail page.
+                    </p>
+                  )}
+                  {documentTypeCatalog.map((docType) => {
+                    const id = docType.id ?? "";
+                    const selected = selectedDocTypeIds.has(id);
+                    const draftIdx = docRequirements.findIndex(
+                      (d) => d.source === "existing" && d.documentTypeId === id
+                    );
+                    const draft = draftIdx >= 0 ? docRequirements[draftIdx] : null;
+                    return (
+                      <div key={id || docType.name} className="p-3 space-y-3">
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <Checkbox
+                            className="mt-0.5"
+                            checked={selected}
+                            onCheckedChange={(v) => toggleDocumentType(docType, !!v)}
+                            disabled={!id}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{docType.name ?? id}</div>
+                            {docType.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{docType.description}</p>
+                            )}
+                          </div>
+                        </label>
+                        {selected && draft && draftIdx >= 0 && (
+                          <div className="ml-7 grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Insured amount over</Label>
+                              <Input
+                                type="number"
+                                className="font-mono"
+                                value={draft.insuredAmountOver}
+                                onChange={(e) => setDocReqField(draftIdx, { insuredAmountOver: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Total exposure over</Label>
+                              <Input
+                                type="number"
+                                className="font-mono"
+                                value={draft.totalExposureOver}
+                                onChange={(e) => setDocReqField(draftIdx, { totalExposureOver: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Age over</Label>
+                              <Input
+                                type="number"
+                                className="font-mono"
+                                value={draft.ageOver}
+                                onChange={(e) => setDocReqField(draftIdx, { ageOver: e.target.value })}
+                              />
+                            </div>
+                            <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
+                              <Checkbox
+                                checked={draft.alwaysRequired}
+                                onCheckedChange={(v) => setDocReqField(draftIdx, { alwaysRequired: !!v })}
+                              />
+                              <span className="text-sm">Always required</span>
+                            </label>
+                            <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
+                              <Checkbox
+                                checked={draft.isPep}
+                                onCheckedChange={(v) => setDocReqField(draftIdx, { isPep: !!v })}
+                              />
+                              <span className="text-sm">PEP</span>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="max-h-72 overflow-y-auto divide-y divide-border">
-                {documentTypesLoading && (
-                  <p className="text-xs text-muted-foreground p-3">Loading document types…</p>
-                )}
-                {!documentTypesLoading && documentTypeCatalog.length === 0 && (
-                  <p className="text-xs text-muted-foreground p-3">
-                    No document types in the catalog yet. Add them later on the product detail page.
-                  </p>
-                )}
-                {documentTypeCatalog.map((docType) => {
-                  const id = docType.id ?? "";
-                  const selected = selectedDocTypeIds.has(id);
-                  const draftIdx = docRequirements.findIndex((d) => d.documentTypeId === id);
-                  const draft = draftIdx >= 0 ? docRequirements[draftIdx] : null;
-                  return (
-                    <div key={id || docType.name} className="p-3 space-y-3">
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <Checkbox
-                          className="mt-0.5"
-                          checked={selected}
-                          onCheckedChange={(v) => toggleDocumentType(docType, !!v)}
-                          disabled={!id}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">{docType.name ?? id}</div>
-                          {docType.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{docType.description}</p>
+
+              {newDocRequirements.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground">New document types to create</p>
+                  {newDocRequirements.map(({ d, idx }) => (
+                    <div key={idx} className="border border-border rounded-md p-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label>Name *</Label>
+                          <Input
+                            value={d.name}
+                            onChange={(e) => setDocReqField(idx, { name: e.target.value })}
+                            placeholder="ID Card / Passport"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Description</Label>
+                          <Input
+                            value={d.description}
+                            onChange={(e) => setDocReqField(idx, { description: e.target.value })}
+                            placeholder="Optional — defaults to name"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label>Template document</Label>
+                          <Select
+                            value={d.templateDocumentId || "none"}
+                            onValueChange={(v) =>
+                              setDocReqField(idx, {
+                                templateDocumentId: v === "none" ? "" : v,
+                                templateFile: null,
+                              })
+                            }
+                            disabled={Boolean(d.templateFile)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select existing document…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {templateDocuments.map((doc) => (
+                                <SelectItem key={doc.id} value={doc.id ?? ""}>
+                                  {doc.originalFileName ?? doc.storedFileName ?? doc.id}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Or upload template</Label>
+                          <Input
+                            type="file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] ?? null;
+                              setDocReqField(idx, {
+                                templateFile: file,
+                                templateDocumentId: file ? "" : d.templateDocumentId,
+                              });
+                            }}
+                          />
+                          {d.templateFile && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              Will upload: {d.templateFile.name}
+                            </p>
                           )}
                         </div>
-                      </label>
-                      {selected && draft && draftIdx >= 0 && (
-                        <div className="ml-7 grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div className="space-y-1.5">
-                            <Label>Insured amount over</Label>
-                            <Input
-                              type="number"
-                              className="font-mono"
-                              value={draft.insuredAmountOver}
-                              onChange={(e) => setDocReqField(draftIdx, { insuredAmountOver: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label>Total exposure over</Label>
-                            <Input
-                              type="number"
-                              className="font-mono"
-                              value={draft.totalExposureOver}
-                              onChange={(e) => setDocReqField(draftIdx, { totalExposureOver: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label>Age over</Label>
-                            <Input
-                              type="number"
-                              className="font-mono"
-                              value={draft.ageOver}
-                              onChange={(e) => setDocReqField(draftIdx, { ageOver: e.target.value })}
-                            />
-                          </div>
-                          <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
-                            <Checkbox
-                              checked={draft.alwaysRequired}
-                              onCheckedChange={(v) => setDocReqField(draftIdx, { alwaysRequired: !!v })}
-                            />
-                            <span className="text-sm">Always required</span>
-                          </label>
-                          <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
-                            <Checkbox
-                              checked={draft.isPep}
-                              onCheckedChange={(v) => setDocReqField(draftIdx, { isPep: !!v })}
-                            />
-                            <span className="text-sm">PEP</span>
-                          </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-1.5">
+                          <Label>Insured amount over</Label>
+                          <Input
+                            type="number"
+                            className="font-mono"
+                            value={d.insuredAmountOver}
+                            onChange={(e) => setDocReqField(idx, { insuredAmountOver: e.target.value })}
+                          />
                         </div>
-                      )}
+                        <div className="space-y-1.5">
+                          <Label>Total exposure over</Label>
+                          <Input
+                            type="number"
+                            className="font-mono"
+                            value={d.totalExposureOver}
+                            onChange={(e) => setDocReqField(idx, { totalExposureOver: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Age over</Label>
+                          <Input
+                            type="number"
+                            className="font-mono"
+                            value={d.ageOver}
+                            onChange={(e) => setDocReqField(idx, { ageOver: e.target.value })}
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
+                          <Checkbox
+                            checked={d.alwaysRequired}
+                            onCheckedChange={(v) => setDocReqField(idx, { alwaysRequired: !!v })}
+                          />
+                          <span className="text-sm">Always required</span>
+                        </label>
+                        <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
+                          <Checkbox
+                            checked={d.isPep}
+                            onCheckedChange={(v) => setDocReqField(idx, { isPep: !!v })}
+                          />
+                          <span className="text-sm">PEP</span>
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="justify-self-end"
+                          onClick={() => setDocRequirements((ds) => ds.filter((_, i) => i !== idx))}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Remove
+                        </Button>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </Card>
 

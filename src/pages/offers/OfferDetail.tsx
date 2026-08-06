@@ -95,6 +95,7 @@ import { mapApiOffer } from "@/api/adapters/offers";
 import { useGetProduct, mapApiProduct } from "@/api/products";
 import { useListCoverages } from "@/api/coverages";
 import { useListDocumentTypes } from "@/api/document-types";
+import { useListDocuments } from "@/api/documents";
 import { customerPath } from "@/api/adapters/customers";
 
 const fmtMoney = (v: number, ccy: string) =>
@@ -178,6 +179,7 @@ const OfferDetail = () => {
   const submitScheduleDocument = useSubmitOfferScheduleDocument();
   const { data: coveragesPage } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
+  const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
 
   const [pendingRemove, setPendingRemove] = useState<
     | { kind: "insured"; id: string; label: string }
@@ -199,7 +201,7 @@ const OfferDetail = () => {
     year: number;
     label: string;
   } | null>(null);
-  const [docSubmitTypeId, setDocSubmitTypeId] = useState("");
+  const [docSubmitDocumentId, setDocSubmitDocumentId] = useState("");
   const [pendingDocApprove, setPendingDocApprove] = useState<{
     requirementId: string;
     year: number;
@@ -427,8 +429,8 @@ const OfferDetail = () => {
 
   const handleSubmitScheduleDocument = async () => {
     if (!docSubmitDialog) return;
-    if (!docSubmitTypeId) {
-      toast.error("Select a document type");
+    if (!docSubmitDocumentId) {
+      toast.error("Select a document");
       return;
     }
     try {
@@ -436,11 +438,11 @@ const OfferDetail = () => {
         offerId: offer.id,
         year: String(docSubmitDialog.year),
         requirementId: docSubmitDialog.requirementId,
-        body: { documentId: docSubmitTypeId },
+        body: { documentId: docSubmitDocumentId },
       });
       toast.success(`Document submitted: ${docSubmitDialog.label}`);
       setDocSubmitDialog(null);
-      setDocSubmitTypeId("");
+      setDocSubmitDocumentId("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit document");
     }
@@ -650,14 +652,24 @@ const OfferDetail = () => {
                 {offer.loanDisbursements.length > 0 && (
                   <div className="col-span-2 mt-2 pt-3 border-t space-y-3">
                     <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Loan Disbursements</div>
-                    {offer.loanDisbursements.map((loan) => (
-                      <div key={loan.id} className="grid grid-cols-2 gap-3">
-                        <Field label="Year" value={loan.year || "—"} />
-                        <Field label="Remaining Amount" value={fmtMoney(loan.remainingLoanAmount, offer.currency)} />
-                        <Field label="Period Start" value={<span className="font-mono text-xs">{loan.startDate || "—"}</span>} />
-                        <Field label="Period End" value={<span className="font-mono text-xs">{loan.endDate || "—"}</span>} />
-                      </div>
-                    ))}
+                    {(() => {
+                      const loans = offer.loanDisbursements;
+                      const endpoints =
+                        loans.length === 1
+                          ? [loans[0]]
+                          : [loans[0], loans[loans.length - 1]];
+                      return endpoints.map((loan, idx) => (
+                        <div key={loan.id || idx} className="grid grid-cols-2 gap-3">
+                          <Field
+                            label={loans.length === 1 ? "Disbursement" : idx === 0 ? "First" : "Last"}
+                            value={loan.year || "—"}
+                          />
+                          <Field label="Remaining Amount" value={fmtMoney(loan.remainingLoanAmount, offer.currency)} />
+                          <Field label="Period Start" value={<span className="font-mono text-xs">{loan.startDate || "—"}</span>} />
+                          <Field label="Period End" value={<span className="font-mono text-xs">{loan.endDate || "—"}</span>} />
+                        </div>
+                      ));
+                    })()}
                   </div>
                 )}
               </CardContent>
@@ -1374,7 +1386,7 @@ const OfferDetail = () => {
                                   className="gap-1.5 h-8"
                                   disabled={!canSubmit || docActionPending}
                                   onClick={() => {
-                                    setDocSubmitTypeId(d.documentTypeId);
+                                    setDocSubmitDocumentId("");
                                     setDocSubmitDialog({
                                       requirementId: d.id,
                                       year: d.scheduleYear,
@@ -1387,7 +1399,7 @@ const OfferDetail = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="gap-1.5 h-8"
+                                  className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
                                   disabled={!canReview || docActionPending}
                                   onClick={() =>
                                     setPendingDocApprove({
@@ -1507,7 +1519,7 @@ const OfferDetail = () => {
             onOpenChange={(open) => {
               if (!open) {
                 setDocSubmitDialog(null);
-                setDocSubmitTypeId("");
+                setDocSubmitDocumentId("");
               }
             }}
           >
@@ -1515,21 +1527,21 @@ const OfferDetail = () => {
               <DialogHeader>
                 <DialogTitle>Submit document · {docSubmitDialog?.label}</DialogTitle>
                 <DialogDescription>
-                  Select a document type to submit for schedule year {docSubmitDialog?.year}.
+                  Select a document to submit for schedule year {docSubmitDialog?.year}.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2 py-2">
-                <Label>Document type</Label>
-                <Select value={docSubmitTypeId} onValueChange={setDocSubmitTypeId}>
+                <Label>Document</Label>
+                <Select value={docSubmitDocumentId} onValueChange={setDocSubmitDocumentId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select document type" />
+                    <SelectValue placeholder="Select document…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(documentTypesPage?.items ?? [])
-                      .filter((dt) => Boolean(dt.id))
-                      .map((dt) => (
-                        <SelectItem key={dt.id!} value={dt.id!}>
-                          {dt.name?.trim() || dt.id}
+                    {(documentsPage?.items ?? [])
+                      .filter((doc) => Boolean(doc.id))
+                      .map((doc) => (
+                        <SelectItem key={doc.id!} value={doc.id!}>
+                          {doc.originalFileName ?? doc.storedFileName ?? doc.id}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -1540,7 +1552,7 @@ const OfferDetail = () => {
                   variant="outline"
                   onClick={() => {
                     setDocSubmitDialog(null);
-                    setDocSubmitTypeId("");
+                    setDocSubmitDocumentId("");
                   }}
                   disabled={submitScheduleDocument.isPending}
                 >
@@ -1548,7 +1560,7 @@ const OfferDetail = () => {
                 </Button>
                 <Button
                   onClick={() => void handleSubmitScheduleDocument()}
-                  disabled={submitScheduleDocument.isPending || !docSubmitTypeId}
+                  disabled={submitScheduleDocument.isPending || !docSubmitDocumentId}
                 >
                   {submitScheduleDocument.isPending ? "Submitting…" : "Submit"}
                 </Button>

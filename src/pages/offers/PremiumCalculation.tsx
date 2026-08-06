@@ -161,6 +161,12 @@ const PremiumCalculation = ({
   const baseCurrency = "EUR";
   const fxCandidates = currency === baseCurrency ? [] : getRatesForPair(baseCurrency, currency);
   const [fxOverrideId, setFxOverrideId] = useState<string>("auto");
+
+  // Reset override when offer currency changes so we don't keep a stale pair id.
+  useEffect(() => {
+    setFxOverrideId("auto");
+  }, [currency]);
+
   const fxOverrideRate =
     fxOverrideId === "auto" ? undefined : fxCandidates.find((c) => c.id === fxOverrideId)?.rate;
   const fxConv = convert(1, baseCurrency, currency, fxOverrideRate);
@@ -274,27 +280,21 @@ const PremiumCalculation = ({
     template ? (template.agentCommission + template.bankCommission) * 100 : (subtotal > 0 ? (weightedCommission / subtotal) * 100 : 0);
   const commission = (netPremium * effectiveCommissionPct) / 100;
 
-  // ---- Multi-year schedule ----
+  // ---- Multi-year schedule (row count = Loan Term when a loan is present) ----
   const schedule: ScheduleRow[] = [];
   const start = startDate ? new Date(startDate) : new Date();
   const currentYearNum = new Date().getFullYear();
-  const termN = Math.max(1, termYears);
+  const termN = Math.max(
+    1,
+    loan && loan.loanTermYears > 0 ? Math.floor(loan.loanTermYears) : termYears,
+  );
 
-  // Pre-compute amortization schedule for loan balance (standard annuity)
+  // Projected loan balance per year — same linear decline as loan-disbursements
   const amort: number[] = [];
-  if (loan && loan.outstandingBalance > 0) {
-    const remTerm = Math.max(1, loan.remainingYears ?? loan.loanTermYears ?? termN);
-    const r = (loan.interestRate ?? 0) / 100;
-    let bal = loan.outstandingBalance;
-    // annual payment via annuity formula
-    const annualPay = r > 0
-      ? (bal * r) / (1 - Math.pow(1 + r, -remTerm))
-      : bal / remTerm;
+  if (loan) {
+    const principal = Math.max(0, loan.outstandingBalance || loan.amount || 0);
     for (let i = 0; i < termN; i++) {
-      amort.push(Math.max(0, bal));
-      const interest = bal * r;
-      const principal = Math.max(0, annualPay - interest);
-      bal = Math.max(0, bal - principal);
+      amort.push(Math.round(((principal * (termN - i)) / termN) * 100) / 100);
     }
   }
 
@@ -324,8 +324,8 @@ const PremiumCalculation = ({
       case "Pagesa me prim te rregullt":
       default: {
         // Regular premium — if loan-protection, follows declining balance
-        if (loan && loan.outstandingBalance > 0 && amort.length > 0) {
-          const factor = amort[i] / loan.outstandingBalance;
+        if (loan && amort.length > 0 && amort[0] > 0) {
+          const factor = amort[i] / amort[0];
           return {
             net: netPremium * factor,
             note: `Tracks loan balance (${(factor * 100).toFixed(0)}%)`,
@@ -381,7 +381,21 @@ const PremiumCalculation = ({
       schedule,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [netPremium, tax, commission, grossPremium, fxConv.rate, manualOverride, manualAmount, manualReason]);
+  }, [
+    netPremium,
+    tax,
+    commission,
+    grossPremium,
+    fxConv.rate,
+    manualOverride,
+    manualAmount,
+    manualReason,
+    termN,
+    loan?.loanTermYears,
+    loan?.outstandingBalance,
+    loan?.amount,
+    paymentMode,
+  ]);
 
   const toggleRider = (id: string) => {
     setSelectedRiders((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -411,7 +425,7 @@ const PremiumCalculation = ({
           <div><div className="text-[11px] uppercase text-muted-foreground">Insured Age</div><div className="font-medium">{insuredAge}</div></div>
           <div><div className="text-[11px] uppercase text-muted-foreground">Gender</div><div className="font-medium">{insuredGender}</div></div>
           <div><div className="text-[11px] uppercase text-muted-foreground">Currency</div><div className="font-medium">{currency}</div></div>
-          <div><div className="text-[11px] uppercase text-muted-foreground">Term</div><div className="font-medium">{termYears} years</div></div>
+          <div><div className="text-[11px] uppercase text-muted-foreground">Term</div><div className="font-medium">{termN} years</div></div>
           {loan && (
             <>
               <div><div className="text-[11px] uppercase text-muted-foreground">Loan Outstanding</div><div className="font-medium">{fmt(loan.outstandingBalance, currency)}</div></div>
@@ -531,9 +545,19 @@ const PremiumCalculation = ({
           <CardHeader className="pb-1.5"><CardDescription>FX Rate (EUR→{currency})</CardDescription></CardHeader>
           <CardContent>
             <div className="text-lg font-semibold font-mono">
-              {currency === baseCurrency ? "n/a" : isFinite(fxConv.rate) ? fxConv.rate.toFixed(4) : "—"}
+              {currency === baseCurrency
+                ? "1.0000"
+                : isFinite(fxConv.rate)
+                  ? fxConv.rate.toFixed(4)
+                  : "—"}
             </div>
-            <div className="text-[10px] text-muted-foreground">{fxConv.source}</div>
+            <div className="text-[10px] text-muted-foreground">
+              {currency === baseCurrency
+                ? "Same currency"
+                : fxConv.source === "missing"
+                  ? "No rate for this pair"
+                  : fxConv.source}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -608,14 +632,16 @@ const PremiumCalculation = ({
         )}
       </Card>
 
-      {/* Multi-year schedule */}
+      {/* Multi-year schedule — temporarily hidden
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <ArrowRight className="h-4 w-4" /> Multi-Year Schedule
           </CardTitle>
           <CardDescription>
-            Estimated premium for each policy year — driven by the selected payment mode{loan ? " and projected loan balance" : ""}.
+            Estimated premium for each policy year — row count follows{" "}
+            {loan && loan.loanTermYears > 0 ? "Loan Term (Years)" : "policy term"}
+            {loan ? " and projected loan balance" : ""}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -693,6 +719,7 @@ const PremiumCalculation = ({
           </div>
         </CardContent>
       </Card>
+      */}
     </div>
   );
 };
