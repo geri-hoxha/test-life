@@ -27,16 +27,18 @@ import {
   listPremiumTables, addPremiumTable, PremiumTableItem,
 } from "@/data/products";
 import { useListProductGroups } from "@/api/product-groups";
-import { useCreateProduct } from "@/api/products";
+import {
+  useCreateProduct,
+  addProductCoverage,
+  addProductDocumentType,
+} from "@/api/products";
+import { useListCoverages, createCoverage } from "@/api/coverages";
+import { useListRatingTables } from "@/api/rating-tables";
+import { useListDocumentTypes } from "@/api/document-types";
 import { toast } from "sonner";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 const ALL_CURRENCIES = ["EUR", "ALL", "USD"] as const;
-
-const DOC_OPTIONS = [
-  "ID document", "Medical questionnaire", "Medical report",
-  "Proof of income", "Proof of address", "Beneficiary declaration",
-];
 
 const FLAGS = [
   { key: "pep", label: "PEP check required", desc: "Politically Exposed Person screening before issuance." },
@@ -68,9 +70,46 @@ const blankTariff = (currency = "EUR"): DraftTariff => ({
   formula: "premium = coefficient × sum_insured", notes: "",
 });
 
-type DraftCoverage = { name: string; description: string; legacyCoverageId: string; isMandatory: boolean };
-const blankCoverage = (): DraftCoverage => ({
-  name: "", description: "", legacyCoverageId: "0", isMandatory: true,
+type DraftCoverage = {
+  source: "new" | "existing";
+  coverageId: string;
+  name: string;
+  description: string;
+  legacyCoverageId: string;
+  ratingTableId: string;
+  ratingTableMultiplier: string;
+  isMandatory: boolean;
+};
+const blankCoverage = (overrides?: Partial<DraftCoverage>): DraftCoverage => ({
+  source: "new",
+  coverageId: "",
+  name: "",
+  description: "",
+  legacyCoverageId: "0",
+  ratingTableId: "",
+  ratingTableMultiplier: "1",
+  isMandatory: true,
+  ...overrides,
+});
+
+type DraftDocRequirement = {
+  documentTypeId: string;
+  name: string;
+  alwaysRequired: boolean;
+  insuredAmountOver: string;
+  totalExposureOver: string;
+  ageOver: string;
+  isPep: boolean;
+};
+const blankDocRequirement = (overrides?: Partial<DraftDocRequirement>): DraftDocRequirement => ({
+  documentTypeId: "",
+  name: "",
+  alwaysRequired: true,
+  insuredAmountOver: "1",
+  totalExposureOver: "1",
+  ageOver: "0",
+  isPep: true,
+  ...overrides,
 });
 
 const CreateProduct = () => {
@@ -79,8 +118,15 @@ const CreateProduct = () => {
   const presetGroupId = searchParams.get("groupId") ?? "";
 
   const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 100 });
+  const { data: coveragesPage, isLoading: coveragesLoading } = useListCoverages({ pageNumber: 1, pageSize: 200 });
+  const { data: ratingTablesPage } = useListRatingTables({ pageNumber: 1, pageSize: 200 });
+  const { data: documentTypesPage, isLoading: documentTypesLoading } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
   const createProduct = useCreateProduct();
   const apiGroups = groupsPage?.items ?? [];
+  const coverageCatalog = coveragesPage?.items ?? [];
+  const ratingTables = ratingTablesPage?.items ?? [];
+  const documentTypeCatalog = documentTypesPage?.items ?? [];
+  const [saving, setSaving] = useState(false);
 
   // Basic
   const [name, setName] = useState("");
@@ -181,14 +227,58 @@ const CreateProduct = () => {
   const setTariffField = (idx: number, patch: Partial<DraftTariff>) =>
     setTariffs((ts) => ts.map((t, i) => (i === idx ? { ...t, ...patch } : t)));
 
-  // Coverages (multiple per product)
-  const [coverages, setCoverages] = useState<DraftCoverage[]>([{ ...blankCoverage(), name: "Death" }]);
+  // Coverages (multiple per product) — posted after product create
+  const [coverages, setCoverages] = useState<DraftCoverage[]>([]);
   const setCovField = (idx: number, patch: Partial<DraftCoverage>) =>
     setCoverages((cs) => cs.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
 
-  // Documents & flags
-  const [docs, setDocs] = useState<string[]>(["ID document"]);
-  const [newDoc, setNewDoc] = useState("");
+  const selectedExistingIds = new Set(
+    coverages.filter((c) => c.source === "existing" && c.coverageId).map((c) => c.coverageId)
+  );
+  const newCoverages = coverages
+    .map((c, idx) => ({ c, idx }))
+    .filter(({ c }) => c.source === "new");
+
+  const toggleCatalogCoverage = (cov: (typeof coverageCatalog)[number], checked: boolean) => {
+    const id = cov.id ?? "";
+    if (!id) return;
+    if (checked) {
+      setCoverages((cs) => [
+        ...cs,
+        blankCoverage({
+          source: "existing",
+          coverageId: id,
+          name: cov.name?.trim() || "",
+          description: cov.description ?? "",
+        }),
+      ]);
+    } else {
+      setCoverages((cs) => cs.filter((c) => !(c.source === "existing" && c.coverageId === id)));
+    }
+  };
+
+  // Required documents — posted after product create via /products/{id}/document-types
+  const [docRequirements, setDocRequirements] = useState<DraftDocRequirement[]>([]);
+  const setDocReqField = (idx: number, patch: Partial<DraftDocRequirement>) =>
+    setDocRequirements((ds) => ds.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
+  const selectedDocTypeIds = new Set(docRequirements.map((d) => d.documentTypeId).filter(Boolean));
+
+  const toggleDocumentType = (docType: (typeof documentTypeCatalog)[number], checked: boolean) => {
+    const id = docType.id ?? "";
+    if (!id) return;
+    if (checked) {
+      setDocRequirements((ds) => [
+        ...ds,
+        blankDocRequirement({
+          documentTypeId: id,
+          name: docType.name?.trim() || id,
+        }),
+      ]);
+    } else {
+      setDocRequirements((ds) => ds.filter((d) => d.documentTypeId !== id));
+    }
+  };
+
   const [flags, setFlags] = useState({
     pep: false, highInsuredAmount: false, totalExposure: false, manualUnderwriting: false, compliance: false,
   });
@@ -196,37 +286,68 @@ const CreateProduct = () => {
   const toggleCurrency = (c: string) =>
     setCurrencies((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
-  const addDoc = (d: string) => {
-    const v = d.trim();
-    if (!v || docs.includes(v)) return;
-    setDocs([...docs, v]);
-    setNewDoc("");
-  };
-
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) { toast.error("Product name is required"); return; }
     if (!productGroup) { toast.error("Product family is required"); return; }
     if (currencies.length === 0) { toast.error("Select at least one currency"); return; }
 
-    // API currently accepts name, productGroupId, supportedCurrencies, coverageText.
-    createProduct.mutate(
-      {
+    const coverageDrafts = coverages.filter((c) =>
+      c.source === "existing" ? Boolean(c.coverageId) : Boolean(c.name.trim())
+    );
+    for (const c of coverageDrafts) {
+      if (!c.ratingTableId) {
+        toast.error(`Coverage "${c.name || c.coverageId}" needs a rating table`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const created = await createProduct.mutateAsync({
         name: name.trim(),
         productGroupId: productGroup,
         supportedCurrencies: currencies,
         coverageText: coveragePrintableText.trim() || description.trim() || undefined,
-      },
-      {
-        onSuccess: (created) => {
-          toast.success(`Product ${created.name ?? name} created`);
-          if (created.id) navigate(`/products/${created.id}`);
-          else navigate("/products");
-        },
-        onError: (err) => {
-          toast.error(err instanceof Error ? err.message : "Failed to create product");
-        },
+      });
+      if (!created.id) throw new Error("Product created without id");
+
+      for (const c of coverageDrafts) {
+        let coverageId = c.source === "existing" ? c.coverageId : undefined;
+        if (!coverageId) {
+          const cov = await createCoverage({
+            name: c.name.trim(),
+            description: c.description.trim() || undefined,
+          });
+          if (!cov.id) throw new Error(`Coverage "${c.name}" created without id`);
+          coverageId = cov.id;
+        }
+        await addProductCoverage(created.id, {
+          coverageId,
+          ratingTableId: c.ratingTableId,
+          ratingTableMultiplier: parseFloat(c.ratingTableMultiplier) || 1,
+          isMandatory: c.isMandatory,
+        });
       }
-    );
+
+      for (const d of docRequirements) {
+        if (!d.documentTypeId) continue;
+        await addProductDocumentType(created.id, {
+          documentTypeId: d.documentTypeId,
+          alwaysRequired: d.alwaysRequired,
+          insuredAmountOver: d.insuredAmountOver === "" ? null : Number(d.insuredAmountOver),
+          totalExposureOver: d.totalExposureOver === "" ? null : Number(d.totalExposureOver),
+          ageOver: d.ageOver === "" ? 0 : Number(d.ageOver),
+          isPep: d.isPep,
+        });
+      }
+
+      toast.success(`Product ${created.name ?? name} created`);
+      navigate(`/products/${created.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create product");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -239,11 +360,11 @@ const CreateProduct = () => {
           <>
             <Button variant="outline" asChild><Link to="/products">Cancel</Link></Button>
             <Button
-              onClick={handleSave}
-              disabled={createProduct.isPending}
+              onClick={() => void handleSave()}
+              disabled={saving || createProduct.isPending}
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
-              {createProduct.isPending ? "Saving…" : "Save Product"}
+              {saving || createProduct.isPending ? "Saving…" : "Save Product"}
             </Button>
           </>
         }
@@ -576,35 +697,266 @@ const CreateProduct = () => {
             </div>
           </Card>
 
-          {/* Coverages */}
+          {/* Coverages — linked after product create via /products/{id}/coverages */}
           <Card className="p-6 shadow-card border-border">
             <div className="flex items-start justify-between mb-4 gap-3">
-              <SectionTitle title="Coverages" desc="Risks the policy covers. Add one or more." />
-              <Button type="button" variant="outline" size="sm" onClick={() => setCoverages((cs) => [...cs, blankCoverage()])} className="gap-1">
-                <Plus className="h-4 w-4" /> Add coverage
+              <SectionTitle
+                title="Coverages"
+                desc="Select coverages from the catalog and assign a rating table. Saved after the product is created."
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCoverages((cs) => [...cs, blankCoverage()])}
+                className="gap-1"
+              >
+                <Plus className="h-4 w-4" /> Create new
               </Button>
             </div>
-            <div className="space-y-3">
-              {coverages.map((c, idx) => (
-                <div key={idx} className="border border-border rounded-md p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                  <div className="space-y-1.5"><Label>Name</Label>
-                    <Input value={c.name} onChange={(e) => setCovField(idx, { name: e.target.value })} placeholder="Death, Disability…" /></div>
-                  <div className="space-y-1.5 md:col-span-2"><Label>Description</Label>
-                    <Input value={c.description} onChange={(e) => setCovField(idx, { description: e.target.value })} /></div>
-                  <div className="space-y-1.5"><Label>Legacy coverage ID</Label>
-                    <Input type="number" className="font-mono" value={c.legacyCoverageId} onChange={(e) => setCovField(idx, { legacyCoverageId: e.target.value })} /></div>
-                  <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer md:col-span-3">
-                    <Checkbox checked={c.isMandatory} onCheckedChange={(v) => setCovField(idx, { isMandatory: !!v })} />
-                    <span className="text-sm">Mandatory</span>
-                  </label>
-                  {coverages.length > 1 && (
-                    <Button type="button" variant="ghost" size="sm" className="justify-self-end"
-                      onClick={() => setCoverages((cs) => cs.filter((_, i) => i !== idx))}>
-                      <Trash2 className="h-4 w-4 mr-1" /> Remove
-                    </Button>
-                  )}
+
+            <div className="space-y-4">
+              <div className="rounded-md border border-border">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
+                  <p className="text-xs font-medium text-muted-foreground">All coverages</p>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {selectedExistingIds.size} selected
+                  </Badge>
                 </div>
-              ))}
+                <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                  {coveragesLoading && (
+                    <p className="text-xs text-muted-foreground p-3">Loading coverages…</p>
+                  )}
+                  {!coveragesLoading && coverageCatalog.length === 0 && (
+                    <p className="text-xs text-muted-foreground p-3">
+                      No coverages in the catalog yet. Use Create new, or add them later on the product detail page.
+                    </p>
+                  )}
+                  {coverageCatalog.map((cov) => {
+                    const id = cov.id ?? "";
+                    const selected = selectedExistingIds.has(id);
+                    const draftIdx = coverages.findIndex(
+                      (c) => c.source === "existing" && c.coverageId === id
+                    );
+                    const draft = draftIdx >= 0 ? coverages[draftIdx] : null;
+                    return (
+                      <div key={id || cov.name} className="p-3 space-y-3">
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <Checkbox
+                            className="mt-0.5"
+                            checked={selected}
+                            onCheckedChange={(v) => toggleCatalogCoverage(cov, !!v)}
+                            disabled={!id}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{cov.name ?? id}</div>
+                            {cov.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{cov.description}</p>
+                            )}
+                          </div>
+                        </label>
+                        {selected && draft && draftIdx >= 0 && (
+                          <div className="ml-7 grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Rating table *</Label>
+                              <Select
+                                value={draft.ratingTableId || undefined}
+                                onValueChange={(v) => setCovField(draftIdx, { ratingTableId: v })}
+                              >
+                                <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                                <SelectContent>
+                                  {ratingTables.map((t) => (
+                                    <SelectItem key={t.id} value={t.id ?? ""}>{t.name ?? t.id}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Multiplier</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                className="font-mono"
+                                value={draft.ratingTableMultiplier}
+                                onChange={(e) => setCovField(draftIdx, { ratingTableMultiplier: e.target.value })}
+                              />
+                            </div>
+                            <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer self-end">
+                              <Checkbox
+                                checked={draft.isMandatory}
+                                onCheckedChange={(v) => setCovField(draftIdx, { isMandatory: !!v })}
+                              />
+                              <span className="text-sm">Mandatory</span>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {newCoverages.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground">New coverages to create</p>
+                  {newCoverages.map(({ c, idx }) => (
+                    <div key={idx} className="border border-border rounded-md p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                      <div className="space-y-1.5">
+                        <Label>Name *</Label>
+                        <Input
+                          value={c.name}
+                          onChange={(e) => setCovField(idx, { name: e.target.value })}
+                          placeholder="Death, Disability…"
+                        />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label>Description</Label>
+                        <Input
+                          value={c.description}
+                          onChange={(e) => setCovField(idx, { description: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Rating table *</Label>
+                        <Select
+                          value={c.ratingTableId || undefined}
+                          onValueChange={(v) => setCovField(idx, { ratingTableId: v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                          <SelectContent>
+                            {ratingTables.map((t) => (
+                              <SelectItem key={t.id} value={t.id ?? ""}>{t.name ?? t.id}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Multiplier</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="font-mono"
+                          value={c.ratingTableMultiplier}
+                          onChange={(e) => setCovField(idx, { ratingTableMultiplier: e.target.value })}
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer md:col-span-2">
+                        <Checkbox
+                          checked={c.isMandatory}
+                          onCheckedChange={(v) => setCovField(idx, { isMandatory: !!v })}
+                        />
+                        <span className="text-sm">Mandatory</span>
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="justify-self-end"
+                        onClick={() => setCoverages((cs) => cs.filter((_, i) => i !== idx))}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" /> Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Required documents — linked after product create via /products/{id}/document-types */}
+          <Card className="p-6 shadow-card border-border">
+            <SectionTitle
+              title="Required documents"
+              desc="Select document types to require. Saved after the product is created."
+            />
+            <div className="rounded-md border border-border">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground">All document types</p>
+                <Badge variant="secondary" className="text-[10px]">
+                  {selectedDocTypeIds.size} selected
+                </Badge>
+              </div>
+              <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                {documentTypesLoading && (
+                  <p className="text-xs text-muted-foreground p-3">Loading document types…</p>
+                )}
+                {!documentTypesLoading && documentTypeCatalog.length === 0 && (
+                  <p className="text-xs text-muted-foreground p-3">
+                    No document types in the catalog yet. Add them later on the product detail page.
+                  </p>
+                )}
+                {documentTypeCatalog.map((docType) => {
+                  const id = docType.id ?? "";
+                  const selected = selectedDocTypeIds.has(id);
+                  const draftIdx = docRequirements.findIndex((d) => d.documentTypeId === id);
+                  const draft = draftIdx >= 0 ? docRequirements[draftIdx] : null;
+                  return (
+                    <div key={id || docType.name} className="p-3 space-y-3">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <Checkbox
+                          className="mt-0.5"
+                          checked={selected}
+                          onCheckedChange={(v) => toggleDocumentType(docType, !!v)}
+                          disabled={!id}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{docType.name ?? id}</div>
+                          {docType.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{docType.description}</p>
+                          )}
+                        </div>
+                      </label>
+                      {selected && draft && draftIdx >= 0 && (
+                        <div className="ml-7 grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="space-y-1.5">
+                            <Label>Insured amount over</Label>
+                            <Input
+                              type="number"
+                              className="font-mono"
+                              value={draft.insuredAmountOver}
+                              onChange={(e) => setDocReqField(draftIdx, { insuredAmountOver: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Total exposure over</Label>
+                            <Input
+                              type="number"
+                              className="font-mono"
+                              value={draft.totalExposureOver}
+                              onChange={(e) => setDocReqField(draftIdx, { totalExposureOver: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Age over</Label>
+                            <Input
+                              type="number"
+                              className="font-mono"
+                              value={draft.ageOver}
+                              onChange={(e) => setDocReqField(draftIdx, { ageOver: e.target.value })}
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
+                            <Checkbox
+                              checked={draft.alwaysRequired}
+                              onCheckedChange={(v) => setDocReqField(draftIdx, { alwaysRequired: !!v })}
+                            />
+                            <span className="text-sm">Always required</span>
+                          </label>
+                          <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
+                            <Checkbox
+                              checked={draft.isPep}
+                              onCheckedChange={(v) => setDocReqField(draftIdx, { isPep: !!v })}
+                            />
+                            <span className="text-sm">PEP</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </Card>
 
@@ -614,7 +966,7 @@ const CreateProduct = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5 md:col-span-2">
                 <Label>Coverage printable text</Label>
-                <Textarea rows={2} value={coveragePrintableText} onChange={(e) => setCoveragePrintableText(e.target.value)} />
+                <Textarea rows={2} value={coveragePrintableText} onChange={(e) => setCoveragePrintableText(e.target.value)} placeholder="Sent as coverageText on create" />
               </div>
               <div className="space-y-1.5">
                 <Label>Packet fin type (legacy)</Label>
@@ -639,31 +991,6 @@ const CreateProduct = () => {
                   <SelectContent>{ACTUARIAL_CODES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-            </div>
-          </Card>
-
-          {/* Required documents */}
-          <Card className="p-6 shadow-card border-border">
-            <SectionTitle title="Required documents" desc="Documents the customer must submit when applying." />
-            <div className="flex flex-wrap gap-2 mb-4">
-              {docs.map((d) => (
-                <Badge key={d} className="bg-accent-soft text-accent-soft-foreground border-0 gap-1 pl-2.5 pr-1 py-1">
-                  {d}
-                  <button onClick={() => setDocs(docs.filter((x) => x !== d))} className="rounded hover:bg-accent/20 p-0.5"><X className="h-3 w-3" /></button>
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input value={newDoc} onChange={(e) => setNewDoc(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addDoc(newDoc))}
-                placeholder="Add custom document…" />
-              <Button type="button" variant="outline" onClick={() => addDoc(newDoc)}>Add</Button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="text-xs text-muted-foreground mr-1">Suggestions:</span>
-              {DOC_OPTIONS.filter((d) => !docs.includes(d)).map((d) => (
-                <button key={d} onClick={() => addDoc(d)} className="text-xs px-2 py-0.5 rounded border border-dashed border-border hover:border-accent hover:text-accent">+ {d}</button>
-              ))}
             </div>
           </Card>
         </div>

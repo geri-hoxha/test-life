@@ -116,6 +116,11 @@ const CreateOffer = () => {
     () => mergeCustomers(peoplePage?.items, companiesPage?.items),
     [peoplePage?.items, companiesPage?.items]
   );
+  /** Insured persons API only accepts people (not companies). */
+  const peopleOnly = useMemo(
+    () => customers.filter((c) => c.customerType === "Individual"),
+    [customers]
+  );
   const productGroups = useMemo(
     () => (productGroupsPage?.items ?? []).filter((g) => g.id),
     [productGroupsPage?.items]
@@ -134,6 +139,8 @@ const CreateOffer = () => {
     [products, productGroupId]
   );
   const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+  const partyTypeOf = (customerId: string): "person" | "company" =>
+    getCustomerLocal(customerId)?.customerType === "Company" ? "company" : "person";
   const [policyHolderId, setPolicyHolderId] = useState("");
   const [payerId, setPayerId] = useState("");
   const [insuredId, setInsuredId] = useState("");
@@ -270,6 +277,7 @@ const CreateOffer = () => {
   // Validation — version not yet on API; product group + product + currency are required.
   const productOk = !!(productGroupId && productId && currency);
   const peopleOk = !!(policyHolderId && payerId && insuredId)
+    && peopleOnly.some((p) => p.id === insuredId)
     && (beneficiaries.length === 0 || (beneficiariesValid && beneficiaries.every((b) => b.customerId && b.percentage > 0)));
   const canSave = productOk && peopleOk;
   const saving =
@@ -279,7 +287,7 @@ const CreateOffer = () => {
     addLoan.isPending ||
     calculateSchedules.isPending;
 
-  const handleSave = async (intent: "Draft" | "Submit" | "Approve") => {
+  const handleSave = async (_intent: "Draft" | "Submit" | "Approve") => {
     if (!canSave) {
       toast.error("Complete required fields before saving");
       return;
@@ -290,52 +298,48 @@ const CreateOffer = () => {
       const offerId = created.id;
       if (!offerId) throw new Error("Offer created without id");
 
-      const holder = getCustomerLocal(policyHolderId);
-      const payer = getCustomerLocal(payerId);
-      const insuredPerson = getCustomerLocal(insuredId);
-
+      // Participants: policyHolder / invoiced / beneficiary via /participants
+      // share is always 1 except beneficiaries (UI % → fraction, e.g. 50 → 0.5)
       await addParticipant.mutateAsync({
         offerId,
         body: {
           partyId: policyHolderId,
-          partyType: holder?.customerType === "Company" ? "company" : "person",
+          partyType: partyTypeOf(policyHolderId),
           role: "policyHolder",
           isLeader: true,
+          share: 1,
         },
       });
 
-      if (payerId !== policyHolderId) {
-        await addParticipant.mutateAsync({
-          offerId,
-          body: {
-            partyId: payerId,
-            partyType: payer?.customerType === "Company" ? "company" : "person",
-            role: "invoiced",
-          },
-        });
-      }
+      await addParticipant.mutateAsync({
+        offerId,
+        body: {
+          partyId: payerId,
+          partyType: partyTypeOf(payerId),
+          role: "invoiced",
+          isLeader: true,
+          share: 1,
+        },
+      });
 
       for (const b of beneficiaries.filter((x) => x.customerId)) {
-        const bc = getCustomerLocal(b.customerId);
         await addParticipant.mutateAsync({
           offerId,
           body: {
             partyId: b.customerId,
-            partyType: bc?.customerType === "Company" ? "company" : "person",
+            partyType: partyTypeOf(b.customerId),
             role: "beneficiary",
-            share: b.percentage,
+            isLeader: true,
+            share: (Number(b.percentage) || 0) / 100,
           },
         });
       }
 
-      if (insuredPerson?.customerType === "Individual") {
-        await addInsured.mutateAsync({
-          offerId,
-          body: {
-            personId: insuredId,
-          },
-        });
-      }
+      // Insured person is always a person (never company) via /insured-persons
+      await addInsured.mutateAsync({
+        offerId,
+        body: { personId: insuredId },
+      });
 
       if (hasLoan) {
         await addLoan.mutateAsync({
@@ -347,15 +351,9 @@ const CreateOffer = () => {
             remainingLoanAmount: Number(outstandingBalance) || Number(loanAmount) || 0,
           },
         });
-      }
 
-      // Calculate schedules when submitting/approving (API may also work for draft).
-      if (intent !== "Draft") {
-        try {
-          await calculateSchedules.mutateAsync(offerId);
-        } catch {
-          // Schedule calculation may fail until more fields exist — keep offer.
-        }
+        // Schedules only apply when the offer has a loan, after loan-disbursements.
+        await calculateSchedules.mutateAsync(offerId);
       }
 
       toast.success(`Offer ${offerId} saved`);
@@ -512,13 +510,18 @@ const CreateOffer = () => {
               </div>
               <div>
                 <Label>Insured Person</Label>
-                <Select value={insuredId} onValueChange={setInsuredId}>
-                  <SelectTrigger><SelectValue placeholder="Select insured" /></SelectTrigger>
+                <Select
+                  value={insuredId}
+                  onValueChange={setInsuredId}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select insured person" /></SelectTrigger>
                   <SelectContent>
-                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>)}
+                    {peopleOnly.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{fullName(c)}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {policyHolderId && (
+                {policyHolderId && getCustomerLocal(policyHolderId)?.customerType === "Individual" && (
                   <Button
                     variant="link" size="sm" className="px-0 h-7 text-xs"
                     onClick={() => setInsuredId(policyHolderId)}

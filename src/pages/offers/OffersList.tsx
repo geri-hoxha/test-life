@@ -33,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Eye, Edit, Send, MoreHorizontal, Plus, Search, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
-import { statusColor, OfferStatus } from "@/data/offers";
+import { statusColor, OfferStatus, offerStatusToApi } from "@/data/offers";
 import { fullName } from "@/data/customers";
 import { useListOffers } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
@@ -45,13 +45,24 @@ import { listTemplates } from "@/data/templates";
 import { computeVerification, overallStatus } from "./VerificationStep";
 import { toast } from "sonner";
 
-const STATUSES: OfferStatus[] = ["Draft", "Quoted", "Pending Review", "Approved", "Issued", "Rejected"];
+const STATUSES: OfferStatus[] = [
+  "Draft",
+  "Quoted",
+  "Partially Bound",
+  "Bound",
+  "Cancelled",
+  "Expired",
+];
 
 const OffersList = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const { data: offersPage, isLoading } = useListOffers({ pageNumber: 1, pageSize: 200 });
+  const { data: offersPage, isLoading } = useListOffers({
+    pageNumber: 1,
+    pageSize: 200,
+    ...(statusFilter !== "ALL" ? { status: offerStatusToApi[statusFilter as OfferStatus] } : {}),
+  });
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
   const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
   const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
@@ -78,7 +89,6 @@ const OffersList = () => {
   }, [productMap]);
 
   const filtered = offers.filter((o) => {
-    if (statusFilter !== "ALL" && o.status !== statusFilter) return false;
     if (!q.trim()) return true;
     const ph = getCustomerLocal(o.policyHolderId);
     const haystack = [
@@ -145,7 +155,7 @@ const OffersList = () => {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All statuses</SelectItem>
                   {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -268,7 +278,11 @@ const OffersList = () => {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => toast.success(`${o.number} sent for issuance`)}
-                                  disabled={o.status === "Issued" || o.status === "Rejected"}
+                                  disabled={
+                                    o.status === "Bound" ||
+                                    o.status === "Cancelled" ||
+                                    o.status === "Expired"
+                                  }
                                 >
                                   <Send className="h-4 w-4 mr-2" />Issue
                                 </DropdownMenuItem>

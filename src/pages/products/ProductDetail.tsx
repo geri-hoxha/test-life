@@ -27,6 +27,7 @@ import {
   ProductInternalDetails, ProductExternalDetails, PaymentModel,
 } from "@/data/products";
 import { useGetProduct, useUpdateProduct, mapApiProduct, type MappedProduct } from "@/api/products";
+import { useListProductGroups } from "@/api/product-groups";
 import { Check, AlertCircle, ScrollText, Save, X, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import VersionsTab from "./VersionsTab";
@@ -69,11 +70,19 @@ const ProductDetail = () => {
   const { id } = useParams();
   const { data: apiProduct, isLoading, isError } = useGetProduct(id ?? "", { enabled: Boolean(id) });
   const updateProductMutation = useUpdateProduct();
+  const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
 
   const product = useMemo(
     () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
     [apiProduct]
   );
+
+  const productGroupName = useMemo(() => {
+    const gid = product?.productGroupId;
+    if (!gid) return "—";
+    const match = (groupsPage?.items ?? []).find((g) => g.id === gid);
+    return match?.name?.trim() || gid;
+  }, [product?.productGroupId, groupsPage?.items]);
 
   const [flags, setFlags] = useState<Product["flags"] | null>(null);
   const [fields, setFields] = useState<EditableFields | null>(null);
@@ -91,7 +100,7 @@ const ProductDetail = () => {
       code: product.code,
       status: product.status,
       type: product.type,
-      description: product.description,
+      description: product.coverageText ?? product.description,
       currencies: [...product.currencies],
       requiredDocuments: [...product.requiredDocuments],
       agentCommissionPct: parseFloat((product.agentCommission * 100).toFixed(6)).toString(),
@@ -127,16 +136,11 @@ const ProductDetail = () => {
   }
 
   const dirty = JSON.stringify(flags) !== JSON.stringify(product.flags);
+  // Only fields returned/accepted by GET/PUT product are considered for Save.
   const fieldsDirty =
     fields.name !== product.name ||
-    fields.code !== product.code ||
-    fields.status !== product.status ||
-    fields.type !== product.type ||
-    fields.description !== product.description ||
-    JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
-    JSON.stringify(fields.requiredDocuments) !== JSON.stringify(product.requiredDocuments) ||
-    (parseFloat(fields.agentCommissionPct) || 0) / 100 !== product.agentCommission ||
-    (parseFloat(fields.bankCommissionPct) || 0) / 100 !== product.bankCommission;
+    fields.description !== (product.coverageText ?? product.description) ||
+    JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies);
 
   const toggleFlag = (key: keyof Product["flags"]) =>
     setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
@@ -186,12 +190,36 @@ const ProductDetail = () => {
       <PageHeader
         breadcrumbs={[{ label: "Products", to: "/products" }, { label: product.name }]}
         title={product.name}
-        description={product.description}
+        description={product.coverageText?.trim() || product.description || undefined}
       />
 
       {/* Summary strip */}
       <Card className="p-5 mb-6 shadow-card border-border">
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Product family</div>
+            <div className="text-sm mt-0.5">{productGroupName}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Currencies</div>
+            <div className="flex gap-1 mt-0.5">
+              {product.currencies.length === 0 ? (
+                <span className="text-sm text-muted-foreground">—</span>
+              ) : (
+                product.currencies.map((c) => (
+                  <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Coverages</div>
+            <div className="text-sm mt-0.5">{apiProduct?.coverages?.length ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Document types</div>
+            <div className="text-sm mt-0.5">{apiProduct?.productDocumentTypes?.length ?? 0}</div>
+          </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Code</div>
             <div className="font-mono text-sm text-accent mt-0.5">{product.code}</div>
@@ -207,14 +235,6 @@ const ProductDetail = () => {
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Active Version</div>
             <div className="font-mono text-sm mt-0.5">{product.activeVersion}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Currencies</div>
-            <div className="flex gap-1 mt-0.5">
-              {product.currencies.map((c) => (
-                <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
-              ))}
-            </div>
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Created</div>
@@ -252,7 +272,7 @@ const ProductDetail = () => {
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Product details</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Edit the core attributes of this product.
+                  Name, coverage text, and currencies are saved to the product API.
                 </p>
               </div>
               <Button
@@ -269,6 +289,10 @@ const ProductDetail = () => {
               <div className="space-y-2">
                 <Label htmlFor="p-name">Name</Label>
                 <Input id="p-name" value={fields.name} onChange={(e) => setFields({ ...fields, name: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Product family</Label>
+                <Input value={productGroupName} readOnly className="bg-muted/40" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="p-code">Code</Label>
@@ -322,12 +346,13 @@ const ProductDetail = () => {
                 </div>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="p-desc">Description</Label>
+                <Label htmlFor="p-desc">Coverage text</Label>
                 <Textarea
                   id="p-desc"
                   rows={4}
                   value={fields.description}
                   onChange={(e) => setFields({ ...fields, description: e.target.value })}
+                  placeholder="Printable coverage text for this product"
                 />
               </div>
 
@@ -858,17 +883,48 @@ const TariffEditor = ({ tariff, onChange }: { tariff: Tariff; onChange: () => vo
 
 const defaultInternal: ProductInternalDetails = { coveragePrintableText: "", packetFinType: null };
 const InternalTab = ({ product }: { product: MappedProduct }) => {
+  const updateProductMutation = useUpdateProduct();
   const initial = product.internalDetails ?? defaultInternal;
   const [i, setI] = useState<ProductInternalDetails>(initial);
-  const dirty = JSON.stringify(i) !== JSON.stringify(initial);
+  useEffect(() => {
+    setI({
+      coveragePrintableText: product.coverageText ?? product.internalDetails?.coveragePrintableText ?? "",
+      packetFinType: product.internalDetails?.packetFinType ?? null,
+    });
+  }, [product.id, product.coverageText]);
+  const dirty = i.coveragePrintableText !== (product.coverageText ?? product.internalDetails?.coveragePrintableText ?? "");
   const save = () => {
-    toast.message("Use Overview → Save to persist coverage text. Other internal fields are coming later.");
+    updateProductMutation.mutate(
+      {
+        id: product.id,
+        body: {
+          name: product.name,
+          supportedCurrencies: product.currencies,
+          coverageText: i.coveragePrintableText.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => toast.success("Coverage text saved"),
+        onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to save"),
+      }
+    );
   };
   return (
     <SectionShell title="Internal details" onSave={save} dirty={dirty}>
       <div className="md:col-span-2">
         <Field label="Coverage printable text">
           <Textarea rows={3} value={i.coveragePrintableText} onChange={(e) => setI({ ...i, coveragePrintableText: e.target.value })} />
+        </Field>
+      </div>
+      <div className="md:col-span-2">
+        <Field label="Packet fin type (legacy)">
+          <Input
+            type="number"
+            value={i.packetFinType ?? ""}
+            onChange={(e) => setI({ ...i, packetFinType: e.target.value === "" ? null : Number(e.target.value) })}
+            className="font-mono"
+            placeholder="Not persisted yet"
+          />
         </Field>
       </div>
     </SectionShell>

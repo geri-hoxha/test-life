@@ -57,10 +57,10 @@ const fmtMoney = (v: number, ccy = "EUR") =>
 const STATUS_COLORS: Record<OfferStatus, string> = {
   Draft: "hsl(var(--muted-foreground))",
   Quoted: "hsl(217 91% 60%)",
-  "Pending Review": "hsl(38 92% 50%)",
-  Approved: "hsl(142 71% 45%)",
-  Issued: "hsl(160 84% 39%)",
-  Rejected: "hsl(var(--destructive))",
+  "Partially Bound": "hsl(38 92% 50%)",
+  Bound: "hsl(160 84% 39%)",
+  Cancelled: "hsl(var(--destructive))",
+  Expired: "hsl(var(--muted-foreground))",
 };
 
 const Reports = () => {
@@ -90,7 +90,14 @@ const Reports = () => {
 
   // Offers by Status
   const offersByStatus = useMemo(() => {
-    const order: OfferStatus[] = ["Draft", "Quoted", "Pending Review", "Approved", "Issued", "Rejected"];
+    const order: OfferStatus[] = [
+      "Draft",
+      "Quoted",
+      "Partially Bound",
+      "Bound",
+      "Cancelled",
+      "Expired",
+    ];
     return order.map((s) => ({ status: s, count: offers.filter((o) => o.status === s).length }));
   }, [offers]);
 
@@ -114,7 +121,7 @@ const Reports = () => {
   }, [policies, products]);
 
   // Pending manual verification
-  const pendingReview = offers.filter((o) => o.status === "Pending Review");
+  const pendingReview = offers.filter((o) => o.status === "Partially Bound");
 
   // Expiring policies — within next 365 days
   const expiring = useMemo(() => {
@@ -140,7 +147,9 @@ const Reports = () => {
       map.set(cid, cur);
     };
     policies.forEach((p) => add(p.policyHolderId, p.premium, true));
-    offers.filter((o) => o.status !== "Rejected" && o.status !== "Issued").forEach((o) => add(o.policyHolderId, o.premium, false));
+    offers
+      .filter((o) => o.status !== "Cancelled" && o.status !== "Expired" && o.status !== "Bound")
+      .forEach((o) => add(o.policyHolderId, o.premium, false));
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [policies, offers]);
 

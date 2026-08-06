@@ -26,4 +26,7 @@ export const mapProductCoverage = (
   basePremiumValue: 0,
   commissionPct: 0,
   isActive: true,
+  ratingTableId: entry.ratingTableId,
+  ratingTableMultiplier: entry.ratingTableMultiplier ?? 1,
+  sortOrder: entry.sortOrder,
 });

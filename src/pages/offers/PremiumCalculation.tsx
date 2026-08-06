@@ -596,9 +596,9 @@ const PremiumCalculation = ({
               />
             </div>
             <div className="md:col-span-2">
-              <div className="flex items-start gap-2 text-xs rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 px-3 py-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                <div>
+              <div className="flex items-center gap-2 text-xs rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 px-3 py-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 " />
+                <div className="mt-0.5">
                   <strong>Requires approval: Yes.</strong> This offer will be routed to management for sign-off
                   before it can be issued.
                 </div>

@@ -3,8 +3,11 @@ export type DocumentRequiredFor = "Policy Holder" | "Insured Person" | "Benefici
 export type DocumentAppliesWhen =
   | "Always"
   | "Sum insured above threshold"
+  | "Total exposure above threshold"
+  | "Age above threshold"
   | "PEP detected"
-  | "Manual verification required";
+  | "Manual verification required"
+  | "Conditional";
 
 export type ProductDocument = {
   id: string;
@@ -15,6 +18,15 @@ export type ProductDocument = {
   isMandatory: boolean;
   appliesWhen: DocumentAppliesWhen;
   thresholdAmount?: number;
+  /** Catalog document-type id when linking an existing type. */
+  documentTypeId?: string;
+  /** Template file from documents API, used when creating a catalog document type. */
+  templateDocumentId?: string | null;
+  /** Product document-type rules (API). */
+  insuredAmountOver?: number | null;
+  totalExposureOver?: number | null;
+  ageOver?: number | null;
+  isPep?: boolean | null;
   notes?: string;
 };
 

@@ -6,13 +6,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, MoreHorizontal, Pencil, Trash2, FileText, Info } from "lucide-react";
+import { Plus, Trash2, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
 import {
   ProductDocument, DocumentAppliesWhen,
@@ -25,8 +22,6 @@ import {
 } from "@/api/products";
 import {
   useListDocumentTypes,
-  useCreateDocumentType,
-  useUpdateDocumentType,
 } from "@/api/document-types";
 import { mapProductDocumentType } from "@/api/adapters/document-types";
 
@@ -34,37 +29,40 @@ type Props = { productId: string };
 
 const VERSION_NA = "N/A";
 
+const fmtMoney = (n?: number) =>
+  n && n > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n) : "—";
+
 const appliesBadge = (a: DocumentAppliesWhen) => {
   switch (a) {
     case "Always": return "bg-success/15 text-success";
     case "Sum insured above threshold": return "bg-accent-soft text-accent-soft-foreground";
+    case "Total exposure above threshold": return "bg-accent-soft text-accent-soft-foreground";
+    case "Age above threshold": return "bg-accent-soft text-accent-soft-foreground";
     case "PEP detected": return "bg-warning/20 text-warning-foreground";
     case "Manual verification required": return "bg-destructive/10 text-destructive";
+    case "Conditional": return "bg-muted text-muted-foreground";
   }
 };
 
-const fmtMoney = (n?: number) =>
-  n && n > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n) : "—";
+const rulesSummary = (d: ProductDocument) => {
+  const parts: string[] = [];
+  if (d.isMandatory) parts.push("Always");
+  if (d.isPep) parts.push("PEP");
+  if (d.insuredAmountOver != null && d.insuredAmountOver > 0) parts.push(`Insured > ${fmtMoney(d.insuredAmountOver)}`);
+  if (d.totalExposureOver != null && d.totalExposureOver > 0) parts.push(`Exposure > ${fmtMoney(d.totalExposureOver)}`);
+  if (d.ageOver != null && d.ageOver > 0) parts.push(`Age > ${d.ageOver}`);
+  return parts.length ? parts.join(" · ") : d.appliesWhen;
+};
 
 const DocumentsTab = ({ productId }: Props) => {
   const { data: apiProduct, isLoading: productLoading } = useGetProduct(productId);
   const { data: typesPage, isLoading: typesLoading } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
-  const createDocumentType = useCreateDocumentType();
-  const updateDocumentType = useUpdateDocumentType();
   const addProductDocumentType = useAddProductDocumentType();
   const removeProductDocumentType = useRemoveProductDocumentType();
 
   const typesById = useMemo(
     () => Object.fromEntries((typesPage?.items ?? []).map((t) => [t.id ?? "", t])),
     [typesPage?.items]
-  );
-
-  const entryById = useMemo(
-    () =>
-      Object.fromEntries(
-        (apiProduct?.productDocumentTypes ?? []).map((e) => [String(e.id ?? ""), e])
-      ),
-    [apiProduct?.productDocumentTypes]
   );
 
   const docs = useMemo(
@@ -76,46 +74,34 @@ const DocumentsTab = ({ productId }: Props) => {
   );
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<ProductDocument | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const openNew = () => { setEditing(null); setDialogOpen(true); };
-  const openEdit = (d: ProductDocument) => { setEditing(d); setDialogOpen(true); };
+  const openNew = () => { setDialogOpen(true); };
+
+  const linkedDocumentTypeIds = useMemo(
+    () => (apiProduct?.productDocumentTypes ?? []).map((e) => e.documentTypeId ?? "").filter(Boolean),
+    [apiProduct?.productDocumentTypes]
+  );
 
   const handleSave = async (d: ProductDocument) => {
     try {
-      if (editing) {
-        const entry = entryById[editing.id];
-        const documentTypeId = entry?.documentTypeId;
-        if (documentTypeId) {
-          await updateDocumentType.mutateAsync({
-            id: documentTypeId,
-            body: {
-              name: d.name,
-              description: d.notes ?? "",
-            },
-          });
-        }
-        toast.success("Document updated");
-        toast.info("Required-for and applies-when rules will sync when the API supports full updates");
-      } else {
-        const created = await createDocumentType.mutateAsync({
-          name: d.name,
-          description: d.notes ?? d.name,
-        });
-        if (!created.id) throw new Error("Document type created without id");
-        await addProductDocumentType.mutateAsync({
-          productId,
-          body: {
-            documentTypeId: created.id,
-            alwaysRequired: d.isMandatory || d.appliesWhen === "Always",
-            insuredAmountOver:
-              d.appliesWhen === "Sum insured above threshold" ? (d.thresholdAmount ?? null) : null,
-            isPep: d.appliesWhen === "PEP detected" ? true : null,
-          },
-        });
-        toast.success("Document added");
+      const documentTypeId = d.documentTypeId;
+      if (!documentTypeId) {
+        toast.error("Document type is required");
+        return;
       }
+      await addProductDocumentType.mutateAsync({
+        productId,
+        body: {
+          documentTypeId,
+          alwaysRequired: d.isMandatory,
+          insuredAmountOver: d.insuredAmountOver ?? null,
+          totalExposureOver: d.totalExposureOver ?? null,
+          ageOver: d.ageOver ?? null,
+          isPep: d.isPep ?? null,
+        },
+      });
+      toast.success("Document type linked to product");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save document");
     }
@@ -195,20 +181,19 @@ const DocumentsTab = ({ productId }: Props) => {
         )}
 
         <Table>
-          <TableHeader>
+            <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Document</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Required For</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Mandatory</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Applies When</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Threshold</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Document Type ID</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Always required</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Rules</TableHead>
               <TableHead className="text-right text-xs uppercase tracking-wider font-semibold text-muted-foreground">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {docs.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-10">
+                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-10">
                   No documents yet. Click <span className="font-medium text-foreground">Add Document</span> to create one.
                 </TableCell>
               </TableRow>
@@ -220,19 +205,16 @@ const DocumentsTab = ({ productId }: Props) => {
                     <FileText className="h-4 w-4 text-accent mt-0.5 shrink-0" />
                     <div>
                       <div className="font-medium text-foreground">{d.name}</div>
+                      {d.documentTypeId && (
+                        <div className="font-mono text-xs text-accent mt-0.5">{d.documentTypeId}</div>
+                      )}
                       {d.notes && (
                         <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1 max-w-md">{d.notes}</div>
                       )}
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {d.requiredFor.map((p) => (
-                      <Badge key={p} variant="outline" className="text-[10px]">{p}</Badge>
-                    ))}
-                  </div>
-                </TableCell>
+                <TableCell className="font-mono text-xs">{d.documentTypeId ?? "—"}</TableCell>
                 <TableCell>
                   {d.isMandatory ? (
                     <Badge className="bg-success/15 text-success border-0">Required</Badge>
@@ -241,40 +223,19 @@ const DocumentsTab = ({ productId }: Props) => {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Badge className={`border-0 ${appliesBadge(d.appliesWhen)}`}>{d.appliesWhen}</Badge>
-                </TableCell>
-                <TableCell className="font-medium">
-                  {d.appliesWhen === "Sum insured above threshold" ? fmtMoney(d.thresholdAmount) : "—"}
+                  <div className="flex flex-col gap-1">
+                    <Badge className={`border-0 w-fit ${appliesBadge(d.appliesWhen)}`}>{d.appliesWhen}</Badge>
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="inline-flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(d)}>
-                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(d)}>
-                          <Pencil className="h-4 w-4 mr-2" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            toast.info("Toggle mandatory will be available when product document-type updates are supported")
-                          }
-                        >
-                          Mark as {d.isMandatory ? "optional" : "mandatory"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setDeleteId(d.id)} className="text-destructive focus:text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => setDeleteId(d.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -284,12 +245,12 @@ const DocumentsTab = ({ productId }: Props) => {
 
       {dialogOpen && (
         <DocumentDialog
-          key={editing?.id ?? "new"}
+          key="new"
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           productId={productId}
           versionId={VERSION_NA}
-          initial={editing}
+          linkedDocumentTypeIds={linkedDocumentTypeIds}
           onSave={(d) => void handleSave(d)}
         />
       )}

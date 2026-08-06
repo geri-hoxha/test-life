@@ -33,7 +33,7 @@ const PendingReviewTable = () => {
     () =>
       (offersPage?.items ?? [])
         .map(mapApiOffer)
-        .filter((o) => o.status === "Pending Review" || o.status === "Quoted")
+        .filter((o) => o.status === "Partially Bound" || o.status === "Quoted")
         .slice(0, 5),
     [offersPage?.items]
   );

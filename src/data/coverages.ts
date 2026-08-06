@@ -18,6 +18,11 @@ export type Coverage = {
   basePremiumValue: number; // amount, percent, or table reference id
   commissionPct: number;
   isActive: boolean;
+  /** Product-coverage link: rating table used for premium calculation. */
+  ratingTableId?: string;
+  ratingTableMultiplier?: number;
+  /** Product-coverage link sort order from API. */
+  sortOrder?: number;
 };
 
 const seed: Coverage[] = [

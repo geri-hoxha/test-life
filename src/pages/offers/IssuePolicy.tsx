@@ -171,11 +171,11 @@ const IssuePolicy = () => {
 
   // Build warnings list
   const warnings: { title: string; detail: string; level: "warning" | "blocker" }[] = [];
-  if (offer.status !== "Approved") {
+  if (offer.status !== "Quoted" && offer.status !== "Partially Bound") {
     warnings.push({
-      title: "Offer is not approved",
-      detail: `Current status: ${offer.status}. Issuance is normally only permitted after approval.`,
-      level: offer.status === "Issued" ? "blocker" : "warning",
+      title: "Offer is not ready to issue",
+      detail: `Current status: ${offer.status}. Issuance is normally only permitted for quoted or partially bound offers.`,
+      level: offer.status === "Bound" ? "blocker" : "warning",
     });
   }
   if (mandatoryDocs.length > 0) {
@@ -201,7 +201,7 @@ const IssuePolicy = () => {
     });
   }
 
-  const isAlreadyIssued = offer.status === "Issued";
+  const isAlreadyIssued = offer.status === "Bound";
 
   const handleConfirm = async () => {
     if (!confirmed) {

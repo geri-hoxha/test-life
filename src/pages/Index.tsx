@@ -30,7 +30,7 @@ const Index = () => {
   );
 
   const draftOffers = offers.filter((o) => o.status === "Draft").length;
-  const pendingReview = offers.filter((o) => o.status === "Pending Review").length;
+  const pendingReview = offers.filter((o) => o.status === "Partially Bound").length;
   const issuedPolicies = policies.length;
   const premiumThisMonth = useMemo(() => {
     const ym = new Date().toISOString().slice(0, 7);

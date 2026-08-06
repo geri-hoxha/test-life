@@ -37,6 +37,23 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   Edit,
   RefreshCw,
@@ -45,34 +62,59 @@ import {
   Send,
   ShieldCheck,
   ShieldAlert,
-  Calculator,
   Calendar,
   Users,
   FileText,
   StickyNote,
   Package,
   AlertTriangle,
+  Trash2,
+  Percent,
+  Upload,
 } from "lucide-react";
 import { getOffer, statusColor } from "@/data/offers";
-import { listVersions } from "@/data/productVersions";
-import { listTemplates, overrideSummary } from "@/data/templates";
-import { fullName, ageFromDob } from "@/data/customers";
-
-import { listCoverages } from "@/data/coverages";
-import { listDocuments } from "@/data/documents";
+import { ageFromDob } from "@/data/customers";
 import { PremiumResult } from "./PremiumCalculation";
 import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
-import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
-import { useGetOffer, useCancelOffer, useCalculateOfferSchedules } from "@/api/offers";
+import {
+  useGetOffer,
+  useCancelOffer,
+  useCalculateOfferSchedules,
+  useRemoveOfferInsuredPerson,
+  useRemoveOfferParticipant,
+  useCancelOfferSchedule,
+  useRequestOfferScheduleDiscount,
+  useApproveOfferScheduleDiscount,
+  useRejectOfferScheduleDiscount,
+  useApproveOfferScheduleDocument,
+  useRejectOfferScheduleDocument,
+  useSubmitOfferScheduleDocument,
+} from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useGetProduct, mapApiProduct } from "@/api/products";
-import { useListPeople } from "@/api/people";
-import { useListCompanies } from "@/api/companies";
-import { customerPath, mergeCustomers } from "@/api/adapters/customers";
+import { useListCoverages } from "@/api/coverages";
+import { useListDocumentTypes } from "@/api/document-types";
+import { customerPath } from "@/api/adapters/customers";
 
 const fmtMoney = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(v);
+
+const titleCase = (s?: string) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined;
+
+const scheduleStatusColor: Record<string, string> = {
+  draft: "bg-muted text-muted-foreground border-transparent",
+  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  cancelled: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
+const discountRequestStatusColor: Record<string, string> = {
+  requested: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  approved: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  rejected: "bg-destructive/15 text-destructive border-destructive/30",
+};
 
 const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
@@ -81,6 +123,43 @@ const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
   </div>
 );
 
+const PartyLink = ({
+  partyId,
+  partyType,
+  displayName,
+}: {
+  partyId?: string;
+  partyType?: "person" | "company";
+  displayName?: string;
+}) => {
+  if (!partyId || !displayName) return <span className="text-muted-foreground">—</span>;
+  return (
+    <Link
+      to={customerPath(partyId, partyType ?? "person")}
+      className="text-primary hover:underline"
+    >
+      {displayName}
+    </Link>
+  );
+};
+
+const docStatusBadge = (status: string) => {
+  switch (status) {
+    case "accepted":
+      return <Badge variant="default" className="bg-emerald-600">Accepted</Badge>;
+    case "submitted":
+      return <Badge variant="secondary">Submitted</Badge>;
+    case "refused":
+      return <Badge variant="destructive">Refused</Badge>;
+    default:
+      return (
+        <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="h-3 w-3 mr-1" /> Required
+        </Badge>
+      );
+  }
+};
+
 const OfferDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -88,17 +167,63 @@ const OfferDetail = () => {
   const { data: apiOffer, isLoading } = useGetOffer(id ?? "", { enabled: Boolean(id) });
   const cancelOffer = useCancelOffer();
   const calculateSchedules = useCalculateOfferSchedules();
-  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
-  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
-  const customers = useMemo(
-    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
-    [peoplePage?.items, companiesPage?.items]
-  );
-  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+  const removeInsuredPerson = useRemoveOfferInsuredPerson();
+  const removeParticipant = useRemoveOfferParticipant();
+  const cancelSchedule = useCancelOfferSchedule();
+  const requestDiscount = useRequestOfferScheduleDiscount();
+  const approveDiscount = useApproveOfferScheduleDiscount();
+  const rejectDiscount = useRejectOfferScheduleDiscount();
+  const approveScheduleDocument = useApproveOfferScheduleDocument();
+  const rejectScheduleDocument = useRejectOfferScheduleDocument();
+  const submitScheduleDocument = useSubmitOfferScheduleDocument();
+  const { data: coveragesPage } = useListCoverages({ pageNumber: 1, pageSize: 200 });
+  const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
+
+  const [pendingRemove, setPendingRemove] = useState<
+    | { kind: "insured"; id: string; label: string }
+    | { kind: "participant"; id: string; label: string }
+    | null
+  >(null);
+  const [cancelScheduleYear, setCancelScheduleYear] = useState<number | null>(null);
+  const [discountDialog, setDiscountDialog] = useState<{ year: number } | null>(null);
+  const [discountPct, setDiscountPct] = useState("50");
+  const [discountReason, setDiscountReason] = useState("");
+  const [docRejectDialog, setDocRejectDialog] = useState<{
+    requirementId: string;
+    year: number;
+    label: string;
+  } | null>(null);
+  const [docRejectReason, setDocRejectReason] = useState("");
+  const [docSubmitDialog, setDocSubmitDialog] = useState<{
+    requirementId: string;
+    year: number;
+    label: string;
+  } | null>(null);
+  const [docSubmitTypeId, setDocSubmitTypeId] = useState("");
+  const [pendingDocApprove, setPendingDocApprove] = useState<{
+    requirementId: string;
+    year: number;
+    label: string;
+  } | null>(null);
+
+  const coverageNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const c of coveragesPage?.items ?? []) {
+      if (c.id) m[c.id] = c.name?.trim() || c.id;
+    }
+    return m;
+  }, [coveragesPage?.items]);
+
+  const documentTypeNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const d of documentTypesPage?.items ?? []) {
+      if (d.id) m[d.id] = d.name?.trim() || d.id;
+    }
+    return m;
+  }, [documentTypesPage?.items]);
 
   const offer = useMemo(() => {
     if (apiOffer) return mapApiOffer(apiOffer);
-    // Fallback to local seed while migrating (keep for unsupported flows).
     return id ? getOffer(id) : undefined;
   }, [apiOffer, id]);
 
@@ -110,9 +235,7 @@ const OfferDetail = () => {
 
   const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
   const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
-  const [notes, setNotes] = useState(
-    "Initial draft prepared by Erin Hoxha. Awaiting underwriter review.\n• Customer requested annual payment.\n• Beneficiary split confirmed via call on 2026-04-22."
-  );
+  const [notes, setNotes] = useState("");
 
   if (isLoading) {
     return (
@@ -136,23 +259,16 @@ const OfferDetail = () => {
     );
   }
 
-  const version = listVersions(offer.productId).find((v) => v.id === offer.versionId);
-  const template = listTemplates(offer.productId, offer.versionId).find((t) => t.id === offer.templateId);
-  const holder = getCustomerLocal(offer.policyHolderId);
-  const insured = getCustomerLocal(offer.insuredId);
-  const payer = getCustomerLocal(offer.payerId);
-  const coverages = listCoverages(offer.productId, offer.versionId);
-  const docs = listDocuments(offer.productId, offer.versionId);
-
-  const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
-  const insuredGender: RuleGender = insured?.gender === "Female" ? "Female" : insured?.gender === "Male" ? "Male" : "Any";
-
-  const mandatoryCoverages = coverages.filter(
-    (c) => c.coverageType === "Mandatory" && template?.includedCoverageIds.includes(c.id)
+  const holder = offer.participants.find((p) => p.role === "policyHolder");
+  const payer = offer.participants.find((p) => p.role === "invoiced") ?? holder;
+  const insuredPerson = offer.insuredPersons[0];
+  const scheduleCoverages = offer.schedules.flatMap((s) => s.coverages);
+  const scheduleDocuments = offer.schedules.flatMap((s) =>
+    s.documents.map((d) => ({ ...d, scheduleYear: s.year }))
   );
-  const includedRiders = coverages.filter(
-    (c) => c.coverageType === "Optional Rider" && template?.optionalRiderIds.includes(c.id)
-  );
+  const insuredAmount =
+    offer.schedules.reduce((sum, s) => sum + (s.insuredAmount || 0), 0) ||
+    scheduleCoverages.reduce((sum, c) => sum + (c.sumInsured || 0), 0);
 
   const verifOverall = overallStatus(verificationChecks);
   const reviewCount = verificationChecks.filter((c) => c.result === "Requires Review").length;
@@ -168,7 +284,6 @@ const OfferDetail = () => {
   };
 
   const handleApprove = () => {
-    // TODO: wire when offer-approval endpoint is available
     toast.info("Offer approval is not yet available from the API");
   };
 
@@ -181,24 +296,175 @@ const OfferDetail = () => {
     }
   };
 
-  const canApprove = offer.status === "Quoted" || offer.status === "Pending Review";
-  const canReject = offer.status !== "Issued" && offer.status !== "Rejected";
-  // API has no separate "Approved" state yet — allow issue from quoted / review.
+  const handleConfirmRemove = async () => {
+    if (!pendingRemove) return;
+    try {
+      if (pendingRemove.kind === "insured") {
+        await removeInsuredPerson.mutateAsync({
+          offerId: offer.id,
+          insuredPersonId: pendingRemove.id,
+        });
+        toast.success("Insured person removed");
+      } else {
+        await removeParticipant.mutateAsync({
+          offerId: offer.id,
+          participantId: pendingRemove.id,
+        });
+        toast.success("Participant removed");
+      }
+      setPendingRemove(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove");
+    }
+  };
+
+  const handleCancelSchedule = async () => {
+    if (cancelScheduleYear == null) return;
+    try {
+      await cancelSchedule.mutateAsync({
+        offerId: offer.id,
+        year: String(cancelScheduleYear),
+      });
+      toast.success(`Schedule ${cancelScheduleYear} cancelled`);
+      setCancelScheduleYear(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to cancel schedule");
+    }
+  };
+
+  const handleRequestDiscount = async () => {
+    if (!discountDialog) return;
+    const pct = Number(discountPct);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+      toast.error("Enter a discount between 0 and 100%");
+      return;
+    }
+    if (!discountReason.trim()) {
+      toast.error("Reason is required");
+      return;
+    }
+    try {
+      await requestDiscount.mutateAsync({
+        offerId: offer.id,
+        year: String(discountDialog.year),
+        body: {
+          requestedDiscountPercentage: pct / 100,
+          reason: discountReason.trim(),
+        },
+      });
+      toast.success(`Discount requested for schedule ${discountDialog.year}`);
+      setDiscountDialog(null);
+      setDiscountPct("50");
+      setDiscountReason("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to request discount");
+    }
+  };
+
+  const handleApproveDiscount = async (year: number, requestId: string) => {
+    try {
+      await approveDiscount.mutateAsync({
+        offerId: offer.id,
+        year: String(year),
+        requestId,
+      });
+      toast.success("Discount request approved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to approve discount");
+    }
+  };
+
+  const handleRejectDiscount = async (year: number, requestId: string) => {
+    try {
+      await rejectDiscount.mutateAsync({
+        offerId: offer.id,
+        year: String(year),
+        requestId,
+      });
+      toast.success("Discount request rejected");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reject discount");
+    }
+  };
+
+  const discountActionPending = approveDiscount.isPending || rejectDiscount.isPending;
+
+  const handleApproveScheduleDocument = async () => {
+    if (!pendingDocApprove) return;
+    try {
+      await approveScheduleDocument.mutateAsync({
+        offerId: offer.id,
+        year: String(pendingDocApprove.year),
+        requirementId: pendingDocApprove.requirementId,
+      });
+      toast.success(`Document approved: ${pendingDocApprove.label}`);
+      setPendingDocApprove(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to approve document");
+    }
+  };
+
+  const handleRejectScheduleDocument = async () => {
+    if (!docRejectDialog) return;
+    if (!docRejectReason.trim()) {
+      toast.error("Rejection reason is required");
+      return;
+    }
+    try {
+      await rejectScheduleDocument.mutateAsync({
+        offerId: offer.id,
+        year: String(docRejectDialog.year),
+        requirementId: docRejectDialog.requirementId,
+        body: { reason: docRejectReason.trim() },
+      });
+      toast.success(`Document rejected: ${docRejectDialog.label}`);
+      setDocRejectDialog(null);
+      setDocRejectReason("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reject document");
+    }
+  };
+
+  const handleSubmitScheduleDocument = async () => {
+    if (!docSubmitDialog) return;
+    if (!docSubmitTypeId) {
+      toast.error("Select a document type");
+      return;
+    }
+    try {
+      await submitScheduleDocument.mutateAsync({
+        offerId: offer.id,
+        year: String(docSubmitDialog.year),
+        requirementId: docSubmitDialog.requirementId,
+        body: { documentId: docSubmitTypeId },
+      });
+      toast.success(`Document submitted: ${docSubmitDialog.label}`);
+      setDocSubmitDialog(null);
+      setDocSubmitTypeId("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit document");
+    }
+  };
+
+  const removing =
+    removeInsuredPerson.isPending || removeParticipant.isPending;
+
+  const canApprove = offer.status === "Quoted" || offer.status === "Partially Bound";
+  const canReject =
+    offer.status !== "Bound" &&
+    offer.status !== "Cancelled" &&
+    offer.status !== "Expired";
   const canIssue =
-    offer.status === "Approved" ||
-    offer.status === "Quoted" ||
-    offer.status === "Pending Review";
+    offer.status === "Quoted" || offer.status === "Partially Bound";
 
   return (
     <AppShell>
-      {/* Back */}
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/offers")} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Offers
         </Button>
       </div>
 
-      {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
         <div className="min-w-0">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Offer</div>
@@ -214,7 +480,7 @@ const OfferDetail = () => {
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {product?.name} · {template?.name} · created {offer.createdDate}
+            {product?.name ?? offer.productId} · created {offer.createdDate}
           </p>
         </div>
 
@@ -239,7 +505,7 @@ const OfferDetail = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Reject this offer?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {offer.number} will be marked as Rejected. This can be reverted by the underwriter.
+                  {offer.number} will be marked as Cancelled.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -267,23 +533,26 @@ const OfferDetail = () => {
         </div>
       </div>
 
-      {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold text-primary">{fmtMoney(offer.premium || premiumResult?.grossPremium || 0, offer.currency)}</div></CardContent>
+          <CardContent>
+            <div className="text-lg font-semibold text-primary">
+              {fmtMoney(offer.premium || premiumResult?.grossPremium || 0, offer.currency)}
+            </div>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Currency</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{offer.currency}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1.5"><CardDescription>Term</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{offer.termYears} years</div></CardContent>
+          <CardHeader className="pb-1.5"><CardDescription>Insured Amount</CardDescription></CardHeader>
+          <CardContent><div className="text-lg font-semibold">{fmtMoney(insuredAmount, offer.currency)}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1.5"><CardDescription>Payment Mode</CardDescription></CardHeader>
-          <CardContent><div className="text-sm font-semibold">{offer.paymentMode}</div></CardContent>
+          <CardHeader className="pb-1.5"><CardDescription>Term</CardDescription></CardHeader>
+          <CardContent><div className="text-lg font-semibold">{offer.termYears} years</div></CardContent>
         </Card>
         <Card className={verifOverall === "Pending Review" ? "border-amber-500/40 bg-amber-500/5" : ""}>
           <CardHeader className="pb-1.5"><CardDescription>Verification</CardDescription></CardHeader>
@@ -315,7 +584,6 @@ const OfferDetail = () => {
           <TabsTrigger value="notes" className="gap-1.5"><StickyNote className="h-3.5 w-3.5" />Notes</TabsTrigger>
         </TabsList>
 
-        {/* SUMMARY */}
         <TabsContent value="summary" className="mt-4 space-y-4">
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -323,26 +591,51 @@ const OfferDetail = () => {
               <CardContent className="grid grid-cols-2 gap-4">
                 <Field label="Product" value={product?.name} />
                 <Field label="Product Code" value={<span className="font-mono text-xs">{product?.code}</span>} />
-                <Field label="Version" value={`${version?.name} (${version?.number})`} />
-                <Field label="Template / Package" value={template?.name} />
+                <Field label="Product ID" value={<span className="font-mono text-xs">{offer.productId}</span>} />
+                <Field label="Currency" value={offer.currency} />
                 <div className="col-span-2">
-                  <Field label="Premium Override" value={template ? overrideSummary(template, offer.currency) : "—"} />
-                </div>
-                <div className="col-span-2">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Mandatory Coverages</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {mandatoryCoverages.length > 0 ? mandatoryCoverages.map((c) => (
-                      <Badge key={c.id} variant="secondary">{c.name}</Badge>
-                    )) : <span className="text-sm text-muted-foreground">None configured</span>}
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Optional Riders Available</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {includedRiders.length > 0 ? includedRiders.map((c) => (
-                      <Badge key={c.id} variant="outline">{c.name}</Badge>
-                    )) : <span className="text-sm text-muted-foreground">No riders available in this package</span>}
-                  </div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Schedule Coverages</div>
+                  {scheduleCoverages.length === 0 ? (
+                    <span className="text-sm text-muted-foreground">No coverages on this offer yet.</span>
+                  ) : (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Coverage</TableHead>
+                            <TableHead className="text-right">Sum Insured</TableHead>
+                            <TableHead className="text-right">Rate</TableHead>
+                            <TableHead className="text-right">Premium</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {scheduleCoverages.map((c) => (
+                            <TableRow key={c.id || c.coverageId}>
+                              <TableCell>
+                                <div className="text-sm font-medium">
+                                  {coverageNameById[c.coverageId] ?? c.coverageId}
+                                </div>
+                                <div className="font-mono text-[11px] text-muted-foreground">{c.coverageId}</div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {fmtMoney(c.sumInsured, offer.currency)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                                {c.rateUsed?.isFlat
+                                  ? fmtMoney(c.rateUsed.flatValue ?? 0, c.rateUsed.flatValueCurrency || offer.currency)
+                                  : c.rateUsed?.percentageValue != null
+                                    ? `${c.rateUsed.percentageValue}%`
+                                    : "—"}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm font-semibold">
+                                {fmtMoney(c.calculatedPremium, offer.currency)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -353,19 +646,19 @@ const OfferDetail = () => {
                 <Field label="Start Date" value={<span className="font-mono text-xs">{offer.startDate}</span>} />
                 <Field label="End Date" value={<span className="font-mono text-xs">{offer.endDate}</span>} />
                 <Field label="Term" value={`${offer.termYears} years`} />
-                <Field label="Payment Mode" value={offer.paymentMode} />
-                {offer.loan && (
-                  <>
-                    <div className="col-span-2 mt-2 pt-3 border-t">
-                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Loan Details</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field label="Outstanding Balance" value={fmtMoney(offer.loan.outstandingBalance, offer.currency)} />
-                        <Field label="Interest Rate" value={`${offer.loan.interestRate}%`} />
-                        <Field label="Loan Term" value={`${offer.loan.loanTermYears} yrs`} />
-                        <Field label="Remaining" value={`${offer.loan.remainingYears} yrs`} />
+                <Field label="Insured Amount" value={fmtMoney(insuredAmount, offer.currency)} />
+                {offer.loanDisbursements.length > 0 && (
+                  <div className="col-span-2 mt-2 pt-3 border-t space-y-3">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Loan Disbursements</div>
+                    {offer.loanDisbursements.map((loan) => (
+                      <div key={loan.id} className="grid grid-cols-2 gap-3">
+                        <Field label="Year" value={loan.year || "—"} />
+                        <Field label="Remaining Amount" value={fmtMoney(loan.remainingLoanAmount, offer.currency)} />
+                        <Field label="Period Start" value={<span className="font-mono text-xs">{loan.startDate || "—"}</span>} />
+                        <Field label="Period End" value={<span className="font-mono text-xs">{loan.endDate || "—"}</span>} />
                       </div>
-                    </div>
-                  </>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -376,184 +669,558 @@ const OfferDetail = () => {
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field
                 label="Policy Holder"
-                value={holder ? <Link to={customerPath(holder.id, holder.customerType)} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"}
+                value={
+                  <PartyLink
+                    partyId={holder?.partyId}
+                    partyType={holder?.partyType}
+                    displayName={holder?.displayName}
+                  />
+                }
               />
               <Field
                 label="Insured Person"
-                value={insured ? <Link to={customerPath(insured.id, insured.customerType)} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"}
+                value={
+                  insuredPerson ? (
+                    <PartyLink
+                      partyId={insuredPerson.personId}
+                      partyType="person"
+                      displayName={[insuredPerson.firstName, insuredPerson.lastName].filter(Boolean).join(" ") || insuredPerson.personalIdentifier}
+                    />
+                  ) : "—"
+                }
               />
               <Field
                 label="Payer / Invoice Recipient"
-                value={payer ? <Link to={customerPath(payer.id, payer.customerType)} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"}
+                value={
+                  <PartyLink
+                    partyId={payer?.partyId}
+                    partyType={payer?.partyType}
+                    displayName={payer?.displayName}
+                  />
+                }
               />
             </CardContent>
           </Card>
-
-
         </TabsContent>
 
-
-        {/* SCHEDULE */}
-        <TabsContent value="schedule" className="mt-4">
+        <TabsContent value="schedule" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Yearly Schedule</CardTitle>
+              <CardTitle className="text-base">Offer Schedules</CardTitle>
               <CardDescription>
-                Premium installments {offer.loan ? "and projected loan balance " : ""}across the {offer.termYears}-year policy term.
+                Premium and coverage schedule rows returned by the offers API.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {(() => {
-                const taxRate = 0.10;
-                const annualGross = offer.premium;
-                const bankPct = template?.bankCommission ?? product?.bankCommission ?? 0;
-                const agentPct = template?.agentCommission ?? product?.agentCommission ?? 0;
-                const startY = new Date(offer.startDate).getFullYear();
-                const mmdd = offer.startDate.slice(5);
-                const currentYear = new Date().getFullYear();
+              {offer.schedules.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-6 text-center">
+                  No schedules calculated for this offer yet.
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[70px]">Year</TableHead>
+                        <TableHead>Start</TableHead>
+                        <TableHead>End</TableHead>
+                        <TableHead className="text-right">Insured Amount</TableHead>
+                        <TableHead className="text-right">Premium</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Coverages</TableHead>
+                        <TableHead className="text-right">Documents</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {offer.schedules.map((s) => {
+                        const isCancelled = s.internalStatus === "cancelled";
+                        return (
+                          <TableRow key={s.id || s.year}>
+                            <TableCell className="font-mono">{s.year}</TableCell>
+                            <TableCell className="font-mono text-xs">{s.startDate || "—"}</TableCell>
+                            <TableCell className="font-mono text-xs">{s.endDate || "—"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {fmtMoney(s.insuredAmount, offer.currency)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm font-semibold">
+                              {fmtMoney(s.premium, offer.currency)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  scheduleStatusColor[s.internalStatus ?? ""] ??
+                                  "bg-muted text-muted-foreground"
+                                }
+                              >
+                                {titleCase(s.internalStatus) ?? "—"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">{s.coverages.length}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{s.documents.length}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="inline-flex items-center gap-1.5">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                  disabled={isCancelled}
+                                  onClick={() => {
+                                    setDiscountPct("50");
+                                    setDiscountReason("");
+                                    setDiscountDialog({ year: s.year });
+                                  }}
+                                >
+                                  <Percent className="h-3.5 w-3.5" /> Request Discount
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="gap-1.5 h-8 text-destructive hover:text-destructive"
+                                  disabled={isCancelled || cancelSchedule.isPending}
+                                  onClick={() => setCancelScheduleYear(s.year)}
+                                >
+                                  <XCircle className="h-3.5 w-3.5" /> Cancel
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      <TableRow className="bg-muted/40 font-medium">
+                        <TableCell colSpan={3} className="text-sm">Total</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {fmtMoney(
+                            offer.schedules.reduce((sum, s) => sum + s.insuredAmount, 0),
+                            offer.currency
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-semibold text-primary">
+                          {fmtMoney(
+                            offer.schedules.reduce((sum, s) => sum + s.premium, 0),
+                            offer.currency
+                          )}
+                        </TableCell>
+                        <TableCell colSpan={4} />
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-                // payment-mode-aware gross for the year
-                const grossForYear = (i: number) => {
-                  switch (offer.paymentMode) {
-                    case "Pagese per gjithe periudhen (Upfront)":
-                      return i === 0 ? annualGross * offer.termYears : 0;
-                    case "Pagesa me tarife te vetme për të gjithë periudhën":
-                      return i === 0 ? annualGross : 0;
-                    default:
-                      return annualGross;
-                  }
-                };
-
-                // loan amortization (very simple linear decline)
-                const loanBalance = (i: number) => {
-                  if (!offer.loan) return undefined;
-                  const remaining = Math.max(0, offer.loan.outstandingBalance * (1 - i / offer.termYears));
-                  return remaining;
-                };
-
-                const rows = Array.from({ length: offer.termYears }, (_, i) => {
-                  const yearLabel = startY + i;
-                  const gross = grossForYear(i);
-                  const tax = +(gross * taxRate / (1 + taxRate)).toFixed(2);
-                  const net = +(gross - tax).toFixed(2);
-                  const bankComm = +(net * bankPct).toFixed(2);
-                  const agentComm = +(net * agentPct).toFixed(2);
-                  let status: "Current Year" | "Future" | "Past" | "Not Billed" = "Future";
-                  if (gross === 0) status = "Not Billed";
-                  else if (yearLabel === currentYear) status = "Current Year";
-                  else if (yearLabel < currentYear) status = "Past";
-                  return {
-                    year: i + 1,
-                    startDate: `${yearLabel}-${mmdd}`,
-                    endDate: `${yearLabel + 1}-${mmdd}`,
-                    gross, tax, net, bankComm, agentComm,
-                    estLoan: loanBalance(i),
-                    status,
-                  };
-                });
-
-                const totals = rows.reduce((acc, r) => ({
-                  gross: acc.gross + r.gross, tax: acc.tax + r.tax, net: acc.net + r.net,
-                  bank: acc.bank + r.bankComm, agent: acc.agent + r.agentComm,
-                }), { gross: 0, tax: 0, net: 0, bank: 0, agent: 0 });
-
-                return (
+          {(() => {
+            const discountRows = offer.schedules.flatMap((s) =>
+              s.discountRequests.map((r) => ({ ...r, scheduleYear: s.year }))
+            );
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Discount Requests</CardTitle>
+                  <CardDescription>
+                    Discount requests attached to offer schedules.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
                   <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[60px]">Year</TableHead>
-                          <TableHead>Start</TableHead>
-                          <TableHead>End</TableHead>
-                          {offer.loan && <TableHead className="text-right">Est. Loan Balance</TableHead>}
-                          <TableHead className="text-right">Gross</TableHead>
-                          <TableHead className="text-right">Tax (10%)</TableHead>
-                          <TableHead className="text-right">Net</TableHead>
-                          <TableHead className="text-right">Bank Comm. ({(bankPct * 100).toFixed(0)}%)</TableHead>
-                          <TableHead className="text-right">Agent Comm. ({(agentPct * 100).toFixed(0)}%)</TableHead>
+                          <TableHead className="w-[70px]">Year</TableHead>
+                          <TableHead className="text-right">Discount</TableHead>
+                          <TableHead>Reason</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rows.map((r) => (
-                          <TableRow key={r.year}>
-                            <TableCell className="font-mono">{r.year}</TableCell>
-                            <TableCell className="font-mono text-xs">{r.startDate}</TableCell>
-                            <TableCell className="font-mono text-xs">{r.endDate}</TableCell>
-                            {offer.loan && (
-                              <TableCell className="text-right font-mono text-sm">
-                                {r.estLoan !== undefined ? fmtMoney(r.estLoan, offer.currency) : "—"}
-                              </TableCell>
-                            )}
-                            <TableCell className="text-right font-mono text-sm font-semibold">{fmtMoney(r.gross, offer.currency)}</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(r.tax, offer.currency)}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{fmtMoney(r.net, offer.currency)}</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(r.bankComm, offer.currency)}</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmtMoney(r.agentComm, offer.currency)}</TableCell>
-                            <TableCell>
-                              <Badge variant={r.status === "Current Year" ? "default" : "secondary"}>{r.status}</Badge>
+                        {discountRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                              No discount requests on this offer.
                             </TableCell>
                           </TableRow>
-                        ))}
-                        <TableRow className="bg-muted/40 font-medium">
-                          <TableCell colSpan={offer.loan ? 4 : 3} className="text-sm">Total over {offer.termYears} years</TableCell>
-                          <TableCell className="text-right font-mono text-sm font-semibold text-primary">{fmtMoney(totals.gross, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.tax, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.net, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.bank, offer.currency)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(totals.agent, offer.currency)}</TableCell>
-                          <TableCell />
-                        </TableRow>
+                        ) : (
+                          discountRows.map((r) => {
+                            const canAct = r.status === "requested";
+                            return (
+                              <TableRow key={`${r.scheduleYear}-${r.id}`}>
+                                <TableCell className="font-mono">{r.scheduleYear}</TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">
+                                  {Math.round(r.requestedDiscountPercentage * 10000) / 100}%
+                                </TableCell>
+                                <TableCell className="text-sm max-w-[320px]">
+                                  {r.reason || "—"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      discountRequestStatusColor[r.status] ??
+                                      "bg-muted text-muted-foreground"
+                                    }
+                                  >
+                                    {titleCase(r.status)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                      disabled={!canAct || discountActionPending}
+                                      onClick={() => void handleApproveDiscount(r.scheduleYear, r.id)}
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      className="gap-1.5 h-8 text-destructive hover:text-destructive"
+                                      disabled={!canAct || discountActionPending}
+                                      onClick={() => void handleRejectDiscount(r.scheduleYear, r.id)}
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" /> Reject
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-
-        {/* PEOPLE */}
-        <TabsContent value="people" className="mt-4 space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3">
-            {[
-              { title: "Policy Holder", c: holder, role: "Owner of the policy" },
-              { title: "Insured Person", c: insured, role: "Life being insured" },
-              { title: "Payer / Invoice Recipient", c: payer, role: "Receives invoices, pays premiums" },
-            ].map((p) => (
-              <Card key={p.title}>
-                <CardHeader>
-                  <CardTitle className="text-base">{p.title}</CardTitle>
-                  <CardDescription>{p.role}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  {p.c ? (
-                    <>
-                      <Field label="Name" value={<Link to={customerPath(p.c.id, p.c.customerType)} className="text-primary hover:underline">{fullName(p.c)}</Link>} />
-                      <Field label="Personal ID" value={<span className="font-mono text-xs">{p.c.personalId}</span>} />
-                      <Field label="DOB / Age" value={`${p.c.dateOfBirth} (${ageFromDob(p.c.dateOfBirth)} yrs)`} />
-                      <Field label="Gender" value={p.c.gender} />
-                      <Field label="Email" value={p.c.email} />
-                      <Field label="Phone" value={p.c.phone} />
-                      <Field label="PEP Status" value={
-                        <Badge variant="outline" className={
-                          p.c.pepStatus === "Yes" ? "border-destructive/40 text-destructive" :
-                          p.c.pepStatus === "Unknown" ? "border-amber-500/40 text-amber-700 dark:text-amber-300" :
-                          "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
-                        }>{p.c.pepStatus}</Badge>
-                      } />
-                    </>
-                  ) : <div className="text-sm text-muted-foreground">Not assigned</div>}
                 </CardContent>
               </Card>
-            ))}
+            );
+          })()}
+
+          <AlertDialog
+            open={cancelScheduleYear != null}
+            onOpenChange={(open) => !open && setCancelScheduleYear(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel schedule {cancelScheduleYear}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will cancel the schedule for year {cancelScheduleYear} on this offer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={cancelSchedule.isPending}>Keep schedule</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleCancelSchedule();
+                  }}
+                  disabled={cancelSchedule.isPending}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {cancelSchedule.isPending ? "Cancelling…" : "Cancel schedule"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <Dialog
+            open={!!discountDialog}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDiscountDialog(null);
+                setDiscountPct("50");
+                setDiscountReason("");
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Request discount · Year {discountDialog?.year}</DialogTitle>
+                <DialogDescription>
+                  Submit a discount request for this schedule year.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="discount-pct">Discount percentage</Label>
+                  <div className="relative">
+                    <Input
+                      id="discount-pct"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="any"
+                      className="pr-8"
+                      value={discountPct}
+                      onChange={(e) => setDiscountPct(e.target.value)}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      %
+                    </span>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="discount-reason">Reason</Label>
+                  <Textarea
+                    id="discount-reason"
+                    rows={3}
+                    value={discountReason}
+                    onChange={(e) => setDiscountReason(e.target.value)}
+                    placeholder="Why is this discount requested?"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDiscountDialog(null)}
+                  disabled={requestDiscount.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={() => void handleRequestDiscount()} disabled={requestDiscount.isPending}>
+                  {requestDiscount.isPending ? "Submitting…" : "Submit request"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="people" className="mt-4 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base">Policy Holder</CardTitle>
+                  <CardDescription>Owner of the policy</CardDescription>
+                </div>
+                {holder?.id && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5 text-destructive hover:text-destructive"
+                    onClick={() =>
+                      setPendingRemove({
+                        kind: "participant",
+                        id: holder.id,
+                        label: holder.displayName || "policy holder",
+                      })
+                    }
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {holder ? (
+                  <>
+                    <Field
+                      label="Name"
+                      value={
+                        <PartyLink
+                          partyId={holder.partyId}
+                          partyType={holder.partyType}
+                          displayName={holder.displayName}
+                        />
+                      }
+                    />
+                    <Field label="Identifier" value={<span className="font-mono text-xs">{holder.uniqueIdentifier}</span>} />
+                    <Field label="Party Type" value={titleCase(holder.partyType)} />
+                    <Field label="Country" value={holder.countryCode} />
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Not assigned</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base">Insured Person</CardTitle>
+                  <CardDescription>Life being insured</CardDescription>
+                </div>
+                {insuredPerson?.id && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5 text-destructive hover:text-destructive"
+                    onClick={() =>
+                      setPendingRemove({
+                        kind: "insured",
+                        id: insuredPerson.id,
+                        label:
+                          [insuredPerson.firstName, insuredPerson.lastName].filter(Boolean).join(" ") ||
+                          insuredPerson.personalIdentifier ||
+                          "insured person",
+                      })
+                    }
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {insuredPerson ? (
+                  <>
+                    <Field
+                      label="Name"
+                      value={
+                        <PartyLink
+                          partyId={insuredPerson.personId}
+                          partyType="person"
+                          displayName={[insuredPerson.firstName, insuredPerson.lastName].filter(Boolean).join(" ")}
+                        />
+                      }
+                    />
+                    <Field
+                      label="Personal ID"
+                      value={<span className="font-mono text-xs">{insuredPerson.personalIdentifier}</span>}
+                    />
+                    <Field
+                      label="DOB / Age"
+                      value={
+                        insuredPerson.dateOfBirth
+                          ? `${insuredPerson.dateOfBirth} (${ageFromDob(insuredPerson.dateOfBirth)} yrs)`
+                          : "—"
+                      }
+                    />
+                    <Field label="Gender" value={titleCase(insuredPerson.gender)} />
+                    <Field label="Country" value={insuredPerson.countryCode} />
+                    <Field
+                      label="PEP Status"
+                      value={
+                        <Badge
+                          variant="outline"
+                          className={
+                            insuredPerson.isPep
+                              ? "border-destructive/40 text-destructive"
+                              : "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                          }
+                        >
+                          {insuredPerson.isPep ? "Yes" : "No"}
+                        </Badge>
+                      }
+                    />
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Not assigned</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base">Payer / Invoice Recipient</CardTitle>
+                  <CardDescription>Receives invoices, pays premiums</CardDescription>
+                </div>
+                {payer?.id && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5 text-destructive hover:text-destructive"
+                    onClick={() =>
+                      setPendingRemove({
+                        kind: "participant",
+                        id: payer.id,
+                        label: payer.displayName || "payer",
+                      })
+                    }
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {payer ? (
+                  <>
+                    <Field
+                      label="Name"
+                      value={
+                        <PartyLink
+                          partyId={payer.partyId}
+                          partyType={payer.partyType}
+                          displayName={payer.displayName}
+                        />
+                      }
+                    />
+                    <Field label="Identifier" value={<span className="font-mono text-xs">{payer.uniqueIdentifier}</span>} />
+                    <Field label="Party Type" value={titleCase(payer.partyType)} />
+                    <Field label="Country" value={payer.countryCode} />
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Not assigned</div>
+                )}
+              </CardContent>
+            </Card>
           </div>
+
+          {offer.insuredPersons.length > 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">All Insured Persons</CardTitle>
+                <CardDescription>{offer.insuredPersons.length} insured persons on this offer.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Identifier</TableHead>
+                        <TableHead>DOB</TableHead>
+                        <TableHead className="w-[100px]" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {offer.insuredPersons.map((ip) => {
+                        const name = [ip.firstName, ip.lastName].filter(Boolean).join(" ");
+                        return (
+                          <TableRow key={ip.id}>
+                            <TableCell>
+                              <PartyLink partyId={ip.personId} partyType="person" displayName={name} />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{ip.personalIdentifier ?? "—"}</TableCell>
+                            <TableCell className="font-mono text-xs">{ip.dateOfBirth ?? "—"}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="gap-1.5 text-destructive hover:text-destructive"
+                                onClick={() =>
+                                  setPendingRemove({
+                                    kind: "insured",
+                                    id: ip.id,
+                                    label: name || ip.personalIdentifier || "insured person",
+                                  })
+                                }
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Remove
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Beneficiaries</CardTitle>
-              <CardDescription>{offer.beneficiaries.length} beneficiaries, total split must equal 100%.</CardDescription>
+              <CardDescription>
+                {offer.beneficiaries.length} beneficiaries
+                {offer.beneficiaries.length > 0
+                  ? `, total split ${offer.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%.`
+                  : "."}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -561,97 +1228,335 @@ const OfferDetail = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Customer</TableHead>
-                      <TableHead>Relationship</TableHead>
-                      <TableHead className="text-right">Percentage</TableHead>
+                      <TableHead>Identifier</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Share</TableHead>
+                      <TableHead className="w-[100px]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {offer.beneficiaries.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">
+                        <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
                           No beneficiaries assigned to this offer.
                         </TableCell>
                       </TableRow>
-                    ) : offer.beneficiaries.map((b) => {
-                      const c = getCustomerLocal(b.customerId);
-                      return (
-                        <TableRow key={b.id}>
-                          <TableCell>
-                            {c ? <Link to={customerPath(c.id, c.customerType)} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}
+                    ) : (
+                      <>
+                        {offer.beneficiaries.map((b) => (
+                          <TableRow key={b.id}>
+                            <TableCell>
+                              <PartyLink
+                                partyId={b.customerId}
+                                partyType={b.partyType}
+                                displayName={b.displayName}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{b.uniqueIdentifier ?? "—"}</TableCell>
+                            <TableCell>{titleCase(b.partyType) ?? "—"}</TableCell>
+                            <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="gap-1.5 text-destructive hover:text-destructive"
+                                onClick={() =>
+                                  setPendingRemove({
+                                    kind: "participant",
+                                    id: b.id,
+                                    label: b.displayName || "beneficiary",
+                                  })
+                                }
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Remove
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/40">
+                          <TableCell colSpan={3} className="font-medium text-sm">Total</TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            {offer.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%
                           </TableCell>
-                          <TableCell>{b.relationship}</TableCell>
-                          <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
+                          <TableCell />
                         </TableRow>
-                      );
-                    })}
-                    {offer.beneficiaries.length > 0 && (
-                      <TableRow className="bg-muted/40">
-                        <TableCell colSpan={2} className="font-medium text-sm">Total</TableCell>
-                        <TableCell className="text-right font-mono font-semibold">
-                          {offer.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%
-                        </TableCell>
-                      </TableRow>
+                      </>
                     )}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
+
+          <AlertDialog open={!!pendingRemove} onOpenChange={(open) => !open && setPendingRemove(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {pendingRemove?.kind === "insured" ? "Remove insured person?" : "Remove participant?"}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove{" "}
+                  <span className="font-medium text-foreground">{pendingRemove?.label}</span> from this offer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleConfirmRemove();
+                  }}
+                  disabled={removing}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {removing ? "Removing…" : "Remove"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
-        {/* DOCUMENTS */}
         <TabsContent value="documents" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Required Documents</CardTitle>
-              <CardDescription>Documents inherited from the product configuration.</CardDescription>
+              <CardTitle className="text-base">Schedule Documents</CardTitle>
+              <CardDescription>Documents attached to offer schedules.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Document</TableHead>
-                      <TableHead>Required For</TableHead>
-                      <TableHead>Mandatory</TableHead>
-                      <TableHead>Trigger</TableHead>
+                      <TableHead>Document Type</TableHead>
+                      <TableHead>Schedule Year</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Refusal Reason</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {docs.length === 0 ? (
+                    {scheduleDocuments.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
-                          No documents configured for this product version.
+                          No documents on this offer's schedules.
                         </TableCell>
                       </TableRow>
-                    ) : docs.map((d) => (
-                      <TableRow key={d.id}>
-                        <TableCell className="font-medium text-sm">{d.name}</TableCell>
-                        <TableCell className="text-xs">
-                          {d.requiredFor.map((r) => <Badge key={r} variant="outline" className="mr-1 font-normal">{r}</Badge>)}
-                        </TableCell>
-                        <TableCell>
-                          {d.isMandatory
-                            ? <Badge variant="default">Mandatory</Badge>
-                            : <Badge variant="secondary">Optional</Badge>}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{d.appliesWhen}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
-                            <AlertTriangle className="h-3 w-3 mr-1" /> Pending
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    ) : (
+                      scheduleDocuments.map((d) => {
+                        const label = documentTypeNameById[d.documentTypeId] ?? d.documentTypeId;
+                        const canSubmit = d.status === "required" || d.status === "refused";
+                        const canReview = d.status === "submitted";
+                        const docActionPending =
+                          approveScheduleDocument.isPending ||
+                          rejectScheduleDocument.isPending ||
+                          submitScheduleDocument.isPending;
+                        return (
+                          <TableRow key={`${d.scheduleYear}-${d.id}`}>
+                            <TableCell>
+                              <div className="text-sm font-medium">{label}</div>
+                              <div className="font-mono text-[11px] text-muted-foreground">{d.documentTypeId}</div>
+                              {d.documentId ? (
+                                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                                  Doc: {d.documentId}
+                                </div>
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{d.scheduleYear}</TableCell>
+                            <TableCell>{docStatusBadge(d.status)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {d.refusalReason || "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="inline-flex items-center gap-1.5">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5 h-8"
+                                  disabled={!canSubmit || docActionPending}
+                                  onClick={() => {
+                                    setDocSubmitTypeId(d.documentTypeId);
+                                    setDocSubmitDialog({
+                                      requirementId: d.id,
+                                      year: d.scheduleYear,
+                                      label,
+                                    });
+                                  }}
+                                >
+                                  <Upload className="h-3.5 w-3.5" /> Submit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5 h-8"
+                                  disabled={!canReview || docActionPending}
+                                  onClick={() =>
+                                    setPendingDocApprove({
+                                      requirementId: d.id,
+                                      year: d.scheduleYear,
+                                      label,
+                                    })
+                                  }
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5 h-8 text-destructive hover:text-destructive"
+                                  disabled={!canReview || docActionPending}
+                                  onClick={() => {
+                                    setDocRejectReason("");
+                                    setDocRejectDialog({
+                                      requirementId: d.id,
+                                      year: d.scheduleYear,
+                                      label,
+                                    });
+                                  }}
+                                >
+                                  <XCircle className="h-3.5 w-3.5" /> Reject
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
+
+          <AlertDialog
+            open={!!pendingDocApprove}
+            onOpenChange={(open) => !open && setPendingDocApprove(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Approve document?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Approve <span className="font-medium text-foreground">{pendingDocApprove?.label}</span> for
+                  schedule year {pendingDocApprove?.year}.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={approveScheduleDocument.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={approveScheduleDocument.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleApproveScheduleDocument();
+                  }}
+                >
+                  {approveScheduleDocument.isPending ? "Approving…" : "Approve"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <Dialog
+            open={!!docRejectDialog}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDocRejectDialog(null);
+                setDocRejectReason("");
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reject document · {docRejectDialog?.label}</DialogTitle>
+                <DialogDescription>
+                  Provide a reason for rejecting this document requirement (year {docRejectDialog?.year}).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="doc-reject-reason">Reason</Label>
+                <Textarea
+                  id="doc-reject-reason"
+                  rows={4}
+                  value={docRejectReason}
+                  onChange={(e) => setDocRejectReason(e.target.value)}
+                  placeholder="Why is this document being rejected?"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDocRejectDialog(null);
+                    setDocRejectReason("");
+                  }}
+                  disabled={rejectScheduleDocument.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => void handleRejectScheduleDocument()}
+                  disabled={rejectScheduleDocument.isPending || !docRejectReason.trim()}
+                >
+                  {rejectScheduleDocument.isPending ? "Rejecting…" : "Reject"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={!!docSubmitDialog}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDocSubmitDialog(null);
+                setDocSubmitTypeId("");
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Submit document · {docSubmitDialog?.label}</DialogTitle>
+                <DialogDescription>
+                  Select a document type to submit for schedule year {docSubmitDialog?.year}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label>Document type</Label>
+                <Select value={docSubmitTypeId} onValueChange={setDocSubmitTypeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select document type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(documentTypesPage?.items ?? [])
+                      .filter((dt) => Boolean(dt.id))
+                      .map((dt) => (
+                        <SelectItem key={dt.id!} value={dt.id!}>
+                          {dt.name?.trim() || dt.id}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDocSubmitDialog(null);
+                    setDocSubmitTypeId("");
+                  }}
+                  disabled={submitScheduleDocument.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleSubmitScheduleDocument()}
+                  disabled={submitScheduleDocument.isPending || !docSubmitTypeId}
+                >
+                  {submitScheduleDocument.isPending ? "Submitting…" : "Submit"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
-        {/* VERIFICATION */}
         <TabsContent value="verification" className="mt-4">
           <VerificationStep
             productId={offer.productId}
@@ -666,7 +1571,6 @@ const OfferDetail = () => {
           />
         </TabsContent>
 
-        {/* NOTES */}
         <TabsContent value="notes" className="mt-4">
           <Card>
             <CardHeader>
