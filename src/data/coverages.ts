@@ -125,15 +125,5 @@ let coverages: Coverage[] = [...seed];
 export const listCoverages = (productId: string, versionId?: string) =>
   coverages.filter((c) => c.productId === productId && (!versionId || c.versionId === versionId));
 
-export const upsertCoverage = (c: Coverage) => {
-  const i = coverages.findIndex((x) => x.id === c.id);
-  if (i >= 0) coverages[i] = c;
-  else coverages = [c, ...coverages];
-};
-
-export const deleteCoverage = (id: string) => {
-  coverages = coverages.filter((c) => c.id !== id);
-};
-
 export const newCoverageId = () =>
   `COV-${Math.floor(1000 + Math.random() * 9000)}${Date.now().toString().slice(-3)}`;

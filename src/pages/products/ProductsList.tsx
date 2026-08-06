@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  Plus, Search, MoreHorizontal, Settings2, Package, Calendar, GitBranch,
-  Layers, Shield, Receipt, FolderOpen, ArrowLeft, ChevronRight, Trash2,
+  Plus, Search, MoreHorizontal, Settings2,
+  FolderOpen, ArrowLeft, ChevronRight, Trash2,
 } from "lucide-react";
 import {
   ProductStatus, PAYMENT_MODELS, BANK_PARTNERS,
@@ -29,7 +29,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -111,7 +111,7 @@ const ProductsList = () => {
 
   const handleCreateGroup = () => {
     if (!ngEnglish.trim()) {
-      toast({ title: "Missing fields", description: "English name is required.", variant: "destructive" });
+      toast.error("English name is required.");
       return;
     }
     // API currently accepts only `name`. Extra fields are typed for when the API adds them.
@@ -119,21 +119,16 @@ const ProductsList = () => {
       { name: ngEnglish.trim() },
       {
         onSuccess: () => {
-          toast({
-            title: "Product group created",
-            description: ngCode.trim()
+          toast.success(
+            ngCode.trim()
               ? `${ngEnglish} (${ngCode}) — code/label will sync when the API supports them.`
-              : ngEnglish,
-          });
+              : `Product group created: ${ngEnglish}`
+          );
           setNgEnglish(""); setNgLabel(""); setNgCode("");
           setNewGroupOpen(false);
         },
         onError: (err) => {
-          toast({
-            title: "Failed to create group",
-            description: err instanceof Error ? err.message : "Request failed",
-            variant: "destructive",
-          });
+          toast.error(err instanceof Error ? err.message : "Failed to create group");
         },
       }
     );
@@ -195,17 +190,13 @@ const ProductsList = () => {
                         e.stopPropagation();
                         if (!g.id) return;
                         if (g.items.length > 0) {
-                          toast({ title: "Cannot delete", description: `${g.english} has ${g.items.length} product(s).`, variant: "destructive" });
+                          toast.error(`${g.english} has ${g.items.length} product(s).`);
                           return;
                         }
                         deleteGroup.mutate(g.id, {
-                          onSuccess: () => toast({ title: "Product group deleted", description: g.english }),
+                          onSuccess: () => toast.success(`Product group deleted: ${g.english}`),
                           onError: (err) =>
-                            toast({
-                              title: "Failed to delete",
-                              description: err instanceof Error ? err.message : "Request failed",
-                              variant: "destructive",
-                            }),
+                            toast.error(err instanceof Error ? err.message : "Failed to delete"),
                         });
                       }}
                       title="Delete group"
@@ -371,7 +362,6 @@ const ProductsList = () => {
 
                 const pay = p.paymentDetails;
                 const loan = p.loanDetails;
-                const intd = p.internalDetails;
                 const ext = p.externalDetails;
                 const dash = (v?: string | number | null) =>
                   v === undefined || v === null || v === "" ? "—" : String(v);

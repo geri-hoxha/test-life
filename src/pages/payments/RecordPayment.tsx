@@ -11,7 +11,7 @@ import { ArrowLeft, CreditCard } from "lucide-react";
 import { listPolicies, getPolicy } from "@/data/policies";
 import { getCustomer, fullName } from "@/data/customers";
 import { getScheduleForPolicy, recordPayment, PaymentMethod } from "@/data/payments";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const METHODS: PaymentMethod[] = ["Cash", "Bank Transfer", "Card"];
 
@@ -51,7 +51,7 @@ const RecordPayment = () => {
   const handleSave = () => {
     const amt = parseFloat(amount);
     if (!policy || !year || !amt || amt <= 0) {
-      toast({ title: "Missing information", description: "Select policy, year and a positive amount.", variant: "destructive" });
+      toast.error("Select policy, year and a positive amount.");
       return;
     }
     recordPayment({
@@ -63,7 +63,7 @@ const RecordPayment = () => {
       method,
       notes: notes.trim() || undefined,
     });
-    toast({ title: "Payment recorded", description: `${policy.number} · year ${year} · ${amt.toFixed(2)} ${policy.currency}` });
+    toast.success(`${policy.number} · year ${year} · ${amt.toFixed(2)} ${policy.currency}`);
     navigate("/payments");
   };
 

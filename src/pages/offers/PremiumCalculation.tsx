@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -20,20 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Calculator,
   AlertTriangle,
-  ArrowRight,
-  Plus,
-  Minus,
-  Equal,
   ShieldAlert,
 } from "lucide-react";
 import { listCoverages, Coverage } from "@/data/coverages";
@@ -171,111 +157,62 @@ const PremiumCalculation = ({
     fxOverrideId === "auto" ? undefined : fxCandidates.find((c) => c.id === fxOverrideId)?.rate;
   const fxConv = convert(1, baseCurrency, currency, fxOverrideRate);
 
-  // ---- Step-by-step calculation ----
-  const lines: { label: string; basis: string; amount: number; sign: "+" | "-" | "="; muted?: boolean }[] = [];
-
+  // ---- Premium calculation ----
   const loanBalance = loan?.outstandingBalance;
 
-  // 1. Mandatory base premium
   let mandatoryTotal = 0;
   let weightedCommission = 0;
   mandatory.forEach((c) => {
-    const { amount, basis } = coveragePremium(c, insuredAge, insuredGender, currency, loanBalance);
+    const { amount } = coveragePremium(c, insuredAge, insuredGender, currency, loanBalance);
     mandatoryTotal += amount;
     weightedCommission += (amount * c.commissionPct) / 100;
-    lines.push({ label: `Mandatory · ${c.name}`, basis, amount, sign: "+" });
   });
 
-  // 2. Riders
   let ridersTotal = 0;
   selectedRiders.forEach((id) => {
     const c = allRiders.find((r) => r.id === id);
     if (!c) return;
-    const { amount, basis } = coveragePremium(c, insuredAge, insuredGender, currency, loanBalance);
+    const { amount } = coveragePremium(c, insuredAge, insuredGender, currency, loanBalance);
     ridersTotal += amount;
     weightedCommission += (amount * c.commissionPct) / 100;
-    lines.push({ label: `Rider · ${c.name}`, basis, amount, sign: "+" });
   });
 
-  let subtotal = mandatoryTotal + ridersTotal;
+  const subtotal = mandatoryTotal + ridersTotal;
 
-  // Reference: age/gender rule applied (informational)
   const baseRule = getPremiumRule(productId, effectiveVersionId ?? "N/A");
   const ruleHit =
     baseRule.rateTable.find(
       (r) => insuredAge >= r.ageFrom && insuredAge <= r.ageTo && (r.gender === "Any" || r.gender === insuredGender)
     ) ?? null;
 
-  // 3. Loan balance adjustment (if any mandatory uses loan and loan is shrinking)
-  let loanAdjustment = 0;
-  const usesLoan = mandatory.some((c) => c.sumInsuredType === "Based on loan amount");
-  if (usesLoan && loan && loan.amount > loan.outstandingBalance) {
-    // already reflected in subtotal via balance, log informationally
-    lines.push({
-      label: "Loan balance adjustment",
-      basis: `Premium based on outstanding ${fmt(loan.outstandingBalance, currency)} (vs original ${fmt(loan.amount, currency)})`,
-      amount: 0,
-      sign: "=",
-      muted: true,
-    });
-  }
-
-  // 4. Template discount/override
   let templateAdjustment = 0;
-  let templateLabel = "";
   if (template) {
     switch (template.premiumOverrideType) {
       case "Fixed discount":
         templateAdjustment = -(template.premiumOverrideValue ?? 0);
-        templateLabel = `Fixed discount of ${fmt(template.premiumOverrideValue ?? 0, currency)}`;
         break;
       case "Percentage discount":
         templateAdjustment = -((subtotal * (template.premiumOverrideValue ?? 0)) / 100);
-        templateLabel = `${template.premiumOverrideValue}% off subtotal`;
         break;
       case "Fixed premium":
         templateAdjustment = (template.premiumOverrideValue ?? 0) - subtotal;
-        templateLabel = `Flat premium ${fmt(template.premiumOverrideValue ?? 0, currency)} replaces calculated`;
-        break;
-      case "Management approved manual premium":
-        templateLabel = "Manual premium pending — see override below.";
         break;
       default:
-        templateLabel = "No template override applied.";
-    }
-    if (templateAdjustment !== 0) {
-      lines.push({
-        label: `Template · ${template.name}`,
-        basis: templateLabel,
-        amount: templateAdjustment,
-        sign: templateAdjustment < 0 ? "-" : "+",
-      });
-    } else {
-      lines.push({ label: `Template · ${template.name}`, basis: templateLabel, amount: 0, sign: "=", muted: true });
+        break;
     }
   }
 
-  let calculatedNet = Math.max(0, subtotal + templateAdjustment + loanAdjustment);
+  const calculatedNet = Math.max(0, subtotal + templateAdjustment);
 
-  // 5. Manual override
   let netPremium = calculatedNet;
   if (manualOverride && manualAmount !== "") {
     netPremium = Math.max(0, Number(manualAmount));
-    lines.push({
-      label: "Manual premium override",
-      basis: manualReason ? `Reason: ${manualReason}` : "No reason provided",
-      amount: netPremium - calculatedNet,
-      sign: netPremium >= calculatedNet ? "+" : "-",
-    });
   }
 
-  // 6. Tax (10% on net) — gross is net + tax
   const TAX_RATE = 0.10;
   const tax = netPremium * TAX_RATE;
   const grossPremium = netPremium + tax;
 
-  // 7. Commission — paid to the agent, calculated on the NET premium.
-  //    Not added to gross; it's a cost to the insurer, not a charge to the customer.
   const effectiveCommissionPct =
     template ? (template.agentCommission + template.bankCommission) * 100 : (subtotal > 0 ? (weightedCommission / subtotal) * 100 : 0);
   const commission = (netPremium * effectiveCommissionPct) / 100;
@@ -289,7 +226,6 @@ const PremiumCalculation = ({
     loan && loan.loanTermYears > 0 ? Math.floor(loan.loanTermYears) : termYears,
   );
 
-  // Projected loan balance per year — same linear decline as loan-disbursements
   const amort: number[] = [];
   if (loan) {
     const principal = Math.max(0, loan.outstandingBalance || loan.amount || 0);
@@ -298,7 +234,6 @@ const PremiumCalculation = ({
     }
   }
 
-  // Mode-aware premium for each year
   const premiumForYear = (i: number): { net: number; note?: string } => {
     switch (paymentMode) {
       case "Pagese per gjithe periudhen (Upfront)":
@@ -310,20 +245,17 @@ const PremiumCalculation = ({
           ? { net: netPremium, note: "Single fee for entire period" }
           : { net: 0, note: "No further charges" };
       case "Pagesa me prim fiks mujor": {
-        // 12 fixed monthly installments per year, derived from annual net
         const monthly = netPremium / 12;
         return { net: monthly * 12, note: `12 × ${fmt(monthly, currency)}/mo` };
       }
       case "Pagesa me prim fiks vjetor":
         return { net: netPremium, note: "Fixed annual premium" };
       case "Pagesa me prim te paracaktuar, kjo eshte e velfshme per sigurimin e jetes se kombinuar Protect, Sigurimi i jetes se kombinuar ISP": {
-        // Predetermined: higher in early years, tapers off
         const factor = 1.25 - (0.5 * i) / Math.max(1, termN - 1);
         return { net: netPremium * factor, note: `Predetermined factor ×${factor.toFixed(2)}` };
       }
       case "Pagesa me prim te rregullt":
       default: {
-        // Regular premium — if loan-protection, follows declining balance
         if (loan && amort.length > 0 && amort[0] > 0) {
           const factor = amort[i] / amort[0];
           return {
@@ -413,7 +345,6 @@ const PremiumCalculation = ({
 
   return (
     <div className="space-y-4">
-      {/* Inputs summary */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -440,7 +371,6 @@ const PremiumCalculation = ({
         </CardContent>
       </Card>
 
-      {/* Riders */}
       {allRiders.length > 0 && (
         <Card>
           <CardHeader>
@@ -473,60 +403,6 @@ const PremiumCalculation = ({
         </Card>
       )}
 
-      {/* Breakdown — temporarily hidden
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Calculation Breakdown</CardTitle>
-          <CardDescription>Step-by-step composition of the net and gross premium. Agent commission is shown separately.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border divide-y">
-            {lines.map((l, i) => (
-              <div key={i} className={`flex items-start justify-between gap-3 px-3 py-2.5 ${l.muted ? "bg-muted/30" : ""}`}>
-                <div className="flex items-start gap-2 min-w-0">
-                  <div className="mt-0.5 h-5 w-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                    {l.sign === "+" ? <Plus className="h-3 w-3" /> : l.sign === "-" ? <Minus className="h-3 w-3" /> : <Equal className="h-3 w-3" />}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{l.label}</div>
-                    <div className="text-[11px] text-muted-foreground">{l.basis}</div>
-                  </div>
-                </div>
-                <div className={`font-mono text-sm ${l.amount < 0 ? "text-destructive" : ""}`}>
-                  {l.amount === 0 ? "—" : (l.amount > 0 ? "+" : "") + fmt(l.amount, currency)}
-                </div>
-              </div>
-            ))}
-            <div className="flex items-center justify-between px-3 py-2.5 bg-muted/40">
-              <div className="text-sm font-semibold">Net Premium</div>
-              <div className="font-mono text-sm font-semibold">{fmt(netPremium, currency)}</div>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2.5">
-              <div>
-                <div className="text-sm">Insurance tax (10%)</div>
-                <div className="text-[11px] text-muted-foreground">Statutory tax applied on top of the net premium.</div>
-              </div>
-              <div className="font-mono text-sm">+ {fmt(tax, currency)}</div>
-            </div>
-            <div className="flex items-center justify-between px-3 py-3 bg-primary/5">
-              <div className="text-sm font-semibold">Gross Premium</div>
-              <div className="font-mono text-base font-bold">{fmt(grossPremium, currency)}</div>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2.5 bg-amber-500/5">
-              <div>
-                <div className="text-sm">Agent commission ({effectiveCommissionPct.toFixed(1)}% of net)</div>
-                <div className="text-[11px] text-muted-foreground">
-                  Paid to the distributing agent. Not charged to the customer — does not affect Gross.
-                </div>
-              </div>
-              <div className="font-mono text-sm">{fmt(commission, currency)}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      */}
-
-      {/* Result cards + FX */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card><CardHeader className="pb-1.5"><CardDescription>Net Premium</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{fmt(netPremium, currency)}</div></CardContent></Card>
@@ -582,7 +458,6 @@ const PremiumCalculation = ({
         </Card>
       )}
 
-      {/* Manual override */}
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
@@ -631,95 +506,6 @@ const PremiumCalculation = ({
           </CardContent>
         )}
       </Card>
-
-      {/* Multi-year schedule — temporarily hidden
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ArrowRight className="h-4 w-4" /> Multi-Year Schedule
-          </CardTitle>
-          <CardDescription>
-            Estimated premium for each policy year — row count follows{" "}
-            {loan && loan.loanTermYears > 0 ? "Loan Term (Years)" : "policy term"}
-            {loan ? " and projected loan balance" : ""}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="text-xs text-muted-foreground bg-muted/40 rounded px-3 py-2">
-            Payment mode: <strong className="text-foreground">{paymentMode}</strong>
-          </div>
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">Year</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
-                  {loan && <TableHead className="text-right">Est. Loan Balance</TableHead>}
-                  <TableHead className="text-right">Net Premium</TableHead>
-                  <TableHead className="text-right">Tax (10%)</TableHead>
-                  <TableHead className="text-right">Gross Premium</TableHead>
-                  <TableHead className="text-right">Agent Commission</TableHead>
-                  <TableHead>Basis</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {schedule.map((s) => (
-                  <TableRow key={s.year}>
-                    <TableCell className="font-mono">{s.year}</TableCell>
-                    <TableCell className="font-mono text-xs">{s.startDate}</TableCell>
-                    <TableCell className="font-mono text-xs">{s.endDate}</TableCell>
-                    {loan && (
-                      <TableCell className="text-right font-mono text-sm">
-                        {s.estimatedLoanBalance !== undefined ? fmt(s.estimatedLoanBalance, currency) : "—"}
-                      </TableCell>
-                    )}
-                    <TableCell className="text-right font-mono text-sm">{fmt(s.premium, currency)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmt(s.tax, currency)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm font-semibold">{fmt(s.gross, currency)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmt(s.commission, currency)}</TableCell>
-                    <TableCell className="text-[11px] text-muted-foreground">{s.note ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          s.status === "Current Year" ? "default"
-                          : s.status === "Not Billed" ? "outline"
-                          : "secondary"
-                        }
-                      >
-                        {s.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {(() => {
-                  const totals = schedule.reduce(
-                    (a, r) => ({
-                      premium: a.premium + r.premium,
-                      tax: a.tax + r.tax,
-                      gross: a.gross + r.gross,
-                      commission: a.commission + r.commission,
-                    }),
-                    { premium: 0, tax: 0, gross: 0, commission: 0 }
-                  );
-                  return (
-                    <TableRow className="bg-muted/40 font-semibold">
-                      <TableCell colSpan={loan ? 4 : 3}>Totals</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{fmt(totals.premium, currency)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{fmt(totals.tax, currency)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{fmt(totals.gross, currency)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmt(totals.commission, currency)}</TableCell>
-                      <TableCell colSpan={2} />
-                    </TableRow>
-                  );
-                })()}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      */}
     </div>
   );
 };

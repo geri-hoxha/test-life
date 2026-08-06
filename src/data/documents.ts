@@ -80,26 +80,5 @@ let docs: ProductDocument[] = [...seed];
 export const listDocuments = (productId: string, versionId?: string) =>
   docs.filter((d) => d.productId === productId && (!versionId || d.versionId === versionId));
 
-export const upsertDocument = (d: ProductDocument) => {
-  const i = docs.findIndex((x) => x.id === d.id);
-  if (i >= 0) docs[i] = d;
-  else docs = [d, ...docs];
-};
-
-export const deleteDocument = (id: string) => {
-  docs = docs.filter((d) => d.id !== id);
-};
-
 export const newDocumentId = () =>
   `DOC-${Math.floor(1000 + Math.random() * 9000)}${Date.now().toString().slice(-3)}`;
-
-export const SUGGESTED_DOCUMENTS = [
-  "ID Card / Passport",
-  "Loan Agreement",
-  "Medical Declaration",
-  "Beneficiary Declaration",
-  "PEP Declaration",
-  "Proof of Income",
-  "Proof of Address",
-  "Bank Statement",
-];

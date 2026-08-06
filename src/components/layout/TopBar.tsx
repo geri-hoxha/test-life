@@ -30,9 +30,7 @@ const TopBar = () => {
   const location = useLocation();
   return (
     <header className="bg-gradient-topbar text-topbar-foreground border-b border-topbar-border sticky top-0 z-40 shadow-elevated">
-      {/* Upper row: brand · search · quick actions · user */}
       <div className="container flex items-center gap-4 h-16">
-        {/* Logo */}
         <a href="/" className="flex items-center gap-2.5 shrink-0 mr-2">
           <div className="h-9 w-9 rounded-md bg-gradient-accent flex items-center justify-center shadow-elevated">
             <Shield className="h-5 w-5 text-accent-foreground" strokeWidth={2.5} />
@@ -43,7 +41,6 @@ const TopBar = () => {
           </div>
         </a>
 
-        {/* Search */}
         <div className="relative flex-1 max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-topbar-muted" />
           <Input
@@ -95,7 +92,6 @@ const TopBar = () => {
         </div>
       </div>
 
-      {/* Lower row: main nav */}
       <nav className="border-t border-topbar-border/60">
         <div className="container flex items-center gap-1 h-11 overflow-x-auto overflow-y-hidden">
           {navItems.map((item) => {

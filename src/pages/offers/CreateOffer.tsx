@@ -38,7 +38,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft, Check, Loader2, Plus, Trash2, Users, Package, Calendar as CalendarNavIcon, Calculator, FileSpreadsheet } from "lucide-react";
-// import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { ageFromDob } from "@/data/customers";
 import {
   Beneficiary,
@@ -150,7 +149,6 @@ const CreateOffer = () => {
   // Step 1
   const [productGroupId, setProductGroupId] = useState("");
   const [productId, setProductId] = useState("");
-  const [versionId, setVersionId] = useState("N/A");
   const [currency, setCurrency] = useState("");
 
   // Step 2
@@ -255,8 +253,7 @@ const CreateOffer = () => {
       } else {
         toast.success(`Imported ${filled} loan field${filled === 1 ? "" : "s"} from ${file.name}`);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error("Could not read Excel file");
     }
   };
@@ -264,10 +261,6 @@ const CreateOffer = () => {
   // Derived
   const productGroup = productGroups.find((g) => g.id === productGroupId);
   const product = products.find((p) => p.id === productId);
-  // Product Version — hidden for now
-  // const versions = productId ? getActiveVersions(productId) : [];
-  // const allVersions = productId ? listVersions(productId) : [];
-  // const version = allVersions.find((v) => v.id === versionId);
 
   const insured = insuredId ? getCustomerLocal(insuredId) : undefined;
   const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
@@ -289,19 +282,13 @@ const CreateOffer = () => {
   const onProductGroupChange = (id: string) => {
     setProductGroupId(id);
     setProductId("");
-    setVersionId("N/A");
     setCurrency("");
   };
   const onProductChange = (id: string) => {
     setProductId(id);
-    setVersionId("N/A");
     const p = products.find((x) => x.id === id);
     setCurrency(p?.currencies[0] ?? "");
   };
-  // Product Version — hidden for now
-  // const onVersionChange = (id: string) => {
-  //   setVersionId(id);
-  // };
 
   const addBeneficiary = () => {
     setBeneficiaries((prev) => [
@@ -496,21 +483,6 @@ const CreateOffer = () => {
                   </SelectContent>
                 </Select>
               </div>
-              {/* Product Version — hidden for now
-              <div>
-                <Label>Product Version (Active only)</Label>
-                <Select value={versionId} onValueChange={onVersionChange} disabled={!productId}>
-                  <SelectTrigger><SelectValue placeholder={productId ? "Select version" : "Pick package first"} /></SelectTrigger>
-                  <SelectContent>
-                    {versions.length === 0 ? (
-                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No active versions for this product.</div>
-                    ) : versions.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>{v.name} · {v.number}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              */}
 
               <div>
                 <Label>Currency</Label>
@@ -788,7 +760,7 @@ const CreateOffer = () => {
         <section id="premium" className="scroll-mt-32">
           <PremiumCalculation
             productId={productId}
-            versionId={versionId}
+            versionId="N/A"
             templateId="N/A"
             currency={currency}
             insuredAge={insuredAge}
@@ -810,7 +782,6 @@ const CreateOffer = () => {
         </section>
       </div>
 
-      {/* Footer actions */}
       <div className="flex items-center justify-between mt-6 sticky bottom-0 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-3 -mx-2 px-2">
         <div className="text-xs text-muted-foreground">
           {canSave ? "Ready to save." : "Complete product, parties and beneficiaries to enable submission."}

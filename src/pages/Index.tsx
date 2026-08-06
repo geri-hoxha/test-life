@@ -41,7 +41,6 @@ const Index = () => {
 
   return (
     <AppShell>
-      {/* Page header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
         <div>
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
@@ -66,7 +65,6 @@ const Index = () => {
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <KpiCard label="Sellable Products / Templates" value={`${productCount} / ${matrixTemplates.length}`} icon={Package} />
         <KpiCard label="Draft Offers" value={String(draftOffers)} icon={FileText} />
@@ -83,13 +81,11 @@ const Index = () => {
         />
       </div>
 
-      {/* Tables */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
         <RecentOffersTable />
         <PendingReviewTable />
       </div>
 
-      {/* Quick Start */}
       <QuickStart />
     </AppShell>
   );

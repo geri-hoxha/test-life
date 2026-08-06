@@ -74,7 +74,6 @@ import {
 } from "lucide-react";
 import { getOffer, statusColor } from "@/data/offers";
 import { ageFromDob } from "@/data/customers";
-import { PremiumResult } from "./PremiumCalculation";
 import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
 import { toast } from "sonner";
 import {
@@ -235,7 +234,6 @@ const OfferDetail = () => {
     return undefined;
   }, [apiProduct]);
 
-  const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
   const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
   const [notes, setNotes] = useState("");
 
@@ -540,7 +538,7 @@ const OfferDetail = () => {
           <CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
           <CardContent>
             <div className="text-lg font-semibold text-primary">
-              {fmtMoney(offer.premium || premiumResult?.grossPremium || 0, offer.currency)}
+              {fmtMoney(offer.premium || 0, offer.currency)}
             </div>
           </CardContent>
         </Card>
@@ -1577,7 +1575,6 @@ const OfferDetail = () => {
             currency={offer.currency}
             policyHolderId={offer.policyHolderId}
             insuredId={offer.insuredId}
-            premium={premiumResult}
             loanOutstanding={offer.loan?.outstandingBalance}
             onChecksComputed={setVerificationChecks}
           />

@@ -41,21 +41,6 @@ let policies: Policy[] = [...seed];
 
 export const listPolicies = () => [...policies].sort((a, b) => (a.issueDate < b.issueDate ? 1 : -1));
 export const getPolicy = (id: string) => policies.find((p) => p.id === id);
-export const getPolicyByOffer = (offerId: string) => policies.find((p) => p.offerId === offerId);
-
-export const upsertPolicy = (p: Policy) => {
-  const i = policies.findIndex((x) => x.id === p.id);
-  if (i >= 0) policies[i] = p;
-  else policies = [p, ...policies];
-};
-
-export const newPolicyId = () => {
-  const n = policies.length + 1;
-  return {
-    id: `POL-${String(n).padStart(4, "0")}`,
-    number: `POL-2026-${String(n).padStart(4, "0")}`,
-  };
-};
 
 export const policyStatusColor: Record<PolicyStatus, string> = {
   "Active": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",

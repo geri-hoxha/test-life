@@ -148,7 +148,6 @@ const CreateProduct = () => {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
-  const type = "Life Insurance";
   const [status, setStatus] = useState<ProductStatus>("Draft");
   const [productGroup, setProductGroup] = useState<string>(presetGroupId);
   const [currencies, setCurrencies] = useState<string[]>(["EUR"]);
@@ -422,7 +421,6 @@ const CreateProduct = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Basic */}
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Basic information" desc="Identity and ownership of the product." />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -476,8 +474,6 @@ const CreateProduct = () => {
               </div>
             </div>
           </Card>
-
-          {/* Setup details */}
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Setup details" desc="Legacy packet & insurance configuration." />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -530,8 +526,6 @@ const CreateProduct = () => {
               </div>
             </div>
           </Card>
-
-          {/* Payment details + behavior model */}
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Payment details"
               desc="Pick a payment behavior model. Recommended defaults are applied — you can override any field." />
@@ -577,8 +571,6 @@ const CreateProduct = () => {
               </div>
             </div>
           </Card>
-
-          {/* Loan details */}
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Loan details" desc="Loan-related configuration for bancassurance." />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -598,8 +590,6 @@ const CreateProduct = () => {
               </div>
             </div>
           </Card>
-
-          {/* Premium table */}
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Premium table" desc="Mortality / coefficient table used to calculate premiums." />
             <div className="flex gap-2 items-end">
@@ -683,8 +673,6 @@ const CreateProduct = () => {
               </Dialog>
             </div>
           </Card>
-
-          {/* Tariffs */}
           <Card className="p-6 shadow-card border-border">
             <div className="flex items-start justify-between mb-4 gap-3">
               <SectionTitle title="Tariff configuration" desc="One or more tariff/rating rules for this product." />
@@ -1152,8 +1140,6 @@ const CreateProduct = () => {
               )}
             </div>
           </Card>
-
-          {/* Internal details */}
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Internal details" desc="ESIG Life internal configuration not exposed externally." />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1167,8 +1153,6 @@ const CreateProduct = () => {
               </div>
             </div>
           </Card>
-
-          {/* External details */}
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="External details" desc="Integration identifiers used by SAP, F5 and actuarial systems." />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1187,8 +1171,6 @@ const CreateProduct = () => {
             </div>
           </Card>
         </div>
-
-        {/* Side column */}
         <div className="space-y-6">
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Available currencies" desc="Currencies in which premiums and benefits can be quoted." />

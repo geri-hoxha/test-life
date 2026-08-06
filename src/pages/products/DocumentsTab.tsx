@@ -34,9 +34,6 @@ type Props = { productId: string };
 
 const VERSION_NA = "N/A";
 
-const fmtMoney = (n?: number) =>
-  n && n > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n) : "—";
-
 const appliesBadge = (a: DocumentAppliesWhen) => {
   switch (a) {
     case "Always": return "bg-success/15 text-success";
@@ -47,16 +44,6 @@ const appliesBadge = (a: DocumentAppliesWhen) => {
     case "Manual verification required": return "bg-destructive/10 text-destructive";
     case "Conditional": return "bg-muted text-muted-foreground";
   }
-};
-
-const rulesSummary = (d: ProductDocument) => {
-  const parts: string[] = [];
-  if (d.isMandatory) parts.push("Always");
-  if (d.isPep) parts.push("PEP");
-  if (d.insuredAmountOver != null && d.insuredAmountOver > 0) parts.push(`Insured > ${fmtMoney(d.insuredAmountOver)}`);
-  if (d.totalExposureOver != null && d.totalExposureOver > 0) parts.push(`Exposure > ${fmtMoney(d.totalExposureOver)}`);
-  if (d.ageOver != null && d.ageOver > 0) parts.push(`Age > ${d.ageOver}`);
-  return parts.length ? parts.join(" · ") : d.appliesWhen;
 };
 
 const DocumentsTab = ({ productId }: Props) => {

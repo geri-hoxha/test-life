@@ -19,11 +19,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, ShieldCheck, FileText, CreditCard, Calendar, Users, History, Files } from "lucide-react";
+import { ArrowLeft, ShieldCheck, FileText, CreditCard, Users, History, Files } from "lucide-react";
 import { getPolicy, policyStatusColor } from "@/data/policies";
 import { listVersions } from "@/data/productVersions";
 import { listTemplates } from "@/data/templates";
-import { fullName, ageFromDob } from "@/data/customers";
+import { fullName } from "@/data/customers";
 import PremiumBreakdownPanel from "@/components/premium/PremiumBreakdownPanel";
 import { useGetPolicy } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";

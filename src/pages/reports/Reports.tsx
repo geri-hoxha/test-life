@@ -167,7 +167,6 @@ const Reports = () => {
         </p>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Total Offers</CardDescription></CardHeader>
@@ -187,7 +186,6 @@ const Reports = () => {
         </Card>
       </div>
 
-      {/* Row 1: Offers by Status + Premium by Product */}
       <div className="grid gap-4 lg:grid-cols-2 mb-4">
         <Card>
           <CardHeader>
@@ -258,7 +256,6 @@ const Reports = () => {
         </Card>
       </div>
 
-      {/* Row 2: Issued this month + Pending review */}
       <div className="grid gap-4 lg:grid-cols-2 mb-4">
         <Card>
           <CardHeader>
@@ -333,7 +330,6 @@ const Reports = () => {
         </Card>
       </div>
 
-      {/* Row 3: Expiring policies */}
       <Card className="mb-4">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2"><CalendarClock className="h-4 w-4" /> Expiring Policies</CardTitle>
@@ -375,7 +371,6 @@ const Reports = () => {
         </CardContent>
       </Card>
 
-      {/* Row 4: Exposure */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Customer Exposure Report</CardTitle>

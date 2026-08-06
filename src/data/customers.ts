@@ -157,17 +157,7 @@ const seed: Customer[] = [
 
 let customers: Customer[] = [...seed];
 
-export const listCustomers = () => customers;
 export const getCustomer = (id: string) => customers.find((c) => c.id === id);
-
-export const upsertCustomer = (c: Customer) => {
-  const i = customers.findIndex((x) => x.id === c.id);
-  if (i >= 0) customers[i] = c;
-  else customers = [c, ...customers];
-};
-
-export const newCustomerId = () =>
-  `CUS-${String(customers.length + 1).padStart(4, "0")}`;
 
 export const fullName = (c: Customer) =>
   c.customerType === "Company"
@@ -180,6 +170,3 @@ export const ageFromDob = (iso: string) => {
   const diff = Date.now() - d.getTime();
   return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
 };
-
-export const f5LocationLabel = (code?: string) =>
-  F5_LOCATIONS.find((l) => l.code === code)?.label ?? code ?? "—";

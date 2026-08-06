@@ -19,10 +19,9 @@ import {
   POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
   PREMIUM_PAYMENT_TYPES, PACKET_PAYMENT_TYPES, PACKET_RENEWAL_TYPES,
   PACKET_LOAN_TYPES, LOAN_PRODUCT_TYPES, ACTUARIAL_CODES,
-  PAYMENT_MODELS, listTariffs, listProductCoverages, getPremiumTable,
+  PAYMENT_MODELS,
   listPremiumTables, addPremiumTable, updatePremiumTable,
-  addTariff, updateTariff, removeTariff,
-  PremiumTable, PremiumTableItem, Tariff,
+  PremiumTableItem,
   ProductSetupDetails, ProductPaymentDetails, ProductLoanDetails,
   ProductInternalDetails, ProductExternalDetails, PaymentModel,
 } from "@/data/products";
@@ -30,10 +29,7 @@ import { useGetProduct, useUpdateProduct, mapApiProduct, type MappedProduct } fr
 import { useListProductGroups } from "@/api/product-groups";
 import { Check, AlertCircle, ScrollText, Save, X, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import VersionsTab from "./VersionsTab";
 import CoveragesTab from "./CoveragesTab";
-import PremiumRulesTab from "./PremiumRulesTab";
-import TemplatesTab from "./TemplatesTab";
 import DocumentsTab from "./DocumentsTab";
 import CurrenciesTab from "./CurrenciesTab";
 
@@ -434,10 +430,6 @@ const ProductDetail = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="versions">
-          <VersionsTab productId={product.id} />
-        </TabsContent>
-
         <TabsContent value="setup">
           <SetupTab product={product} />
         </TabsContent>
@@ -814,70 +806,6 @@ const PremiumTableTab = ({ product }: { product: MappedProduct }) => {
         </Card>
       )}
     </div>
-  );
-};
-
-const blankTariff = (productId: string): Omit<Tariff, "id"> => ({
-  productId, name: "New tariff", legacyTariffId: 0, tariffType: "Standard", currency: "EUR",
-  effectiveFrom: new Date().toISOString().slice(0, 10), effectiveTo: "2030-12-31", isActive: true,
-  minPremium: 0, maxPremium: 0, fixedPremium: 0, fixedMonthlyPremium: 0, fixedAnnualPremium: 0,
-  formula: "premium = coefficient × sum_insured", notes: "",
-});
-
-const TariffsTab = ({ product }: { product: MappedProduct }) => {
-  const [tick, setTick] = useState(0);
-  const ts = listTariffs(product.id);
-  const refresh = () => setTick((n) => n + 1);
-  return (
-    <div className="space-y-4" key={tick}>
-      <div className="flex justify-end">
-        <Button size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground" onClick={() => { addTariff(blankTariff(product.id)); refresh(); toast.success("Tariff added"); }}>
-          <Plus className="h-4 w-4" /> Add tariff
-        </Button>
-      </div>
-      {!ts.length && <Card className="p-8 text-center text-sm text-muted-foreground">No tariffs configured for this product.</Card>}
-      {ts.map((t) => <TariffEditor key={t.id} tariff={t} onChange={refresh} />)}
-    </div>
-  );
-};
-
-const TariffEditor = ({ tariff, onChange }: { tariff: Tariff; onChange: () => void }) => {
-  const [t, setT] = useState<Tariff>(tariff);
-  const dirty = JSON.stringify(t) !== JSON.stringify(tariff);
-  const save = () => { updateTariff(tariff.id, t); onChange(); toast.success("Tariff saved"); };
-  const del = () => { removeTariff(tariff.id); onChange(); toast.success("Tariff removed"); };
-  return (
-    <Card className="shadow-card border-border overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
-        <Input value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} className="font-semibold max-w-md" />
-        <div className="flex gap-2">
-          <label className="flex items-center gap-2 text-xs">
-            <Switch checked={t.isActive} onCheckedChange={(v) => setT({ ...t, isActive: v })} /> Active
-          </label>
-          <Button size="sm" variant="outline" onClick={del} className="gap-2 text-destructive"><Trash2 className="h-4 w-4" /> Remove</Button>
-          <Button size="sm" onClick={save} disabled={!dirty} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"><Save className="h-4 w-4" /> Save</Button>
-        </div>
-      </div>
-      <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
-        <Field label="Tariff type"><Input value={t.tariffType} onChange={(e) => setT({ ...t, tariffType: e.target.value })} /></Field>
-        <Field label="Currency">
-          <Select value={t.currency} onValueChange={(v) => setT({ ...t, currency: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{ALL_CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-          </Select>
-        </Field>
-        <Field label="Legacy tariff ID"><Input type="number" value={t.legacyTariffId} onChange={(e) => setT({ ...t, legacyTariffId: +e.target.value })} className="font-mono" /></Field>
-        <Field label="Effective from"><Input type="date" value={t.effectiveFrom} onChange={(e) => setT({ ...t, effectiveFrom: e.target.value })} /></Field>
-        <Field label="Effective to"><Input type="date" value={t.effectiveTo} onChange={(e) => setT({ ...t, effectiveTo: e.target.value })} /></Field>
-        <Field label="Min premium"><Input type="number" value={t.minPremium} onChange={(e) => setT({ ...t, minPremium: +e.target.value })} className="font-mono" /></Field>
-        <Field label="Max premium"><Input type="number" value={t.maxPremium} onChange={(e) => setT({ ...t, maxPremium: +e.target.value })} className="font-mono" /></Field>
-        <Field label="Fixed premium"><Input type="number" value={t.fixedPremium} onChange={(e) => setT({ ...t, fixedPremium: +e.target.value })} className="font-mono" /></Field>
-        <Field label="Fixed monthly"><Input type="number" value={t.fixedMonthlyPremium} onChange={(e) => setT({ ...t, fixedMonthlyPremium: +e.target.value })} className="font-mono" /></Field>
-        <Field label="Fixed annual"><Input type="number" value={t.fixedAnnualPremium} onChange={(e) => setT({ ...t, fixedAnnualPremium: +e.target.value })} className="font-mono" /></Field>
-        <div className="md:col-span-3"><Field label="Formula"><Input value={t.formula} onChange={(e) => setT({ ...t, formula: e.target.value })} className="font-mono" /></Field></div>
-        <div className="md:col-span-3"><Field label="Notes"><Textarea rows={2} value={t.notes} onChange={(e) => setT({ ...t, notes: e.target.value })} /></Field></div>
-      </div>
-    </Card>
   );
 };
 

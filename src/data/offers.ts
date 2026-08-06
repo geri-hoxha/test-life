@@ -198,26 +198,7 @@ const seed: Offer[] = [
 
 let offers: Offer[] = [...seed];
 
-export const listOffers = () => [...offers].sort((a, b) => (a.createdDate < b.createdDate ? 1 : -1));
 export const getOffer = (id: string) => offers.find((o) => o.id === id);
-
-export const upsertOffer = (o: Offer) => {
-  const i = offers.findIndex((x) => x.id === o.id);
-  if (i >= 0) offers[i] = o;
-  else offers = [o, ...offers];
-};
-
-export const setOfferStatus = (id: string, status: OfferStatus) => {
-  const o = offers.find((x) => x.id === id);
-  if (o) o.status = status;
-};
-
-export const newOfferId = () => {
-  const n = offers.length + 1;
-  const id = `OFR-${String(n).padStart(4, "0")}`;
-  const number = `OFR-2026-${String(n).padStart(4, "0")}`;
-  return { id, number };
-};
 
 export const statusColor: Record<OfferStatus, string> = {
   Draft: "bg-muted text-muted-foreground",

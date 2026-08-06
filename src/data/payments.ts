@@ -28,10 +28,6 @@ export type ScheduleRow = {
 
 let payments: PaymentRecord[] = [];
 
-export const listPayments = () => [...payments].sort((a, b) => (a.paymentDate < b.paymentDate ? 1 : -1));
-export const listPaymentsForPolicy = (policyId: string) =>
-  payments.filter((p) => p.policyId === policyId).sort((a, b) => (a.paymentDate < b.paymentDate ? 1 : -1));
-
 export const recordPayment = (p: Omit<PaymentRecord, "id">) => {
   const id = `PAY-${String(payments.length + 1).padStart(4, "0")}`;
   payments = [{ id, ...p }, ...payments];

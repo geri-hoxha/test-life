@@ -11,54 +11,6 @@ export const PRODUCT_GROUPS = [
 ] as const;
 export type ProductGroup = typeof PRODUCT_GROUPS[number]["value"] | string;
 
-export type ProductGroupDef = { value: string; code: string; label: string; english: string };
-
-const GROUPS_STORAGE_KEY = "esiglife.productGroups.v1";
-const loadCustomGroups = (): ProductGroupDef[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GROUPS_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ProductGroupDef[]) : [];
-  } catch { return []; }
-};
-let customGroups: ProductGroupDef[] = loadCustomGroups();
-const persistGroups = () => {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(customGroups)); } catch { /* ignore */ }
-};
-
-// One-time cleanup: remove the legacy "wef" custom group if it still exists.
-const migrateDeleteWefGroup = () => {
-  if (typeof window === "undefined") return;
-  const migratedKey = "esiglife.productGroups.wefDeleted.v1";
-  if (window.localStorage.getItem(migratedKey)) return;
-  if (customGroups.some((g) => g.code === "wef")) {
-    customGroups = customGroups.filter((g) => g.code !== "wef");
-    persistGroups();
-  }
-  window.localStorage.setItem(migratedKey, "1");
-};
-migrateDeleteWefGroup();
-export const listProductGroups = (): ProductGroupDef[] =>
-  [...(PRODUCT_GROUPS as readonly ProductGroupDef[]), ...customGroups];
-export const addProductGroup = (g: Omit<ProductGroupDef, "value"> & { value?: string }): ProductGroupDef => {
-  const value = g.value?.trim() || `Custom_${g.code}_${Date.now()}`;
-  const created: ProductGroupDef = { value, code: g.code, label: g.label, english: g.english };
-  customGroups = [...customGroups, created];
-  persistGroups();
-  return created;
-};
-export const isBuiltInProductGroup = (code: string): boolean =>
-  (PRODUCT_GROUPS as readonly ProductGroupDef[]).some((g) => g.code === code);
-export const deleteProductGroup = (code: string): boolean => {
-  if (isBuiltInProductGroup(code)) return false;
-  const before = customGroups.length;
-  customGroups = customGroups.filter((g) => g.code !== code);
-  if (customGroups.length === before) return false;
-  persistGroups();
-  return true;
-};
-
 export const POLICY_TYPES = [
   { value: "NotApplicable", label: "NA" },
   { value: "UpToOneYear", label: "D1V — Deri në 1 vit" },
@@ -291,7 +243,7 @@ const seedItems = (base: number): PremiumTableItem[] => [
   { id: "row-4", gender: "Any", minAge: 61, maxAge: 75, coefficient: +(base * 3.6).toFixed(4) },
 ];
 
-export const seedPremiumTables: PremiumTable[] = [
+const seedPremiumTables: PremiumTable[] = [
   { id: "PT-001", name: "Standard Mortality 2020", legacyId: 1001, items: seedItems(0.0012) },
   { id: "PT-002", name: "Credit Life — Regular", legacyId: 1002, items: seedItems(0.0018) },
   { id: "PT-003", name: "Single Premium PPI", legacyId: 1003, items: seedItems(0.0025) },
@@ -299,7 +251,6 @@ export const seedPremiumTables: PremiumTable[] = [
 ];
 let premiumTables: PremiumTable[] = [...seedPremiumTables];
 export const listPremiumTables = () => premiumTables;
-export const getPremiumTable = (id?: string) => premiumTables.find((t) => t.id === id);
 export const addPremiumTable = (name: string, legacyId?: number, items?: PremiumTableItem[]): PremiumTable => {
   const maxNum = premiumTables.reduce((m, t) => {
     const n = parseInt(t.id.replace(/\D/g, ""), 10);
@@ -364,15 +315,10 @@ export type ProductCoverage = {
   isMandatory: boolean;
 };
 let productCoverages: ProductCoverage[] = [];
-export const listProductCoverages = (productId?: string) =>
-  productId ? productCoverages.filter((c) => c.productId === productId) : productCoverages;
 export const addProductCoverage = (c: Omit<ProductCoverage, "id">): ProductCoverage => {
   const created: ProductCoverage = { ...c, id: `COV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}` };
   productCoverages = [...productCoverages, created];
   return created;
-};
-export const removeProductCoverage = (id: string) => {
-  productCoverages = productCoverages.filter((c) => c.id !== id);
 };
 
 // === Detail groupings ===
@@ -835,55 +781,3 @@ const seedAuxiliary = () => {
   }
 };
 seedAuxiliary();
-
-
-// In-memory store backed by localStorage (demo persistence)
-const STORAGE_KEY = "esiglife.products.v6";
-
-const loadProducts = (): Product[] => {
-  if (typeof window === "undefined") return [...seedProducts];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [...seedProducts];
-    const parsed = JSON.parse(raw) as Product[];
-    return Array.isArray(parsed) && parsed.length ? parsed : [...seedProducts];
-  } catch {
-    return [...seedProducts];
-  }
-};
-
-let products: Product[] = loadProducts();
-
-const persist = () => {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); } catch { /* ignore */ }
-};
-
-export const resetProducts = () => { products = [...seedProducts]; persist(); };
-export const listProducts = () => products;
-export const getProduct = (id: string) => products.find((p) => p.id === id);
-export const updateProductFlags = (id: string, flags: Product["flags"]) => {
-  products = products.map((p) => (p.id === id ? { ...p, flags } : p));
-  persist();
-  return products.find((p) => p.id === id);
-};
-export const updateProduct = (id: string, patch: Partial<Omit<Product, "id">>) => {
-  products = products.map((p) => (p.id === id ? { ...p, ...patch } : p));
-  persist();
-  return products.find((p) => p.id === id);
-};
-export const addProduct = (p: Omit<Product, "id" | "activeVersion" | "createdDate">) => {
-  const maxNum = products.reduce((m, x) => {
-    const n = parseInt(x.id.replace(/\D/g, ""), 10);
-    return Number.isFinite(n) && n > m ? n : m;
-  }, 0);
-  const id = `PRD-${String(maxNum + 1).padStart(3, "0")}`;
-  const created: Product = {
-    ...p, id,
-    activeVersion: "v0.1",
-    createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-  };
-  products = [created, ...products];
-  persist();
-  return created;
-};
