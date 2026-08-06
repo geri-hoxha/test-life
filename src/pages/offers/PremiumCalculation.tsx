@@ -81,7 +81,7 @@ type Props = {
     amount: number;
     interestRate: number;
     loanTermYears: number;
-    remainingYears: number;
+    remainingYears?: number;
     outstandingBalance: number;
   };
   onResultChange?: (r: PremiumResult) => void;
@@ -430,7 +430,6 @@ const PremiumCalculation = ({
             <>
               <div><div className="text-[11px] uppercase text-muted-foreground">Loan Outstanding</div><div className="font-medium">{fmt(loan.outstandingBalance, currency)}</div></div>
               <div><div className="text-[11px] uppercase text-muted-foreground">Mortgage Rate</div><div className="font-medium">{loan.interestRate}%</div></div>
-              <div><div className="text-[11px] uppercase text-muted-foreground">Remaining Loan Yrs</div><div className="font-medium">{loan.remainingYears}</div></div>
             </>
           )}
           {ruleHit && (
@@ -474,7 +473,7 @@ const PremiumCalculation = ({
         </Card>
       )}
 
-      {/* Breakdown */}
+      {/* Breakdown — temporarily hidden
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Calculation Breakdown</CardTitle>
@@ -525,6 +524,7 @@ const PremiumCalculation = ({
           </div>
         </CardContent>
       </Card>
+      */}
 
       {/* Result cards + FX */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">

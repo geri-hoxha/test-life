@@ -38,7 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, CalendarIcon, Check, Loader2, Plus, Trash2, Users, Package, Calendar as CalendarNavIcon, Calculator, ShieldCheck, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, CalendarIcon, Check, Loader2, Plus, Trash2, Users, Package, Calendar as CalendarNavIcon, Calculator, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 // import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { ageFromDob } from "@/data/customers";
@@ -60,8 +60,7 @@ import {
 } from "@/api/offers";
 import { CustomerCombobox } from "@/components/CustomerCombobox";
 import CustomerForm from "@/pages/customers/CustomerForm";
-import PremiumCalculation, { PremiumResult } from "./PremiumCalculation";
-import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
+import PremiumCalculation from "./PremiumCalculation";
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
 
@@ -81,7 +80,6 @@ const SECTIONS = [
   { id: "people", label: "People", icon: Users },
   { id: "dates", label: "Dates", icon: CalendarNavIcon },
   { id: "premium", label: "Premium", icon: Calculator },
-  { id: "verification", label: "Verification", icon: ShieldCheck },
 ] as const;
 
 /** One loan-disbursement per Loan Term year. Year and remaining balance come from the loop. */
@@ -213,7 +211,6 @@ const CreateOffer = () => {
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
   const [loanTermYears, setLoanTermYears] = useState("");
-  const [remainingYears, setRemainingYears] = useState("");
   const [outstandingBalance, setOutstandingBalance] = useState("");
   const loanFileRef = useRef<HTMLInputElement>(null);
   const [loanFileName, setLoanFileName] = useState<string | null>(null);
@@ -245,18 +242,16 @@ const CreateOffer = () => {
       const amt = pick("loan amount", "amount", "principal");
       const ir = pick("interest rate", "mortgage interest rate", "rate");
       const term = pick("loan term", "loan term (years)", "term", "term years");
-      const rem = pick("remaining years", "remaining loan years", "remaining");
       const out = pick("outstanding balance", "outstanding", "balance");
 
       if (amt) setLoanAmount(amt);
       if (ir) setInterestRate(ir);
       if (term) setLoanTermYears(term);
-      if (rem) setRemainingYears(rem);
       if (out) setOutstandingBalance(out);
       if (!hasLoan) setHasLoan(true);
       setLoanFileName(file.name);
 
-      const filled = [amt, ir, term, rem, out].filter(Boolean).length;
+      const filled = [amt, ir, term, out].filter(Boolean).length;
       if (filled === 0) {
         toast.error("No loan fields recognized in the file. Use a two-column sheet: Field | Value.");
       } else {
@@ -267,12 +262,6 @@ const CreateOffer = () => {
       toast.error("Could not read Excel file");
     }
   };
-
-  // Step 4 result
-  const [premiumResult, setPremiumResult] = useState<PremiumResult | null>(null);
-
-  // Step 5 result
-  const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
 
   // Derived
   const productGroup = productGroups.find((g) => g.id === productGroupId);
@@ -814,7 +803,7 @@ const CreateOffer = () => {
               )}
             </CardHeader>
             {hasLoan && (
-              <CardContent className="grid gap-4 md:grid-cols-3">
+              <CardContent className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label>Loan Amount ({currency || "—"})</Label>
                   <Input type="number" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} />
@@ -826,10 +815,6 @@ const CreateOffer = () => {
                 <div>
                   <Label>Loan Term (Years)</Label>
                   <Input type="number" value={loanTermYears} onChange={(e) => setLoanTermYears(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Remaining Loan Years</Label>
-                  <Input type="number" value={remainingYears} onChange={(e) => setRemainingYears(e.target.value)} />
                 </div>
                 <div>
                   <Label>Outstanding Balance ({currency || "—"})</Label>
@@ -857,26 +842,10 @@ const CreateOffer = () => {
                     amount: Number(loanAmount) || 0,
                     interestRate: Number(interestRate) || 0,
                     loanTermYears: Number(loanTermYears) || 0,
-                    remainingYears: Number(remainingYears) || 0,
                     outstandingBalance: Number(outstandingBalance) || 0,
                   }
                 : undefined
             }
-            onResultChange={setPremiumResult}
-          />
-        </section>
-
-        <section id="verification" className="scroll-mt-32">
-          <VerificationStep
-            productId={productId}
-            versionId={versionId}
-            templateId="N/A"
-            currency={currency}
-            policyHolderId={policyHolderId}
-            insuredId={insuredId}
-            premium={premiumResult}
-            loanOutstanding={hasLoan ? Number(outstandingBalance) || 0 : undefined}
-            onChecksComputed={setVerificationChecks}
           />
         </section>
       </div>
