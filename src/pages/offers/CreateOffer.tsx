@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Card,
   CardContent,
@@ -38,8 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, CalendarIcon, Check, Loader2, Plus, Trash2, Users, Package, Calendar as CalendarNavIcon, Calculator, FileSpreadsheet } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowLeft, Check, Loader2, Plus, Trash2, Users, Package, Calendar as CalendarNavIcon, Calculator, FileSpreadsheet } from "lucide-react";
 // import { listVersions, getActiveVersions } from "@/data/productVersions";
 import { ageFromDob } from "@/data/customers";
 import {
@@ -692,56 +690,18 @@ const CreateOffer = () => {
             <CardContent className="grid gap-4 md:grid-cols-3">
               <div>
                 <Label>Start Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !startDate && "text-muted-foreground",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(parseISO(startDate), "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate ? parseISO(startDate) : undefined}
-                      onSelect={(d) => setStartDate(d ? format(d, "yyyy-MM-dd") : "")}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePicker
+                  value={startDate ? parseISO(startDate) : undefined}
+                  onChange={(d) => setStartDate(d ? format(d, "yyyy-MM-dd") : "")}
+                />
               </div>
               <div>
                 <Label>End Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !endDate && "text-muted-foreground",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(parseISO(endDate), "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={endDate ? parseISO(endDate) : undefined}
-                      onSelect={(d) => setEndDate(d ? format(d, "yyyy-MM-dd") : "")}
-                      disabled={(date) => (startDate ? date < parseISO(startDate) : false)}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePicker
+                  value={endDate ? parseISO(endDate) : undefined}
+                  onChange={(d) => setEndDate(d ? format(d, "yyyy-MM-dd") : "")}
+                  disabled={(date) => (startDate ? date < parseISO(startDate) : false)}
+                />
                 <div className="text-[11px] text-muted-foreground mt-1">Term: {termYears} years</div>
               </div>
               <div>

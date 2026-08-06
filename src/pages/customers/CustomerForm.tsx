@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
-import { CalendarIcon, User, Building2 } from "lucide-react";
+import { User, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -315,26 +314,13 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                 </div>
                 <div className="space-y-1.5">
                   <Label>Registration Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !regDate && "text-muted-foreground")}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {regDate ? format(regDate, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single" selected={regDate}
-                        onSelect={(d) => set("registrationDate", d ? format(d, "yyyy-MM-dd") : "")}
-                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                        fromYear={1900}
-                        toYear={new Date().getFullYear()}
-                        defaultMonth={regDate}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker
+                    value={regDate}
+                    onChange={(d) => set("registrationDate", d ? format(d, "yyyy-MM-dd") : "")}
+                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                    fromYear={1900}
+                    toYear={new Date().getFullYear()}
+                  />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <Label htmlFor="legalrep">Legal Representative</Label>
@@ -377,26 +363,13 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                 </div>
                 <div className="space-y-1.5">
                   <Label>Date of Birth *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dob && "text-muted-foreground")}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dob ? format(dob, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single" selected={dob}
-                        onSelect={(d) => set("dateOfBirth", d ? format(d, "yyyy-MM-dd") : "")}
-                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                        fromYear={1900}
-                        toYear={new Date().getFullYear()}
-                        defaultMonth={dob}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker
+                    value={dob}
+                    onChange={(d) => set("dateOfBirth", d ? format(d, "yyyy-MM-dd") : "")}
+                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                    fromYear={1900}
+                    toYear={new Date().getFullYear()}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>F5 Location</Label>
