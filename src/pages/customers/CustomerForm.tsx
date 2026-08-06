@@ -327,6 +327,9 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                         mode="single" selected={regDate}
                         onSelect={(d) => set("registrationDate", d ? format(d, "yyyy-MM-dd") : "")}
                         disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                        fromYear={1900}
+                        toYear={new Date().getFullYear()}
+                        defaultMonth={regDate}
                         initialFocus
                         className={cn("p-3 pointer-events-auto")}
                       />
@@ -386,6 +389,9 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                         mode="single" selected={dob}
                         onSelect={(d) => set("dateOfBirth", d ? format(d, "yyyy-MM-dd") : "")}
                         disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                        fromYear={1900}
+                        toYear={new Date().getFullYear()}
+                        defaultMonth={dob}
                         initialFocus
                         className={cn("p-3 pointer-events-auto")}
                       />
