@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Package, FileText, ArrowRight } from "lucide-react";
@@ -7,16 +8,19 @@ const items = [
     icon: UserPlus,
     title: "New Customer",
     desc: "Start onboarding & KYC for an individual or business client.",
+    to: "/customers/new",
   },
   {
     icon: Package,
     title: "New Product",
     desc: "Configure coverage, pricing tables, and underwriting rules.",
+    to: "/products/new",
   },
   {
     icon: FileText,
     title: "New Offer",
     desc: "Build a personalized quote based on an active product.",
+    to: "/offers/new",
   },
 ];
 
@@ -30,7 +34,7 @@ const QuickStart = () => {
         </div>
       </div>
       <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
-        {items.map(({ icon: Icon, title, desc }) => (
+        {items.map(({ icon: Icon, title, desc, to }) => (
           <div key={title} className="p-5 flex flex-col">
             <div className="h-10 w-10 rounded-md bg-gradient-accent text-accent-foreground flex items-center justify-center shadow-elevated">
               <Icon className="h-5 w-5" />
@@ -41,8 +45,11 @@ const QuickStart = () => {
               variant="ghost"
               size="sm"
               className="mt-3 self-start text-accent hover:text-accent hover:bg-accent-soft -ml-3"
+              asChild
             >
-              Start now <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              <Link to={to}>
+                Start now <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Link>
             </Button>
           </div>
         ))}

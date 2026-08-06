@@ -250,16 +250,16 @@ const ProductDetail = () => {
       <Tabs defaultValue="overview" className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="setup">Setup</TabsTrigger>
+          {/* <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="payment">Payment</TabsTrigger>
           <TabsTrigger value="loan">Loan</TabsTrigger>
-          <TabsTrigger value="premium-table">Premium Table</TabsTrigger>
+          <TabsTrigger value="premium-table">Premium Table</TabsTrigger> */}
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
-          <TabsTrigger value="internal">Internal</TabsTrigger>
-          <TabsTrigger value="external">External</TabsTrigger>
+          {/* <TabsTrigger value="internal">Internal</TabsTrigger>
+          <TabsTrigger value="external">External</TabsTrigger> */}
           <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="currencies">Currencies</TabsTrigger>
-          <TabsTrigger value="verification">Verification</TabsTrigger>
+          {/* <TabsTrigger value="currencies">Currencies</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -430,7 +430,7 @@ const ProductDetail = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="setup">
+        {/* <TabsContent value="setup">
           <SetupTab product={product} />
         </TabsContent>
         <TabsContent value="payment">
@@ -447,7 +447,7 @@ const ProductDetail = () => {
         </TabsContent>
         <TabsContent value="external">
           <ExternalTab product={product} />
-        </TabsContent>
+        </TabsContent> */}
 
 
         <TabsContent value="coverages">
@@ -458,7 +458,7 @@ const ProductDetail = () => {
           <DocumentsTab productId={product.id} />
         </TabsContent>
 
-        <TabsContent value="currencies">
+        {/* <TabsContent value="currencies">
           <CurrenciesTab productId={product.id} currencies={fields.currencies} />
         </TabsContent>
 
@@ -512,7 +512,7 @@ const ProductDetail = () => {
               ))}
             </div>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </AppShell>
   );

@@ -194,9 +194,9 @@ const CustomerDetail = () => {
       <Tabs defaultValue="overview" className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="offers">Offers</TabsTrigger>
+          {/* <TabsTrigger value="offers">Offers</TabsTrigger>
           <TabsTrigger value="policies">Policies</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger> */}
           <TabsTrigger value="exposure">Exposure</TabsTrigger>
         </TabsList>
 
@@ -258,7 +258,7 @@ const CustomerDetail = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="offers">
+        {/* <TabsContent value="offers">
           <Card className="shadow-card border-border overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div>
@@ -296,7 +296,7 @@ const CustomerDetail = () => {
 
         <TabsContent value="documents">
           <EmptyTab icon={FileSignature} title="No documents on file" hint="Upload identification, medical declarations and other supporting documents." cta="Upload Document" />
-        </TabsContent>
+        </TabsContent> */}
 
         <TabsContent value="exposure">
           <Card className="p-6 shadow-card border-border">

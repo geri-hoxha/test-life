@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ArrowLeft, CreditCard } from "lucide-react";
 import { listPolicies, getPolicy } from "@/data/policies";
 import { getCustomer, fullName } from "@/data/customers";
@@ -131,7 +133,11 @@ const RecordPayment = () => {
 
             <div>
               <Label>Payment Date</Label>
-              <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="mt-1.5" />
+              <DatePicker
+                value={paymentDate ? parseISO(paymentDate) : undefined}
+                onChange={(d) => setPaymentDate(d ? format(d, "yyyy-MM-dd") : "")}
+                buttonClassName="mt-1.5"
+              />
             </div>
 
             <div className="md:col-span-2">

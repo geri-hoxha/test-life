@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -64,15 +64,23 @@ const OffersList = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, statusFilter, pageSize]);
+
   const { data: offersPage, isLoading } = useListOffers({
     pageNumber: 1,
-    pageSize: 100,
+    pageSize: 500,
     ...(statusFilter !== "ALL" ? { status: offerStatusToApi[statusFilter as OfferStatus] } : {}),
   });
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
 
+  // Temporary: reverse API order so newest offers appear first.
   const offers = useMemo(
-    () => (offersPage?.items ?? []).map(mapApiOffer),
+    () => [...(offersPage?.items ?? [])].map(mapApiOffer).reverse(),
     [offersPage?.items]
   );
 
@@ -96,6 +104,10 @@ const OffersList = () => {
       .toLowerCase();
     return haystack.includes(q.toLowerCase());
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const counts = STATUSES.reduce((acc, s) => {
     acc[s] = offers.filter((o) => o.status === s).length;
@@ -143,7 +155,7 @@ const OffersList = () => {
               <CardDescription>
                 {isLoading
                   ? "Loading…"
-                  : `${filtered.length} shown · ${totalCount} total`}
+                  : `${filtered.length} match · ${totalCount} total`}
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -196,7 +208,7 @@ const OffersList = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((o) => {
+                  paged.map((o) => {
                     const holderParticipant = o.participants.find((p) => p.role === "policyHolder");
                     const holder = holderParticipant?.displayName?.trim() || null;
                     const insured = insuredName(o);
@@ -290,6 +302,68 @@ const OffersList = () => {
                 )}
               </TableBody>
             </Table>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-2.5 text-xs">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span>Rows per page</span>
+              <select
+                className="h-7 rounded border border-border bg-background px-2 text-xs"
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+              >
+                {[10, 20, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span className="ml-2">
+                {filtered.length === 0
+                  ? "0 of 0"
+                  : `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length}`}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={currentPage === 1}
+                onClick={() => setPage(1)}
+              >
+                « First
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={currentPage === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ‹ Prev
+              </Button>
+              <span className="px-2 text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next ›
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage(totalPages)}
+              >
+                Last »
+              </Button>
+            </div>
+          </div>
           </div>
         </CardContent>
       </Card>

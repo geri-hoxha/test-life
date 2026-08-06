@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Card,
   CardContent,
@@ -424,11 +425,9 @@ const IssuePolicy = () => {
               />
               <div>
                 <Label htmlFor="issue-date">Issue Date</Label>
-                <Input
-                  id="issue-date"
-                  type="date"
-                  value={issueDate}
-                  onChange={(e) => setIssueDate(e.target.value)}
+                <DatePicker
+                  value={issueDate ? parseISO(issueDate) : undefined}
+                  onChange={(d) => setIssueDate(d ? format(d, "yyyy-MM-dd") : "")}
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Issue date is not yet sent to the API (coming later).

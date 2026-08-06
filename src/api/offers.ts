@@ -26,6 +26,8 @@ export const offersKeys = {
   list: (params?: Record<string, unknown>) => [...offersKeys.lists(), params ?? {}] as const,
   details: () => [...offersKeys.all, "detail"] as const,
   detail: (id: string) => [...offersKeys.details(), id] as const,
+  scheduleDocuments: (offerId: string, year: string) =>
+    [...offersKeys.detail(offerId), "schedules", year, "documents"] as const,
 };
 
 /** POST /api/offers/{offerId}/schedules/{year}/policy */
@@ -295,7 +297,7 @@ export const listOfferScheduleDocuments = async (offerId: string, year: string, 
 
 export const useListOfferScheduleDocuments = (offerId: string, year: string, options?: { enabled?: boolean }) =>
   useQuery({
-    queryKey: offersKeys.list({ offerId, year }),
+    queryKey: offersKeys.scheduleDocuments(offerId, year),
     queryFn: ({ signal }) => listOfferScheduleDocuments(offerId, year, signal),
     enabled: Boolean(offerId) && Boolean(year) && (options?.enabled ?? true),
   });

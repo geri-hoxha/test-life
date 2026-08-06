@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -706,9 +708,15 @@ const CreateProduct = () => {
                         <SelectContent>{ALL_CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                       </Select></div>
                     <div className="space-y-1.5"><Label>Effective from</Label>
-                      <Input type="date" value={t.effectiveFrom} onChange={(e) => setTariffField(idx, { effectiveFrom: e.target.value })} /></div>
+                      <DatePicker
+                        value={t.effectiveFrom ? parseISO(t.effectiveFrom) : undefined}
+                        onChange={(d) => setTariffField(idx, { effectiveFrom: d ? format(d, "yyyy-MM-dd") : "" })}
+                      /></div>
                     <div className="space-y-1.5"><Label>Effective to</Label>
-                      <Input type="date" value={t.effectiveTo} onChange={(e) => setTariffField(idx, { effectiveTo: e.target.value })} /></div>
+                      <DatePicker
+                        value={t.effectiveTo ? parseISO(t.effectiveTo) : undefined}
+                        onChange={(d) => setTariffField(idx, { effectiveTo: d ? format(d, "yyyy-MM-dd") : "" })}
+                      /></div>
                     <div className="space-y-1.5"><Label>Min premium</Label>
                       <Input type="number" className="font-mono" value={t.minPremium} onChange={(e) => setTariffField(idx, { minPremium: e.target.value })} /></div>
                     <div className="space-y-1.5"><Label>Max premium</Label>

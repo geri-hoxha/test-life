@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/table";
 import { useListOffers } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
-import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
 import { mergeCustomers } from "@/api/adapters/customers";
@@ -25,17 +24,12 @@ const fmtMoney = (v: number, ccy: string) =>
 
 const RecentOffersTable = () => {
   const { data: offersPage, isLoading } = useListOffers({ pageNumber: 1, pageSize: 10 });
-  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
   const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
   const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
 
   const customers = useMemo(
     () => mergeCustomers(peoplePage?.items, companiesPage?.items),
     [peoplePage?.items, companiesPage?.items]
-  );
-  const productMap = useMemo(
-    () => Object.fromEntries((productsPage?.items ?? []).map(mapApiProduct).map((p) => [p.id, p])),
-    [productsPage?.items]
   );
   const offers = useMemo(
     () =>
@@ -62,7 +56,6 @@ const RecentOffersTable = () => {
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Offer</TableHead>
             <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Customer</TableHead>
-            <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Product</TableHead>
             <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Premium</TableHead>
             <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Status</TableHead>
           </TableRow>
@@ -70,13 +63,13 @@ const RecentOffersTable = () => {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center py-8 text-sm text-muted-foreground">
+              <TableCell colSpan={4} className="text-center py-8 text-sm text-muted-foreground">
                 Loading offers…
               </TableCell>
             </TableRow>
           ) : offers.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center py-8 text-sm text-muted-foreground">
+              <TableCell colSpan={4} className="text-center py-8 text-sm text-muted-foreground">
                 No offers yet.
               </TableCell>
             </TableRow>
@@ -92,7 +85,6 @@ const RecentOffersTable = () => {
                     <div className="text-[11px] text-muted-foreground mt-0.5">{o.createdDate}</div>
                   </TableCell>
                   <TableCell className="text-sm">{holder ? fullName(holder) : "—"}</TableCell>
-                  <TableCell className="text-sm">{productMap[o.productId]?.name ?? o.productId}</TableCell>
                   <TableCell className="font-mono text-sm">{fmtMoney(o.premium, o.currency)}</TableCell>
                   <TableCell>
                     <Badge className={`border-0 ${statusColor[o.status]}`}>{o.status}</Badge>

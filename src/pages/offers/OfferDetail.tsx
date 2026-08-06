@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -65,16 +65,23 @@ import {
   Calendar,
   Users,
   FileText,
-  StickyNote,
+  // StickyNote,
   Package,
   AlertTriangle,
   Trash2,
   Percent,
   Upload,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { getOffer, statusColor } from "@/data/offers";
 import { ageFromDob } from "@/data/customers";
-import VerificationStep, { VerificationCheck, overallStatus } from "./VerificationStep";
+import {
+  VerificationCheck,
+  VerificationChecksTable,
+  computeScheduleVerification,
+  overallStatus,
+} from "./VerificationStep";
 import { toast } from "sonner";
 import {
   useGetOffer,
@@ -89,6 +96,7 @@ import {
   useApproveOfferScheduleDocument,
   useRejectOfferScheduleDocument,
   useSubmitOfferScheduleDocument,
+  useListOfferScheduleDocuments,
 } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useGetProduct, mapApiProduct } from "@/api/products";
@@ -160,6 +168,187 @@ const docStatusBadge = (status: string) => {
   }
 };
 
+type ScheduleDocAction = {
+  requirementId: string;
+  year: number;
+  label: string;
+};
+
+const ScheduleExpandedPanel = ({
+  offerId,
+  year,
+  currency,
+  insuredAmount,
+  internalStatus,
+  documentTypeNameById,
+  docActionPending,
+  onSubmit,
+  onApprove,
+  onReject,
+}: {
+  offerId: string;
+  year: number;
+  currency: string;
+  insuredAmount: number;
+  internalStatus?: string;
+  documentTypeNameById: Record<string, string>;
+  docActionPending: boolean;
+  onSubmit: (args: ScheduleDocAction) => void;
+  onApprove: (args: ScheduleDocAction) => void;
+  onReject: (args: ScheduleDocAction) => void;
+}) => {
+  const { data, isLoading, isError, error } = useListOfferScheduleDocuments(
+    offerId,
+    String(year)
+  );
+
+  const documents = useMemo(
+    () =>
+      (data ?? []).map((d) => ({
+        id: String(d.id ?? ""),
+        documentId: d.documentId ?? null,
+        documentTypeId: d.documentTypeId ?? "",
+        status: d.status ?? ("required" as const),
+        refusalReason: d.refusalReason ?? null,
+      })),
+    [data]
+  );
+
+  const scheduleChecks = useMemo(
+    () =>
+      computeScheduleVerification(documents, {
+        insuredAmount,
+        currency,
+        documentTypeNameById,
+        internalStatus,
+      }),
+    [documents, insuredAmount, currency, documentTypeNameById, internalStatus]
+  );
+
+  return (
+    <div className="grid gap-0 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x border-t bg-muted/20">
+      <div className="p-4 space-y-3 min-w-0">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <h4 className="text-sm font-semibold">Documents</h4>
+        </div>
+        {isLoading ? (
+          <div className="rounded-md border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+            Loading documents…
+          </div>
+        ) : isError ? (
+          <div className="rounded-md border bg-background px-4 py-6 text-center text-sm text-destructive">
+            {error instanceof Error ? error.message : "Failed to load documents"}
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="rounded-md border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+            No documents on this schedule.
+          </div>
+        ) : (
+          <div className="grid gap-2">
+            {documents.map((d) => {
+              const label =
+                documentTypeNameById[d.documentTypeId] ?? d.documentTypeId;
+              const canSubmit = d.status === "required" || d.status === "refused";
+              const canReview = d.status === "submitted";
+              return (
+                <Card
+                  key={d.id || `${d.documentTypeId}-${d.documentId}`}
+                  className="bg-background shadow-none"
+                >
+                  <CardHeader className="p-3 pb-2 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-sm font-medium leading-snug">
+                        {label}
+                      </CardTitle>
+                      {docStatusBadge(d.status)}
+                    </div>
+                    <div className="space-y-0.5">
+                      <CardDescription className="font-mono text-[11px]">
+                        {d.documentTypeId}
+                      </CardDescription>
+                      {d.documentId ? (
+                        <CardDescription className="font-mono text-[11px]">
+                          Doc: {d.documentId}
+                        </CardDescription>
+                      ) : null}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0 space-y-2">
+                    {d.refusalReason ? (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">Refusal: </span>
+                        {d.refusalReason}
+                      </p>
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8"
+                        disabled={!canSubmit || docActionPending || !d.id}
+                        onClick={() =>
+                          onSubmit({
+                            requirementId: d.id,
+                            year,
+                            label,
+                          })
+                        }
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Submit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                        disabled={!canReview || docActionPending || !d.id}
+                        onClick={() =>
+                          onApprove({
+                            requirementId: d.id,
+                            year,
+                            label,
+                          })
+                        }
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8 text-destructive hover:text-destructive"
+                        disabled={!canReview || docActionPending || !d.id}
+                        onClick={() =>
+                          onReject({
+                            requirementId: d.id,
+                            year,
+                            label,
+                          })
+                        }
+                      >
+                        <XCircle className="h-3.5 w-3.5" /> Reject
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 space-y-3 min-w-0">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+          <h4 className="text-sm font-semibold">Verification</h4>
+        </div>
+        <div className="bg-background rounded-md">
+          <VerificationChecksTable checks={scheduleChecks} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const OfferDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -206,6 +395,18 @@ const OfferDetail = () => {
     year: number;
     label: string;
   } | null>(null);
+  const [expandedScheduleYears, setExpandedScheduleYears] = useState<Set<number>>(
+    () => new Set()
+  );
+
+  const toggleScheduleExpanded = (year: number) => {
+    setExpandedScheduleYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  };
 
   const coverageNameById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -234,8 +435,7 @@ const OfferDetail = () => {
     return undefined;
   }, [apiProduct]);
 
-  const [verificationChecks, setVerificationChecks] = useState<VerificationCheck[]>([]);
-  const [notes, setNotes] = useState("");
+  // const [notes, setNotes] = useState("");
 
   if (isLoading) {
     return (
@@ -263,13 +463,18 @@ const OfferDetail = () => {
   const payer = offer.participants.find((p) => p.role === "invoiced") ?? holder;
   const insuredPerson = offer.insuredPersons[0];
   const scheduleCoverages = offer.schedules.flatMap((s) => s.coverages);
-  const scheduleDocuments = offer.schedules.flatMap((s) =>
-    s.documents.map((d) => ({ ...d, scheduleYear: s.year }))
-  );
   const insuredAmount =
     offer.schedules.reduce((sum, s) => sum + (s.insuredAmount || 0), 0) ||
     scheduleCoverages.reduce((sum, c) => sum + (c.sumInsured || 0), 0);
 
+  const verificationChecks: VerificationCheck[] = offer.schedules.flatMap((s) =>
+    computeScheduleVerification(s.documents, {
+      insuredAmount: s.insuredAmount,
+      currency: offer.currency,
+      documentTypeNameById,
+      internalStatus: s.internalStatus,
+    })
+  );
   const verifOverall = overallStatus(verificationChecks);
   const reviewCount = verificationChecks.filter((c) => c.result === "Requires Review").length;
   const warnCount = verificationChecks.filter((c) => c.result === "Warning").length;
@@ -485,7 +690,7 @@ const OfferDetail = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Open editor (demo)")}>
+          {/* <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Open editor (demo)")}>
             <Edit className="h-4 w-4" /> Edit Offer
           </Button>
           <Button
@@ -494,7 +699,7 @@ const OfferDetail = () => {
             disabled={calculateSchedules.isPending}
           >
             <RefreshCw className="h-4 w-4" /> Recalculate Premium
-          </Button>
+          </Button> */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" disabled={!canReject}>
@@ -516,7 +721,7 @@ const OfferDetail = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <Button
+          {/* <Button
             size="sm" variant="secondary" className="gap-2"
             onClick={handleApprove}
             disabled={!canApprove}
@@ -529,7 +734,7 @@ const OfferDetail = () => {
             disabled={!canIssue}
           >
             <Send className="h-4 w-4" /> Issue Policy
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -575,13 +780,12 @@ const OfferDetail = () => {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full md:w-auto">
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full md:w-auto">
           <TabsTrigger value="summary" className="gap-1.5"><Package className="h-3.5 w-3.5" />Summary</TabsTrigger>
           <TabsTrigger value="schedule" className="gap-1.5"><Calendar className="h-3.5 w-3.5" />Schedule</TabsTrigger>
+          <TabsTrigger value="discounts" className="gap-1.5"><Percent className="h-3.5 w-3.5" />Discount Requests</TabsTrigger>
           <TabsTrigger value="people" className="gap-1.5"><Users className="h-3.5 w-3.5" />People</TabsTrigger>
-          <TabsTrigger value="documents" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Documents</TabsTrigger>
-          <TabsTrigger value="verification" className="gap-1.5"><ShieldCheck className="h-3.5 w-3.5" />Verification</TabsTrigger>
-          <TabsTrigger value="notes" className="gap-1.5"><StickyNote className="h-3.5 w-3.5" />Notes</TabsTrigger>
+          {/* <TabsTrigger value="notes" className="gap-1.5"><StickyNote className="h-3.5 w-3.5" />Notes</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="summary" className="mt-4 space-y-4">
@@ -649,25 +853,33 @@ const OfferDetail = () => {
                 <Field label="Insured Amount" value={fmtMoney(insuredAmount, offer.currency)} />
                 {offer.loanDisbursements.length > 0 && (
                   <div className="col-span-2 mt-2 pt-3 border-t space-y-3">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Loan Disbursements</div>
-                    {(() => {
-                      const loans = offer.loanDisbursements;
-                      const endpoints =
-                        loans.length === 1
-                          ? [loans[0]]
-                          : [loans[0], loans[loans.length - 1]];
-                      return endpoints.map((loan, idx) => (
-                        <div key={loan.id || idx} className="grid grid-cols-2 gap-3">
-                          <Field
-                            label={loans.length === 1 ? "Disbursement" : idx === 0 ? "First" : "Last"}
-                            value={loan.year || "—"}
-                          />
-                          <Field label="Remaining Amount" value={fmtMoney(loan.remainingLoanAmount, offer.currency)} />
-                          <Field label="Period Start" value={<span className="font-mono text-xs">{loan.startDate || "—"}</span>} />
-                          <Field label="Period End" value={<span className="font-mono text-xs">{loan.endDate || "—"}</span>} />
-                        </div>
-                      ));
-                    })()}
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Loan Disbursements ({offer.loanDisbursements.length})
+                    </div>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Year</TableHead>
+                            <TableHead>Period start</TableHead>
+                            <TableHead>Period end</TableHead>
+                            <TableHead className="text-right">Remaining</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {offer.loanDisbursements.map((loan, idx) => (
+                            <TableRow key={loan.id || idx}>
+                              <TableCell className="font-mono">{loan.year || "—"}</TableCell>
+                              <TableCell className="font-mono">{loan.startDate || "—"}</TableCell>
+                              <TableCell className="font-mono">{loan.endDate || "—"}</TableCell>
+                              <TableCell className="text-right">
+                                {fmtMoney(loan.remainingLoanAmount, offer.currency)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -718,7 +930,7 @@ const OfferDetail = () => {
             <CardHeader>
               <CardTitle className="text-base">Offer Schedules</CardTitle>
               <CardDescription>
-                Premium and coverage schedule rows returned by the offers API.
+                Expand a schedule row to view its documents and verification side by side.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -731,6 +943,7 @@ const OfferDetail = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[44px]" />
                         <TableHead className="w-[70px]">Year</TableHead>
                         <TableHead>Start</TableHead>
                         <TableHead>End</TableHead>
@@ -745,61 +958,125 @@ const OfferDetail = () => {
                     <TableBody>
                       {offer.schedules.map((s) => {
                         const isCancelled = s.internalStatus === "cancelled";
+                        const isExpanded = expandedScheduleYears.has(s.year);
+                        const docActionPending =
+                          approveScheduleDocument.isPending ||
+                          rejectScheduleDocument.isPending ||
+                          submitScheduleDocument.isPending;
+
                         return (
-                          <TableRow key={s.id || s.year}>
-                            <TableCell className="font-mono">{s.year}</TableCell>
-                            <TableCell className="font-mono text-xs">{s.startDate || "—"}</TableCell>
-                            <TableCell className="font-mono text-xs">{s.endDate || "—"}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {fmtMoney(s.insuredAmount, offer.currency)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm font-semibold">
-                              {fmtMoney(s.premium, offer.currency)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  scheduleStatusColor[s.internalStatus ?? ""] ??
-                                  "bg-muted text-muted-foreground"
-                                }
-                              >
-                                {titleCase(s.internalStatus) ?? "—"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">{s.coverages.length}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{s.documents.length}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="inline-flex items-center gap-1.5">
+                          <Fragment key={s.id || s.year}>
+                            <TableRow
+                              className={isExpanded ? "border-b-0" : undefined}
+                              data-state={isExpanded ? "open" : undefined}
+                            >
+                              <TableCell className="pr-0">
                                 <Button
-                                  size="sm"
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground"
+                                  aria-label={
+                                    isExpanded
+                                      ? `Collapse schedule ${s.year}`
+                                      : `Expand schedule ${s.year}`
+                                  }
+                                  aria-expanded={isExpanded}
+                                  onClick={() => toggleScheduleExpanded(s.year)}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-mono">{s.year}</TableCell>
+                              <TableCell className="font-mono text-xs">{s.startDate || "—"}</TableCell>
+                              <TableCell className="font-mono text-xs">{s.endDate || "—"}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {fmtMoney(s.insuredAmount, offer.currency)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm font-semibold">
+                                {fmtMoney(s.premium, offer.currency)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
                                   variant="outline"
-                                  className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                  disabled={isCancelled}
-                                  onClick={() => {
-                                    setDiscountPct("50");
-                                    setDiscountReason("");
-                                    setDiscountDialog({ year: s.year });
-                                  }}
+                                  className={
+                                    scheduleStatusColor[s.internalStatus ?? ""] ??
+                                    "bg-muted text-muted-foreground"
+                                  }
                                 >
-                                  <Percent className="h-3.5 w-3.5" /> Request Discount
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  className="gap-1.5 h-8 text-destructive hover:text-destructive"
-                                  disabled={isCancelled || cancelSchedule.isPending}
-                                  onClick={() => setCancelScheduleYear(s.year)}
-                                >
-                                  <XCircle className="h-3.5 w-3.5" /> Cancel
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
+                                  {titleCase(s.internalStatus) ?? "—"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {s.coverages.length}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {s.documents.length}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                    disabled={isCancelled}
+                                    onClick={() => {
+                                      setDiscountPct("50");
+                                      setDiscountReason("");
+                                      setDiscountDialog({ year: s.year });
+                                    }}
+                                  >
+                                    <Percent className="h-3.5 w-3.5" /> Request Discount
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="gap-1.5 h-8 text-destructive hover:text-destructive"
+                                    disabled={isCancelled || cancelSchedule.isPending}
+                                    onClick={() => setCancelScheduleYear(s.year)}
+                                  >
+                                    <XCircle className="h-3.5 w-3.5" /> Cancel
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+
+                            {isExpanded && (
+                              <TableRow className="hover:bg-transparent">
+                                <TableCell colSpan={10} className="p-0">
+                                  <ScheduleExpandedPanel
+                                    offerId={offer.id}
+                                    year={s.year}
+                                    currency={offer.currency}
+                                    insuredAmount={s.insuredAmount}
+                                    internalStatus={s.internalStatus}
+                                    documentTypeNameById={documentTypeNameById}
+                                    docActionPending={docActionPending}
+                                    onSubmit={(args) => {
+                                      setDocSubmitDocumentId("");
+                                      setDocSubmitDialog(args);
+                                    }}
+                                    onApprove={setPendingDocApprove}
+                                    onReject={(args) => {
+                                      setDocRejectReason("");
+                                      setDocRejectDialog(args);
+                                    }}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
                         );
                       })}
                       <TableRow className="bg-muted/40 font-medium">
-                        <TableCell colSpan={3} className="text-sm">Total</TableCell>
+                        <TableCell />
+                        <TableCell colSpan={3} className="text-sm">
+                          Total
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {fmtMoney(
                             offer.schedules.reduce((sum, s) => sum + s.insuredAmount, 0),
@@ -820,94 +1097,6 @@ const OfferDetail = () => {
               )}
             </CardContent>
           </Card>
-
-          {(() => {
-            const discountRows = offer.schedules.flatMap((s) =>
-              s.discountRequests.map((r) => ({ ...r, scheduleYear: s.year }))
-            );
-            return (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Discount Requests</CardTitle>
-                  <CardDescription>
-                    Discount requests attached to offer schedules.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[70px]">Year</TableHead>
-                          <TableHead className="text-right">Discount</TableHead>
-                          <TableHead>Reason</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {discountRows.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
-                              No discount requests on this offer.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          discountRows.map((r) => {
-                            const canAct = r.status === "requested";
-                            return (
-                              <TableRow key={`${r.scheduleYear}-${r.id}`}>
-                                <TableCell className="font-mono">{r.scheduleYear}</TableCell>
-                                <TableCell className="text-right font-mono text-sm font-semibold">
-                                  {Math.round(r.requestedDiscountPercentage * 10000) / 100}%
-                                </TableCell>
-                                <TableCell className="text-sm max-w-[320px]">
-                                  {r.reason || "—"}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant="outline"
-                                    className={
-                                      discountRequestStatusColor[r.status] ??
-                                      "bg-muted text-muted-foreground"
-                                    }
-                                  >
-                                    {titleCase(r.status)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                      disabled={!canAct || discountActionPending}
-                                      onClick={() => void handleApproveDiscount(r.scheduleYear, r.id)}
-                                    >
-                                      <CheckCircle2 className="h-3.5 w-3.5" /> Approve
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="secondary"
-                                      className="gap-1.5 h-8 text-destructive hover:text-destructive"
-                                      disabled={!canAct || discountActionPending}
-                                      onClick={() => void handleRejectDiscount(r.scheduleYear, r.id)}
-                                    >
-                                      <XCircle className="h-3.5 w-3.5" /> Reject
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
 
           <AlertDialog
             open={cancelScheduleYear != null}
@@ -997,6 +1186,225 @@ const OfferDetail = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog
+            open={!!pendingDocApprove}
+            onOpenChange={(open) => !open && setPendingDocApprove(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Approve document?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Approve <span className="font-medium text-foreground">{pendingDocApprove?.label}</span> for
+                  schedule year {pendingDocApprove?.year}.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={approveScheduleDocument.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={approveScheduleDocument.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleApproveScheduleDocument();
+                  }}
+                >
+                  {approveScheduleDocument.isPending ? "Approving…" : "Approve"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <Dialog
+            open={!!docRejectDialog}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDocRejectDialog(null);
+                setDocRejectReason("");
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reject document · {docRejectDialog?.label}</DialogTitle>
+                <DialogDescription>
+                  Provide a reason for rejecting this document requirement (year {docRejectDialog?.year}).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="doc-reject-reason">Reason</Label>
+                <Textarea
+                  id="doc-reject-reason"
+                  rows={4}
+                  value={docRejectReason}
+                  onChange={(e) => setDocRejectReason(e.target.value)}
+                  placeholder="Why is this document being rejected?"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDocRejectDialog(null);
+                    setDocRejectReason("");
+                  }}
+                  disabled={rejectScheduleDocument.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => void handleRejectScheduleDocument()}
+                  disabled={rejectScheduleDocument.isPending || !docRejectReason.trim()}
+                >
+                  {rejectScheduleDocument.isPending ? "Rejecting…" : "Reject"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={!!docSubmitDialog}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDocSubmitDialog(null);
+                setDocSubmitDocumentId("");
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Submit document · {docSubmitDialog?.label}</DialogTitle>
+                <DialogDescription>
+                  Select a document to submit for schedule year {docSubmitDialog?.year}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label>Document</Label>
+                <Select value={docSubmitDocumentId} onValueChange={setDocSubmitDocumentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select document…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(documentsPage?.items ?? [])
+                      .filter((doc) => Boolean(doc.id))
+                      .map((doc) => (
+                        <SelectItem key={doc.id!} value={doc.id!}>
+                          {doc.originalFileName ?? doc.storedFileName ?? doc.id}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDocSubmitDialog(null);
+                    setDocSubmitDocumentId("");
+                  }}
+                  disabled={submitScheduleDocument.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleSubmitScheduleDocument()}
+                  disabled={submitScheduleDocument.isPending || !docSubmitDocumentId}
+                >
+                  {submitScheduleDocument.isPending ? "Submitting…" : "Submit"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="discounts" className="mt-4">
+          {(() => {
+            const discountRows = offer.schedules.flatMap((s) =>
+              s.discountRequests.map((r) => ({ ...r, scheduleYear: s.year }))
+            );
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Discount Requests</CardTitle>
+                  <CardDescription>
+                    Discount requests attached to offer schedules.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[70px]">Year</TableHead>
+                          <TableHead className="text-center">Discount</TableHead>
+                          <TableHead className="text-center">Reason</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {discountRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                              No discount requests on this offer.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          discountRows.map((r) => {
+                            const canAct = r.status === "requested";
+                            return (
+                              <TableRow key={`${r.scheduleYear}-${r.id}`}>
+                                <TableCell className="font-mono">{r.scheduleYear}</TableCell>
+                                <TableCell className="text-center font-mono text-sm font-semibold min-w-[320px]">
+                                  {Math.round(r.requestedDiscountPercentage * 10000) / 100}%
+                                </TableCell>
+                                <TableCell className="text-sm text-center min-w-[320px]">
+                                  {r.reason || "—"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      discountRequestStatusColor[r.status] ??
+                                      "bg-muted text-muted-foreground"
+                                    }
+                                  >
+                                    {titleCase(r.status)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                      disabled={!canAct || discountActionPending}
+                                      onClick={() => void handleApproveDiscount(r.scheduleYear, r.id)}
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      className="gap-1.5 h-8 text-destructive hover:text-destructive"
+                                      disabled={!canAct || discountActionPending}
+                                      onClick={() => void handleRejectDiscount(r.scheduleYear, r.id)}
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" /> Reject
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="people" className="mt-4 space-y-4">
@@ -1326,261 +1734,7 @@ const OfferDetail = () => {
           </AlertDialog>
         </TabsContent>
 
-        <TabsContent value="documents" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Schedule Documents</CardTitle>
-              <CardDescription>Documents attached to offer schedules.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Document Type</TableHead>
-                      <TableHead>Schedule Year</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Refusal Reason</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scheduleDocuments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
-                          No documents on this offer's schedules.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      scheduleDocuments.map((d) => {
-                        const label = documentTypeNameById[d.documentTypeId] ?? d.documentTypeId;
-                        const canSubmit = d.status === "required" || d.status === "refused";
-                        const canReview = d.status === "submitted";
-                        const docActionPending =
-                          approveScheduleDocument.isPending ||
-                          rejectScheduleDocument.isPending ||
-                          submitScheduleDocument.isPending;
-                        return (
-                          <TableRow key={`${d.scheduleYear}-${d.id}`}>
-                            <TableCell>
-                              <div className="text-sm font-medium">{label}</div>
-                              <div className="font-mono text-[11px] text-muted-foreground">{d.documentTypeId}</div>
-                              {d.documentId ? (
-                                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
-                                  Doc: {d.documentId}
-                                </div>
-                              ) : null}
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{d.scheduleYear}</TableCell>
-                            <TableCell>{docStatusBadge(d.status)}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {d.refusalReason || "—"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="inline-flex items-center gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-1.5 h-8"
-                                  disabled={!canSubmit || docActionPending}
-                                  onClick={() => {
-                                    setDocSubmitDocumentId("");
-                                    setDocSubmitDialog({
-                                      requirementId: d.id,
-                                      year: d.scheduleYear,
-                                      label,
-                                    });
-                                  }}
-                                >
-                                  <Upload className="h-3.5 w-3.5" /> Submit
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                  disabled={!canReview || docActionPending}
-                                  onClick={() =>
-                                    setPendingDocApprove({
-                                      requirementId: d.id,
-                                      year: d.scheduleYear,
-                                      label,
-                                    })
-                                  }
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" /> Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-1.5 h-8 text-destructive hover:text-destructive"
-                                  disabled={!canReview || docActionPending}
-                                  onClick={() => {
-                                    setDocRejectReason("");
-                                    setDocRejectDialog({
-                                      requirementId: d.id,
-                                      year: d.scheduleYear,
-                                      label,
-                                    });
-                                  }}
-                                >
-                                  <XCircle className="h-3.5 w-3.5" /> Reject
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <AlertDialog
-            open={!!pendingDocApprove}
-            onOpenChange={(open) => !open && setPendingDocApprove(null)}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Approve document?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Approve <span className="font-medium text-foreground">{pendingDocApprove?.label}</span> for
-                  schedule year {pendingDocApprove?.year}.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={approveScheduleDocument.isPending}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={approveScheduleDocument.isPending}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void handleApproveScheduleDocument();
-                  }}
-                >
-                  {approveScheduleDocument.isPending ? "Approving…" : "Approve"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <Dialog
-            open={!!docRejectDialog}
-            onOpenChange={(open) => {
-              if (!open) {
-                setDocRejectDialog(null);
-                setDocRejectReason("");
-              }
-            }}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Reject document · {docRejectDialog?.label}</DialogTitle>
-                <DialogDescription>
-                  Provide a reason for rejecting this document requirement (year {docRejectDialog?.year}).
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-2 py-2">
-                <Label htmlFor="doc-reject-reason">Reason</Label>
-                <Textarea
-                  id="doc-reject-reason"
-                  rows={4}
-                  value={docRejectReason}
-                  onChange={(e) => setDocRejectReason(e.target.value)}
-                  placeholder="Why is this document being rejected?"
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDocRejectDialog(null);
-                    setDocRejectReason("");
-                  }}
-                  disabled={rejectScheduleDocument.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => void handleRejectScheduleDocument()}
-                  disabled={rejectScheduleDocument.isPending || !docRejectReason.trim()}
-                >
-                  {rejectScheduleDocument.isPending ? "Rejecting…" : "Reject"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog
-            open={!!docSubmitDialog}
-            onOpenChange={(open) => {
-              if (!open) {
-                setDocSubmitDialog(null);
-                setDocSubmitDocumentId("");
-              }
-            }}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Submit document · {docSubmitDialog?.label}</DialogTitle>
-                <DialogDescription>
-                  Select a document to submit for schedule year {docSubmitDialog?.year}.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-2 py-2">
-                <Label>Document</Label>
-                <Select value={docSubmitDocumentId} onValueChange={setDocSubmitDocumentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select document…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(documentsPage?.items ?? [])
-                      .filter((doc) => Boolean(doc.id))
-                      .map((doc) => (
-                        <SelectItem key={doc.id!} value={doc.id!}>
-                          {doc.originalFileName ?? doc.storedFileName ?? doc.id}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDocSubmitDialog(null);
-                    setDocSubmitDocumentId("");
-                  }}
-                  disabled={submitScheduleDocument.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => void handleSubmitScheduleDocument()}
-                  disabled={submitScheduleDocument.isPending || !docSubmitDocumentId}
-                >
-                  {submitScheduleDocument.isPending ? "Submitting…" : "Submit"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        <TabsContent value="verification" className="mt-4">
-          <VerificationStep
-            productId={offer.productId}
-            versionId={offer.versionId}
-            templateId={offer.templateId}
-            currency={offer.currency}
-            policyHolderId={offer.policyHolderId}
-            insuredId={offer.insuredId}
-            loanOutstanding={offer.loan?.outstandingBalance}
-            onChecksComputed={setVerificationChecks}
-          />
-        </TabsContent>
-
-        <TabsContent value="notes" className="mt-4">
+        {/* <TabsContent value="notes" className="mt-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Notes</CardTitle>
@@ -1600,7 +1754,7 @@ const OfferDetail = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </AppShell>
   );

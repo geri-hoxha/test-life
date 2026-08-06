@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { addFxRate, CURRENCIES, getLatestRate } from "@/data/fxRates";
 import { toast } from "sonner";
 
@@ -90,7 +92,10 @@ const FxRateDialog = ({ open, onOpenChange, onSaved }: Props) => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DatePicker
+                value={date ? parseISO(date) : undefined}
+                onChange={(d) => setDate(d ? format(d, "yyyy-MM-dd") : "")}
+              />
             </div>
             <div>
               <Label>Rate</Label>

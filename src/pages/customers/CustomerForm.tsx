@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Customer, customerSchema,
+  Customer, customerSchema, ageFromDob,
   Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPES, F5_LOCATIONS,
   SSN_ISSUING_COUNTRIES,
 } from "@/data/customers";
@@ -133,6 +133,10 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
           }
         );
       } else {
+        if (ageFromDob(c.dateOfBirth) < 18) {
+          toast.error("Person must be at least 18 years old");
+          return;
+        }
         createPerson.mutate(customerToCreatePerson(c), {
           onSuccess: (res) => {
             if (!res.id) {

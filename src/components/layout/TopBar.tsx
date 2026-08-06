@@ -20,10 +20,11 @@ const navItems = [
   { label: "Customers", to: "/customers" },
   { label: "Offers", to: "/offers" },
   { label: "Policies", to: "/policies" },
-  { label: "Payments", to: "/payments" },
-  { label: "Permissions", to: "/administration/permission-matrix" },
-  { label: "Reports", to: "/reports" },
-  { label: "Administration", to: "/administration" },
+  // API not ready — hide until backend is available
+  // { label: "Payments", to: "/payments" },
+  // { label: "Permissions", to: "/administration/permission-matrix" },
+  // { label: "Reports", to: "/reports" },
+  // { label: "Administration", to: "/administration" },
 ];
 
 const TopBar = () => {

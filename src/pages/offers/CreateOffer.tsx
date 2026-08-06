@@ -37,12 +37,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Check, Loader2, Plus, Trash2, Users, Package, Calendar as CalendarNavIcon, Calculator, FileSpreadsheet } from "lucide-react";
-import { ageFromDob } from "@/data/customers";
 import {
-  Beneficiary,
-  PaymentMode,
-} from "@/data/offers";
+  ArrowLeft,
+  Check,
+  Loader2,
+  Plus,
+  Trash2,
+  Users,
+  Package,
+  Calendar as CalendarNavIcon,
+  Calculator,
+  FileSpreadsheet,
+} from "lucide-react";
+import { ageFromDob } from "@/data/customers";
+import { Beneficiary, PaymentMode } from "@/data/offers";
 import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListProductGroups } from "@/api/product-groups";
 import { useListPeople } from "@/api/people";
@@ -61,8 +69,6 @@ import PremiumCalculation from "./PremiumCalculation";
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { toast } from "sonner";
 
-
-
 const PAYMENT_MODES: PaymentMode[] = [
   "Pagesa me prim te rregullt",
   "Pagese per gjithe periudhen (Upfront)",
@@ -78,6 +84,63 @@ const SECTIONS = [
   { id: "dates", label: "Dates", icon: CalendarNavIcon },
   { id: "premium", label: "Premium", icon: Calculator },
 ] as const;
+
+type ManualLoanRow = {
+  id: string;
+  year: number;
+  periodStart: string;
+  periodEnd: string;
+  remainingLoanAmount: number;
+};
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+const newManualLoanRow = (overrides?: Partial<ManualLoanRow>): ManualLoanRow => {
+  const today = todayIso();
+  return {
+    id: crypto.randomUUID(),
+    year: 1,
+    periodStart: today,
+    periodEnd: today,
+    remainingLoanAmount: 0,
+    ...overrides,
+  };
+};
+
+/** Offer term in whole years (end − start), minimum 1. */
+const offerTermYears = (startDate: string, endDate: string) => {
+  if (!startDate || !endDate) return 1;
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const diffMs = end.getTime() - start.getTime();
+  const diffYears = Math.round(diffMs / (365.25 * 24 * 60 * 60 * 1000));
+  return Math.max(1, diffYears);
+};
+
+/** One manual row per offer year: periodStart/End advance by 1 year from offer start. */
+const buildManualLoanRowsFromOfferTerm = (
+  startDate: string,
+  endDate: string,
+): ManualLoanRow[] => {
+  if (!startDate) return [newManualLoanRow()];
+  const start = parseISO(startDate);
+  const term = offerTermYears(startDate, endDate);
+  const rows: ManualLoanRow[] = [];
+  for (let i = 0; i < term; i++) {
+    const periodStartDate = new Date(start);
+    periodStartDate.setFullYear(start.getFullYear() + i);
+    const periodEndDate = new Date(start);
+    periodEndDate.setFullYear(start.getFullYear() + i + 1);
+    rows.push({
+      id: crypto.randomUUID(),
+      year: periodStartDate.getFullYear(),
+      periodStart: format(periodStartDate, "yyyy-MM-dd"),
+      periodEnd: format(periodEndDate, "yyyy-MM-dd"),
+      remainingLoanAmount: 0,
+    });
+  }
+  return rows;
+};
 
 /** One loan-disbursement per Loan Term year. Year and remaining balance come from the loop. */
 const buildLoanDisbursements = (opts: {
@@ -153,56 +216,77 @@ const CreateOffer = () => {
 
   // Step 2
   const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
-  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
-  const { data: productGroupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
-  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const { data: companiesPage } = useListCompanies({
+    pageNumber: 1,
+    pageSize: 200,
+  });
+  const { data: productGroupsPage } = useListProductGroups({
+    pageNumber: 1,
+    pageSize: 200,
+  });
+  const { data: productsPage } = useListProducts({
+    pageNumber: 1,
+    pageSize: 200,
+  });
   const customers = useMemo(
     () => mergeCustomers(peoplePage?.items, companiesPage?.items),
-    [peoplePage?.items, companiesPage?.items]
+    [peoplePage?.items, companiesPage?.items],
   );
   /** Insured persons API only accepts people (not companies). */
   const peopleOnly = useMemo(
     () => customers.filter((c) => c.customerType === "Individual"),
-    [customers]
+    [customers],
   );
   const productGroups = useMemo(
     () => (productGroupsPage?.items ?? []).filter((g) => g.id),
-    [productGroupsPage?.items]
+    [productGroupsPage?.items],
   );
   const products = useMemo(
     () => (productsPage?.items ?? []).map(mapApiProduct),
-    [productsPage?.items]
+    [productsPage?.items],
   );
   const productsInGroup = useMemo(
     () =>
       products.filter(
         (p) =>
           p.productGroupId === productGroupId &&
-          (p.status === "Active" || p.status === "Draft")
+          (p.status === "Active" || p.status === "Draft"),
       ),
-    [products, productGroupId]
+    [products, productGroupId],
   );
   const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
   const partyTypeOf = (customerId: string): "person" | "company" =>
-    getCustomerLocal(customerId)?.customerType === "Company" ? "company" : "person";
+    getCustomerLocal(customerId)?.customerType === "Company"
+      ? "company"
+      : "person";
   const [policyHolderId, setPolicyHolderId] = useState("");
   const [payerId, setPayerId] = useState("");
   const [insuredId, setInsuredId] = useState("");
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
-  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  type CreateCustomerTarget =
+    | "policyHolder"
+    | "payer"
+    | "insured"
+    | { beneficiaryId: string };
+  const [createCustomerTarget, setCreateCustomerTarget] =
+    useState<CreateCustomerTarget | null>(null);
   const [loanDisburseProgress, setLoanDisburseProgress] = useState<{
     current: number;
     total: number;
   } | null>(null);
 
   // Step 3
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
     d.setFullYear(d.getFullYear() + 20);
     return d.toISOString().slice(0, 10);
   });
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("Pagesa me prim te rregullt");
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
+    "Pagesa me prim te rregullt",
+  );
   const [hasLoan, setHasLoan] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
@@ -210,21 +294,59 @@ const CreateOffer = () => {
   const [outstandingBalance, setOutstandingBalance] = useState("");
   const loanFileRef = useRef<HTMLInputElement>(null);
   const [loanFileName, setLoanFileName] = useState<string | null>(null);
+  const [manualLoans, setManualLoans] = useState(false);
+  const [manualLoanRows, setManualLoanRows] = useState<ManualLoanRow[]>([]);
+
+  const updateManualLoanRow = (
+    id: string,
+    patch: Partial<Omit<ManualLoanRow, "id">>,
+  ) => {
+    setManualLoanRows((rows) =>
+      rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    );
+  };
+
+  const toggleLoanDetails = () => {
+    setHasLoan((prev) => {
+      if (prev) return false;
+      setManualLoans(false);
+      setManualLoanRows([]);
+      return true;
+    });
+  };
+
+  const toggleManualLoans = () => {
+    setManualLoans((prev) => {
+      if (prev) {
+        setManualLoanRows([]);
+        return false;
+      }
+      setHasLoan(false);
+      setManualLoanRows(buildManualLoanRowsFromOfferTerm(startDate, endDate));
+      return true;
+    });
+  };
 
   const handleLoanExcelUpload = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, blankrows: false });
+      const rows = XLSX.utils.sheet_to_json<any[]>(ws, {
+        header: 1,
+        blankrows: false,
+      });
 
       // Build a key→value map from two-column rows: [Field, Value]
       const map = new Map<string, string>();
       for (const r of rows) {
         if (!Array.isArray(r) || r.length < 2) continue;
-        const k = String(r[0] ?? "").trim().toLowerCase();
+        const k = String(r[0] ?? "")
+          .trim()
+          .toLowerCase();
         const v = r[1];
-        if (k && v !== undefined && v !== null && v !== "") map.set(k, String(v));
+        if (k && v !== undefined && v !== null && v !== "")
+          map.set(k, String(v));
       }
 
       const pick = (...keys: string[]) => {
@@ -244,14 +366,20 @@ const CreateOffer = () => {
       if (ir) setInterestRate(ir);
       if (term) setLoanTermYears(term);
       if (out) setOutstandingBalance(out);
-      if (!hasLoan) setHasLoan(true);
+      setManualLoans(false);
+      setManualLoanRows([]);
+      setHasLoan(true);
       setLoanFileName(file.name);
 
       const filled = [amt, ir, term, out].filter(Boolean).length;
       if (filled === 0) {
-        toast.error("No loan fields recognized in the file. Use a two-column sheet: Field | Value.");
+        toast.error(
+          "No loan fields recognized in the file. Use a two-column sheet: Field | Value.",
+        );
       } else {
-        toast.success(`Imported ${filled} loan field${filled === 1 ? "" : "s"} from ${file.name}`);
+        toast.success(
+          `Imported ${filled} loan field${filled === 1 ? "" : "s"} from ${file.name}`,
+        );
       }
     } catch {
       toast.error("Could not read Excel file");
@@ -264,19 +392,24 @@ const CreateOffer = () => {
 
   const insured = insuredId ? getCustomerLocal(insuredId) : undefined;
   const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
-  const insuredGender: RuleGender = insured?.gender === "Female" ? "Female" : insured?.gender === "Male" ? "Male" : "Any";
+  const insuredGender: RuleGender =
+    insured?.gender === "Female"
+      ? "Female"
+      : insured?.gender === "Male"
+        ? "Male"
+        : "Any";
 
-  const termYears = useMemo(() => {
-    if (!startDate || !endDate) return 20;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffMs = end.getTime() - start.getTime();
-    const diffYears = Math.round(diffMs / (365.25 * 24 * 60 * 60 * 1000));
-    return Math.max(1, diffYears);
-  }, [startDate, endDate]);
+  const termYears = useMemo(
+    () => offerTermYears(startDate, endDate),
+    [startDate, endDate],
+  );
 
-  const beneficiaryTotal = beneficiaries.reduce((s, b) => s + (Number(b.percentage) || 0), 0);
-  const beneficiariesValid = beneficiaries.length === 0 || beneficiaryTotal === 100;
+  const beneficiaryTotal = beneficiaries.reduce(
+    (s, b) => s + (Number(b.percentage) || 0),
+    0,
+  );
+  const beneficiariesValid =
+    beneficiaries.length === 0 || beneficiaryTotal === 100;
 
   // Handlers
   const onProductGroupChange = (id: string) => {
@@ -293,11 +426,18 @@ const CreateOffer = () => {
   const addBeneficiary = () => {
     setBeneficiaries((prev) => [
       ...prev,
-      { id: `b-${Date.now()}`, customerId: "", relationship: "", percentage: 0 },
+      {
+        id: `b-${Date.now()}`,
+        customerId: "",
+        relationship: "",
+        percentage: 0,
+      },
     ]);
   };
   const updateBeneficiary = (id: string, patch: Partial<Beneficiary>) => {
-    setBeneficiaries((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+    setBeneficiaries((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    );
   };
   const removeBeneficiary = (id: string) => {
     setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
@@ -305,9 +445,12 @@ const CreateOffer = () => {
 
   // Validation — version not yet on API; product group + product + currency are required.
   const productOk = !!(productGroupId && productId && currency);
-  const peopleOk = !!(policyHolderId && payerId && insuredId)
-    && peopleOnly.some((p) => p.id === insuredId)
-    && (beneficiaries.length === 0 || (beneficiariesValid && beneficiaries.every((b) => b.customerId && b.percentage > 0)));
+  const peopleOk =
+    !!(policyHolderId && payerId && insuredId) &&
+    peopleOnly.some((p) => p.id === insuredId) &&
+    (beneficiaries.length === 0 ||
+      (beneficiariesValid &&
+        beneficiaries.every((b) => b.customerId && b.percentage > 0)));
   const canSave = productOk && peopleOk;
   const saving =
     createOffer.isPending ||
@@ -372,39 +515,46 @@ const CreateOffer = () => {
         body: { personId: insuredId },
       });
 
-      if (hasLoan) {
-        const termYears = Number(loanTermYears) || 0;
-        const principal =
-          Number(outstandingBalance) || Number(loanAmount) || 0;
-        // Loop count = Loan Term (Years)
-        const disbursements = buildLoanDisbursements({
-          startDate,
-          loanTermYears: termYears,
-          principal,
-        });
+      const disbursements = manualLoans
+        ? manualLoanRows.map((r) => ({
+            year: Number(r.year) || 0,
+            periodStart: r.periodStart,
+            periodEnd: r.periodEnd,
+            remainingLoanAmount: Number(r.remainingLoanAmount) || 0,
+          }))
+        : hasLoan
+          ? buildLoanDisbursements({
+              startDate,
+              loanTermYears: Number(loanTermYears) || 0,
+              principal:
+                Number(outstandingBalance) || Number(loanAmount) || 0,
+            })
+          : [];
 
-        if (disbursements.length > 0) {
-          setLoanDisburseProgress({ current: 0, total: disbursements.length });
-          try {
-            for (let i = 0; i < disbursements.length; i++) {
-              const row = disbursements[i];
-              setLoanDisburseProgress({ current: i + 1, total: disbursements.length });
-              await addLoan.mutateAsync({
-                offerId,
-                body: {
-                  year: row.year,
-                  periodStart: row.periodStart,
-                  periodEnd: row.periodEnd,
-                  remainingLoanAmount: row.remainingLoanAmount,
-                },
-              });
-            }
-
-            // Schedules only apply when the offer has a loan, after loan-disbursements.
-            await calculateSchedules.mutateAsync(offerId);
-          } finally {
-            setLoanDisburseProgress(null);
+      if (disbursements.length > 0) {
+        setLoanDisburseProgress({ current: 0, total: disbursements.length });
+        try {
+          for (let i = 0; i < disbursements.length; i++) {
+            const row = disbursements[i];
+            setLoanDisburseProgress({
+              current: i + 1,
+              total: disbursements.length,
+            });
+            await addLoan.mutateAsync({
+              offerId,
+              body: {
+                year: row.year,
+                periodStart: row.periodStart,
+                periodEnd: row.periodEnd,
+                remainingLoanAmount: row.remainingLoanAmount,
+              },
+            });
           }
+
+          // Schedules only apply when the offer has a loan, after loan-disbursements.
+          await calculateSchedules.mutateAsync(offerId);
+        } finally {
+          setLoanDisburseProgress(null);
         }
       }
 
@@ -412,7 +562,9 @@ const CreateOffer = () => {
       navigate(`/offers/${offerId}`);
     } catch (err) {
       setLoanDisburseProgress(null);
-      toast.error(err instanceof Error ? err.message : "Failed to create offer");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create offer",
+      );
     }
   };
 
@@ -422,7 +574,9 @@ const CreateOffer = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3 rounded-lg border bg-card px-8 py-6 shadow-lg">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <div className="text-sm font-medium">Creating loan disbursements…</div>
+            <div className="text-sm font-medium">
+              Creating loan disbursements…
+            </div>
             <div className="text-xs text-muted-foreground font-mono">
               {loanDisburseProgress.current} / {loanDisburseProgress.total}
             </div>
@@ -431,7 +585,13 @@ const CreateOffer = () => {
       )}
 
       <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/offers")} className="gap-2" disabled={saving}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/offers")}
+          className="gap-2"
+          disabled={saving}
+        >
           <ArrowLeft className="h-4 w-4" /> Back to Offers
         </Button>
       </div>
@@ -452,13 +612,21 @@ const CreateOffer = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Product Selection</CardTitle>
-              <CardDescription>Pick a product group and a package (product) to base the offer on.</CardDescription>
+              <CardDescription>
+                Pick a product group and a package (product) to base the offer
+                on.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label>Product</Label>
-                <Select value={productGroupId} onValueChange={onProductGroupChange}>
-                  <SelectTrigger><SelectValue placeholder="Select product group" /></SelectTrigger>
+                <Select
+                  value={productGroupId}
+                  onValueChange={onProductGroupChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select product group" />
+                  </SelectTrigger>
                   <SelectContent>
                     {productGroups.map((g) => (
                       <SelectItem key={g.id!} value={g.id!}>
@@ -470,34 +638,72 @@ const CreateOffer = () => {
               </div>
               <div>
                 <Label>Template / Package</Label>
-                <Select value={productId} onValueChange={onProductChange} disabled={!productGroupId}>
+                <Select
+                  value={productId}
+                  onValueChange={onProductChange}
+                  disabled={!productGroupId}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder={productGroupId ? "Select package" : "Pick product group first"} />
+                    <SelectValue
+                      placeholder={
+                        productGroupId
+                          ? "Select package"
+                          : "Pick product group first"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {productsInGroup.length === 0 ? (
-                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No packages for this product group.</div>
-                    ) : productsInGroup.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                        No packages for this product group.
+                      </div>
+                    ) : (
+                      productsInGroup.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
                 <Label>Currency</Label>
-                <Select value={currency} onValueChange={setCurrency} disabled={!productId}>
-                  <SelectTrigger><SelectValue placeholder={productId ? "Select currency" : "Pick package first"} /></SelectTrigger>
+                <Select
+                  value={currency}
+                  onValueChange={setCurrency}
+                  disabled={!productId}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        productId ? "Select currency" : "Pick package first"
+                      }
+                    />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(product?.currencies?.length ? product.currencies : ["EUR", "ALL", "USD"]).map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    {(product?.currencies?.length
+                      ? product.currencies
+                      : ["EUR", "ALL", "USD"]
+                    ).map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {product && product.currencies.length > 0 && (
                   <div className="text-[11px] text-muted-foreground mt-1.5">
-                    Available: {product.currencies.map((c) => (
-                      <Badge key={c} variant="outline" className="mr-1 font-normal">{c}</Badge>
+                    Available:{" "}
+                    {product.currencies.map((c) => (
+                      <Badge
+                        key={c}
+                        variant="outline"
+                        className="mr-1 font-normal"
+                      >
+                        {c}
+                      </Badge>
                     ))}
                   </div>
                 )}
@@ -509,7 +715,9 @@ const CreateOffer = () => {
                     {productGroup?.name ?? "—"} · {product.name}
                   </div>
                   {product.description ? (
-                    <div className="text-xs text-muted-foreground mt-0.5">{product.description}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {product.description}
+                    </div>
                   ) : null}
                 </div>
               )}
@@ -521,7 +729,10 @@ const CreateOffer = () => {
           <Card className="mb-4">
             <CardHeader>
               <CardTitle className="text-base">People</CardTitle>
-              <CardDescription>Define who holds the policy, who pays, who is insured, and beneficiaries.</CardDescription>
+              <CardDescription>
+                Define who holds the policy, who pays, who is insured, and
+                beneficiaries.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">
               <div>
@@ -535,10 +746,10 @@ const CreateOffer = () => {
                 <Button
                   variant="link"
                   size="sm"
-                  className="px-0 h-7 text-xs"
-                  onClick={() => setCreateCustomerOpen(true)}
+                  className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                  onClick={() => setCreateCustomerTarget("policyHolder")}
                 >
-                  + Create new customer
+                  Create a new customer
                 </Button>
               </div>
               <div>
@@ -549,14 +760,26 @@ const CreateOffer = () => {
                   onValueChange={setPayerId}
                   placeholder="Select payer"
                 />
-                {policyHolderId && (
+                <div className="flex flex-wrap items-center gap-x-3">
                   <Button
-                    variant="link" size="sm" className="px-0 h-7 text-xs"
-                    onClick={() => setPayerId(policyHolderId)}
+                    variant="link"
+                    size="sm"
+                    className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                    onClick={() => setCreateCustomerTarget("payer")}
                   >
-                    Same as policy holder
+                    Create a new customer
                   </Button>
-                )}
+                  {policyHolderId && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="px-0 h-7 text-xs"
+                      onClick={() => setPayerId(policyHolderId)}
+                    >
+                      Same as policy holder
+                    </Button>
+                  )}
+                </div>
               </div>
               <div>
                 <Label>Insured Person</Label>
@@ -566,14 +789,28 @@ const CreateOffer = () => {
                   onValueChange={setInsuredId}
                   placeholder="Select insured person"
                 />
-                {policyHolderId && getCustomerLocal(policyHolderId)?.customerType === "Individual" && (
+                <div className="flex flex-wrap items-center gap-x-3">
                   <Button
-                    variant="link" size="sm" className="px-0 h-7 text-xs"
-                    onClick={() => setInsuredId(policyHolderId)}
+                    variant="link"
+                    size="sm"
+                    className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                    onClick={() => setCreateCustomerTarget("insured")}
                   >
-                    Same as policy holder
+                    Create a new customer
                   </Button>
-                )}
+                  {policyHolderId &&
+                    getCustomerLocal(policyHolderId)?.customerType ===
+                      "Individual" && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="px-0 h-7 text-xs"
+                        onClick={() => setInsuredId(policyHolderId)}
+                      >
+                        Same as policy holder
+                      </Button>
+                    )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -583,9 +820,17 @@ const CreateOffer = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">Beneficiaries</CardTitle>
-                  <CardDescription>Total percentage must equal 100% when one or more beneficiaries are added.</CardDescription>
+                  <CardDescription>
+                    Total percentage must equal 100% when one or more
+                    beneficiaries are added.
+                  </CardDescription>
                 </div>
-                <Button size="sm" variant="outline" className="gap-2" onClick={addBeneficiary}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={addBeneficiary}
+                >
                   <Plus className="h-4 w-4" /> Add Beneficiary
                 </Button>
               </div>
@@ -603,50 +848,92 @@ const CreateOffer = () => {
                   <TableBody>
                     {beneficiaries.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">
+                        <TableCell
+                          colSpan={3}
+                          className="text-center text-sm text-muted-foreground py-6"
+                        >
                           No beneficiaries added yet.
                         </TableCell>
                       </TableRow>
-                    ) : beneficiaries.map((b) => (
-                      <TableRow key={b.id}>
-                        <TableCell>
-                          <CustomerCombobox
-                            customers={customers}
-                            value={b.customerId}
-                            onValueChange={(v) => updateBeneficiary(b.id, { customerId: v })}
-                            placeholder="Select customer"
-                            triggerClassName="h-9"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={b.percentage}
-                              onChange={(e) => updateBeneficiary(b.id, { percentage: Number(e.target.value) })}
-                              className="h-9 pr-7"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeBeneficiary(b.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    ) : (
+                      beneficiaries.map((b) => (
+                        <TableRow key={b.id}>
+                          <TableCell className="h-24">
+                            <div className="relative">
+                              <CustomerCombobox
+                                customers={customers}
+                                value={b.customerId}
+                                onValueChange={(v) =>
+                                  updateBeneficiary(b.id, { customerId: v })
+                                }
+                                placeholder="Select customer"
+                                triggerClassName="h-9"
+                              />
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="px-0 absolute left-0 top-full h-7 text-xs text-blue-400 hover:text-blue-500"
+                                onClick={() =>
+                                  setCreateCustomerTarget({
+                                    beneficiaryId: b.id,
+                                  })
+                                }
+                              >
+                                Create a new customer
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={b.percentage}
+                                onChange={(e) =>
+                                  updateBeneficiary(b.id, {
+                                    percentage: Number(e.target.value),
+                                  })
+                                }
+                                className="h-9 pr-7"
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                %
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => removeBeneficiary(b.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
               {beneficiaries.length > 0 && (
-                <div className={`mt-3 text-sm flex items-center justify-between rounded-md px-3 py-2 ${
-                  beneficiariesValid ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-destructive/10 text-destructive"
-                }`}>
-                  <span>{beneficiariesValid ? "Beneficiary split is valid." : "Beneficiaries must total exactly 100%."}</span>
-                  <span className="font-mono font-semibold">{beneficiaryTotal}%</span>
+                <div
+                  className={`mt-3 text-sm flex items-center justify-between rounded-md px-3 py-2 ${
+                    beneficiariesValid
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : "bg-destructive/10 text-destructive"
+                  }`}
+                >
+                  <span>
+                    {beneficiariesValid
+                      ? "Beneficiary split is valid."
+                      : "Beneficiaries must total exactly 100%."}
+                  </span>
+                  <span className="font-mono font-semibold">
+                    {beneficiaryTotal}%
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -656,15 +943,21 @@ const CreateOffer = () => {
         <section id="dates" className="scroll-mt-32">
           <Card className="mb-4">
             <CardHeader>
-              <CardTitle className="text-base">Policy Dates & Payment</CardTitle>
-              <CardDescription>Set the cover period and payment schedule.</CardDescription>
+              <CardTitle className="text-base">
+                Policy Dates & Payment
+              </CardTitle>
+              <CardDescription>
+                Set the cover period and payment schedule.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
+            <CardContent className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label>Start Date</Label>
                 <DatePicker
                   value={startDate ? parseISO(startDate) : undefined}
-                  onChange={(d) => setStartDate(d ? format(d, "yyyy-MM-dd") : "")}
+                  onChange={(d) =>
+                    setStartDate(d ? format(d, "yyyy-MM-dd") : "")
+                  }
                 />
               </div>
               <div>
@@ -672,18 +965,13 @@ const CreateOffer = () => {
                 <DatePicker
                   value={endDate ? parseISO(endDate) : undefined}
                   onChange={(d) => setEndDate(d ? format(d, "yyyy-MM-dd") : "")}
-                  disabled={(date) => (startDate ? date < parseISO(startDate) : false)}
+                  disabled={(date) =>
+                    startDate ? date < parseISO(startDate) : false
+                  }
                 />
-                <div className="text-[11px] text-muted-foreground mt-1">Term: {termYears} years</div>
-              </div>
-              <div>
-                <Label>Payment Mode</Label>
-                <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_MODES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  Term: {termYears} years
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -694,7 +982,8 @@ const CreateOffer = () => {
                 <div>
                   <CardTitle className="text-base">Mortgage / Loan</CardTitle>
                   <CardDescription>
-                    Optional — only required for loan-protection policies. You can also import details from an Excel file.
+                    Optional — only required for loan-protection policies. You
+                    can also import details from an Excel file.
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -721,16 +1010,28 @@ const CreateOffer = () => {
                   <Button
                     size="sm"
                     variant={hasLoan ? "secondary" : "outline"}
-                    onClick={() => setHasLoan((v) => !v)}
+                    onClick={toggleLoanDetails}
                   >
                     {hasLoan ? "Remove loan details" : "Add loan details"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={manualLoans ? "secondary" : "outline"}
+                    onClick={toggleManualLoans}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {manualLoans ? "Remove manual loans" : "Add loans manually"}
                   </Button>
                 </div>
               </div>
               {loanFileName && (
                 <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
                   <FileSpreadsheet className="h-3.5 w-3.5" />
-                  Imported from <span className="font-medium text-foreground">{loanFileName}</span>
+                  Imported from{" "}
+                  <span className="font-medium text-foreground">
+                    {loanFileName}
+                  </span>
                 </div>
               )}
             </CardHeader>
@@ -738,19 +1039,187 @@ const CreateOffer = () => {
               <CardContent className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label>Loan Amount ({currency || "—"})</Label>
-                  <Input type="number" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} />
+                  <Input
+                    type="number"
+                    value={loanAmount}
+                    onChange={(e) => setLoanAmount(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Mortgage Interest Rate (%)</Label>
-                  <Input type="number" step="0.01" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Loan Term (Years)</Label>
-                  <Input type="number" value={loanTermYears} onChange={(e) => setLoanTermYears(e.target.value)} />
+                  <Input
+                    type="number"
+                    value={loanTermYears}
+                    onChange={(e) => setLoanTermYears(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Outstanding Balance ({currency || "—"})</Label>
-                  <Input type="number" value={outstandingBalance} onChange={(e) => setOutstandingBalance(e.target.value)} />
+                  <Input
+                    type="number"
+                    value={outstandingBalance}
+                    onChange={(e) => setOutstandingBalance(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            )}
+            {manualLoans && (
+              <CardContent className="pt-0">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="text-xs text-muted-foreground">
+                    {termYears} yr · one row/year · edit amounts as needed
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() =>
+                      setManualLoanRows((rows) => {
+                        const last = rows[rows.length - 1];
+                        if (!last?.periodEnd) {
+                          return [
+                            ...rows,
+                            newManualLoanRow({ year: rows.length + 1 }),
+                          ];
+                        }
+                        const nextStart = parseISO(last.periodEnd);
+                        const nextEnd = new Date(nextStart);
+                        nextEnd.setFullYear(nextStart.getFullYear() + 1);
+                        return [
+                          ...rows,
+                          newManualLoanRow({
+                            year: nextStart.getFullYear(),
+                            periodStart: format(nextStart, "yyyy-MM-dd"),
+                            periodEnd: format(nextEnd, "yyyy-MM-dd"),
+                          }),
+                        ];
+                      })
+                    }
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add row
+                  </Button>
+                </div>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="h-8 w-[96px] px-2 text-xs">
+                          Year
+                        </TableHead>
+                        <TableHead className="h-8 px-2 text-xs">
+                          Start
+                        </TableHead>
+                        <TableHead className="h-8 px-2 text-xs">End</TableHead>
+                        <TableHead className="h-8 px-2 text-xs">
+                          Remaining
+                        </TableHead>
+                        <TableHead className="h-8 w-8 px-1" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {manualLoanRows.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="h-12 text-center text-xs text-muted-foreground"
+                          >
+                            No rows yet. Set offer dates, then re-open manual
+                            loans or add a row.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        manualLoanRows.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell className="p-1.5">
+                              <Input
+                                type="number"
+                                min={1}
+                                className="h-7 px-2 text-xs"
+                                value={row.year}
+                                onChange={(e) =>
+                                  updateManualLoanRow(row.id, {
+                                    year: Number(e.target.value) || 0,
+                                  })
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="p-1.5">
+                              <DatePicker
+                                value={
+                                  row.periodStart
+                                    ? parseISO(row.periodStart)
+                                    : undefined
+                                }
+                                onChange={(d) =>
+                                  updateManualLoanRow(row.id, {
+                                    periodStart: d
+                                      ? format(d, "yyyy-MM-dd")
+                                      : "",
+                                  })
+                                }
+                                buttonClassName="h-7 px-2 text-xs"
+                              />
+                            </TableCell>
+                            <TableCell className="p-1.5">
+                              <DatePicker
+                                value={
+                                  row.periodEnd
+                                    ? parseISO(row.periodEnd)
+                                    : undefined
+                                }
+                                onChange={(d) =>
+                                  updateManualLoanRow(row.id, {
+                                    periodEnd: d
+                                      ? format(d, "yyyy-MM-dd")
+                                      : "",
+                                  })
+                                }
+                                buttonClassName="h-7 px-2 text-xs"
+                              />
+                            </TableCell>
+                            <TableCell className="p-1.5">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                className="h-7 px-2 text-xs"
+                                value={row.remainingLoanAmount}
+                                onChange={(e) =>
+                                  updateManualLoanRow(row.id, {
+                                    remainingLoanAmount:
+                                      Number(e.target.value) || 0,
+                                  })
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() =>
+                                  setManualLoanRows((rows) =>
+                                    rows.filter((r) => r.id !== row.id),
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             )}
@@ -784,36 +1253,61 @@ const CreateOffer = () => {
 
       <div className="flex items-center justify-between mt-6 sticky bottom-0 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-3 -mx-2 px-2">
         <div className="text-xs text-muted-foreground">
-          {canSave ? "Ready to save." : "Complete product, parties and beneficiaries to enable submission."}
+          {canSave
+            ? "Ready to save."
+            : "Complete product, parties and beneficiaries to enable submission."}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => handleSave("Draft")} disabled={saving}>
+          {/* <Button
+            variant="outline"
+            onClick={() => handleSave("Draft")}
+            disabled={saving}
+          >
             {saving ? "Saving…" : "Save as Draft"}
           </Button>
-          <Button variant="outline" onClick={() => handleSave("Approve")} disabled={!canSave || saving}>
+          <Button
+            variant="outline"
+            onClick={() => handleSave("Approve")}
+            disabled={!canSave || saving}
+          >
             Approve & Save
-          </Button>
-          <Button onClick={() => handleSave("Submit")} disabled={!canSave || saving} className="gap-2">
+          </Button> */}
+          <Button
+            onClick={() => handleSave("Submit")}
+            disabled={!canSave || saving}
+            className="gap-2"
+          >
             <Check className="h-4 w-4" /> Submit Offer
           </Button>
         </div>
       </div>
 
-      <Dialog open={createCustomerOpen} onOpenChange={setCreateCustomerOpen}>
+      <Dialog
+        open={createCustomerTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCreateCustomerTarget(null);
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Customer</DialogTitle>
             <DialogDescription>
-              Create a customer and select them as the policy holder.
+              Create a customer and select them for this role.
             </DialogDescription>
           </DialogHeader>
-          {createCustomerOpen && (
+          {createCustomerTarget !== null && (
             <CustomerForm
               embedded
-              onCancel={() => setCreateCustomerOpen(false)}
+              onCancel={() => setCreateCustomerTarget(null)}
               onSuccess={({ id }) => {
-                setCreateCustomerOpen(false);
-                setPolicyHolderId(id);
+                const target = createCustomerTarget;
+                setCreateCustomerTarget(null);
+                if (target === "policyHolder") setPolicyHolderId(id);
+                else if (target === "payer") setPayerId(id);
+                else if (target === "insured") setInsuredId(id);
+                else if (target && "beneficiaryId" in target) {
+                  updateBeneficiary(target.beneficiaryId, { customerId: id });
+                }
               }}
             />
           )}

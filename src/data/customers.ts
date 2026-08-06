@@ -74,6 +74,17 @@ export type Customer = {
   createdDate: string;
 };
 
+export const ageFromDob = (iso: string) => {
+  if (!iso) return 0;
+  const d = new Date(iso.includes("T") ? iso : `${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const monthDiff = today.getMonth() - d.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age -= 1;
+  return age;
+};
+
 export const customerSchema = z.object({
   customerType: z.enum(["Individual", "Company"]),
   firstName: z.string().trim().max(80).optional().or(z.literal("")),
@@ -163,10 +174,3 @@ export const fullName = (c: Customer) =>
   c.customerType === "Company"
     ? (c.companyName ?? "—")
     : `${c.firstName} ${c.lastName}`.trim();
-
-export const ageFromDob = (iso: string) => {
-  if (!iso) return 0;
-  const d = new Date(iso);
-  const diff = Date.now() - d.getTime();
-  return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
-};
