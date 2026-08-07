@@ -1,19 +1,52 @@
-import type { Beneficiary, PaymentMode } from "./offers";
+import type {
+  Beneficiary,
+  OfferInsuredPerson,
+  OfferParticipant,
+  PaymentMode,
+} from "./offers";
 
 export type PolicyStatus = "Active" | "Pending Payment" | "Cancelled" | "Expired" | "Lapsed";
+
+export type PolicyCoverage = {
+  id: string;
+  coverageId: string;
+  coverageName?: string;
+  coverageDescription?: string;
+  sumInsured: number;
+  rateUsed?: {
+    isFlat?: boolean;
+    flatValue?: number | null;
+    flatValueCurrency?: string | null;
+    percentageValue?: number | null;
+  };
+  ratingTableMultiplierUsed?: number;
+  calculatedPremium: number;
+};
+
+export type PolicyDocument = {
+  id: string;
+  documentId?: string | null;
+  documentTypeId: string;
+};
 
 export type Policy = {
   id: string;
   number: string;
   offerId: string;
+  offerScheduleYear?: number;
   productId: string;
   versionId: string;
   templateId: string;
   currency: string;
+  coverageText?: string;
   policyHolderId: string;
   payerId: string;
   insuredId: string;
   beneficiaries: Beneficiary[];
+  participants: OfferParticipant[];
+  insuredPersons: OfferInsuredPerson[];
+  coverages: PolicyCoverage[];
+  documents: PolicyDocument[];
   startDate: string;
   endDate: string;
   termYears: number;
@@ -30,6 +63,10 @@ const seed: Policy[] = [
     productId: "PRD-001", versionId: "VRS-1001", templateId: "TPL-3001", currency: "EUR",
     policyHolderId: "CUS-0001", payerId: "CUS-0001", insuredId: "CUS-0001",
     beneficiaries: [{ id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 100 }],
+    participants: [],
+    insuredPersons: [],
+    coverages: [],
+    documents: [],
     startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
     paymentMode: "Pagesa me prim te rregullt",
     premium: 615, status: "Active",

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfPersonResponse,
@@ -57,6 +57,7 @@ export const useListPeople = (query?: {
     queryKey: peopleKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listPeople(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** GET /api/people/{id} */

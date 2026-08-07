@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   CompaniesAddCompanyAddressRequest,
@@ -83,6 +83,7 @@ export const useListCompanies = (query?: {
     queryKey: companiesKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listCompanies(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** GET /api/companies/{id} */

@@ -1,25 +1,29 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
+import TablePagination from "@/components/TablePagination";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
-import { customerPath, mergeCustomers, newOfferPath } from "@/api/adapters/customers";
+import { customerPath, mapCompanyToCustomer, mapPersonToCustomer, newOfferPath } from "@/api/adapters/customers";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Plus, Search, MoreHorizontal, Eye, Pencil, FileText, Filter } from "lucide-react";
-import { fullName, PEPStatus } from "@/data/customers";
+import { fullName, PEPStatus, type Customer } from "@/data/customers";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const pepClass: Record<PEPStatus, string> = {
@@ -64,11 +68,30 @@ const exposureBreakdown = (
   return rows;
 };
 
+type CustomerTypeFilter = "all" | "person" | "company";
+
 const CustomersList = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const { data: peoplePage, isLoading: peopleLoading } = useListPeople({ pageNumber: 1, pageSize: 200 });
-  const { data: companiesPage, isLoading: companiesLoading } = useListCompanies({ pageNumber: 1, pageSize: 200 });
+  const [typeFilter, setTypeFilter] = useState<CustomerTypeFilter>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, typeFilter, pageSize]);
+
+  const loadPeople = typeFilter === "all" || typeFilter === "person";
+  const loadCompanies = typeFilter === "all" || typeFilter === "company";
+
+  const { data: peoplePage, isLoading: peopleLoading } = useListPeople(
+    { pageNumber: page, pageSize },
+    { enabled: loadPeople }
+  );
+  const { data: companiesPage, isLoading: companiesLoading } = useListCompanies(
+    { pageNumber: page, pageSize },
+    { enabled: loadCompanies }
+  );
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 100 });
 
   const products = useMemo(
@@ -77,7 +100,13 @@ const CustomersList = () => {
   );
 
   const customers = useMemo(() => {
-    const all = mergeCustomers(peoplePage?.items, companiesPage?.items);
+    const people = loadPeople ? (peoplePage?.items ?? []).map(mapPersonToCustomer) : [];
+    const companies = loadCompanies ? (companiesPage?.items ?? []).map(mapCompanyToCustomer) : [];
+    let all: Customer[] = [];
+    if (typeFilter === "person") all = people;
+    else if (typeFilter === "company") all = companies;
+    else all = [...people, ...companies];
+
     const q = query.toLowerCase();
     if (!q) return all;
     return all.filter(
@@ -87,9 +116,38 @@ const CustomersList = () => {
         (c.nipt ?? "").toLowerCase().includes(q) ||
         (c.email ?? "").toLowerCase().includes(q)
     );
-  }, [peoplePage?.items, companiesPage?.items, query]);
+  }, [
+    companiesPage?.items,
+    loadCompanies,
+    loadPeople,
+    peoplePage?.items,
+    query,
+    typeFilter,
+  ]);
 
-  const isLoading = peopleLoading || companiesLoading;
+  const peopleTotal = peoplePage?.totalCount ?? 0;
+  const companiesTotal = companiesPage?.totalCount ?? 0;
+  const totalCount =
+    typeFilter === "person"
+      ? peopleTotal
+      : typeFilter === "company"
+        ? companiesTotal
+        : peopleTotal + companiesTotal;
+
+  const totalPages = Math.max(
+    1,
+    typeFilter === "person"
+      ? (peoplePage?.totalPages ?? peoplePage?.pageCount ?? 1)
+      : typeFilter === "company"
+        ? (companiesPage?.totalPages ?? companiesPage?.pageCount ?? 1)
+        : Math.max(
+            peoplePage?.totalPages ?? peoplePage?.pageCount ?? 1,
+            companiesPage?.totalPages ?? companiesPage?.pageCount ?? 1
+          )
+  );
+
+  const isLoading =
+    (loadPeople && peopleLoading) || (loadCompanies && companiesLoading);
 
   return (
     <AppShell>
@@ -112,18 +170,30 @@ const CustomersList = () => {
       />
 
       <Card className="shadow-card border-border overflow-hidden">
-        <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-border bg-muted/30">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, personal ID or email…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-9 h-9"
-            />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b border-border bg-muted/30">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search this page…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as CustomerTypeFilter)}>
+              <SelectTrigger className="h-9 w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="person">Individuals</SelectItem>
+                <SelectItem value="company">Companies</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="text-xs text-muted-foreground">
-            {isLoading ? "Loading…" : `${customers.length} customer(s)`}
+            {isLoading ? "Loading…" : `${totalCount} customer(s)`}
           </div>
         </div>
 
@@ -159,7 +229,7 @@ const CustomersList = () => {
                 ? (c.companyName ?? "C").slice(0, 2).toUpperCase()
                 : initials(c.firstName, c.lastName);
               return (
-              <TableRow key={c.id} className="hover:bg-accent-soft/40 cursor-pointer" onClick={() => navigate(customerPath(c.id, c.customerType))}>
+              <TableRow key={`${c.customerType}-${c.id}`} className="hover:bg-accent-soft/40 cursor-pointer" onClick={() => navigate(customerPath(c.id, c.customerType))}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
                     <Avatar className="h-8 w-8">
@@ -249,6 +319,15 @@ const CustomersList = () => {
             );})}
           </TableBody>
         </Table>
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          disabled={isLoading}
+        />
       </Card>
     </AppShell>
   );

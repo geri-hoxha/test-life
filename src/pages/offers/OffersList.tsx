@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQueries } from "@tanstack/react-query";
 import AppShell from "@/components/layout/AppShell";
+import TablePagination from "@/components/TablePagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -26,18 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Eye, Edit, Send, MoreHorizontal, Plus, Search } from "lucide-react";
+import { Eye, Plus, Search } from "lucide-react";
 import { statusColor, OfferStatus, offerStatusToApi, type Offer } from "@/data/offers";
-import { useListOffers } from "@/api/offers";
+import { listOffers, offersKeys, useListOffers } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useListProducts, mapApiProduct } from "@/api/products";
-import { toast } from "sonner";
 
 const STATUSES: OfferStatus[] = [
   "Draft",
@@ -47,9 +42,6 @@ const STATUSES: OfferStatus[] = [
   "Cancelled",
   "Expired",
 ];
-
-const policyHolderName = (o: Offer) =>
-  o.participants.find((p) => p.role === "policyHolder")?.displayName?.trim() || null;
 
 const insuredName = (o: Offer) => {
   const person = o.insuredPersons[0];
@@ -71,16 +63,28 @@ const OffersList = () => {
     setPage(1);
   }, [q, statusFilter, pageSize]);
 
-  const { data: offersPage, isLoading } = useListOffers({
-    pageNumber: 1,
-    pageSize: 500,
+  const listQuery = {
+    pageNumber: page,
+    pageSize,
     ...(statusFilter !== "ALL" ? { status: offerStatusToApi[statusFilter as OfferStatus] } : {}),
-  });
+  };
+
+  const { data: offersPage, isLoading, isFetching } = useListOffers(listQuery);
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
 
-  // Temporary: reverse API order so newest offers appear first.
+  const statusCountQueries = useQueries({
+    queries: STATUSES.map((s) => {
+      const params = { pageNumber: 1, pageSize: 1, status: offerStatusToApi[s] };
+      return {
+        queryKey: offersKeys.list(params),
+        queryFn: ({ signal }: { signal?: AbortSignal }) => listOffers(params, signal),
+        staleTime: 30_000,
+      };
+    }),
+  });
+
   const offers = useMemo(
-    () => [...(offersPage?.items ?? [])].map(mapApiOffer).reverse(),
+    () => (offersPage?.items ?? []).map(mapApiOffer),
     [offersPage?.items]
   );
 
@@ -89,32 +93,35 @@ const OffersList = () => {
     [productsPage?.items]
   );
 
-  const filtered = offers.filter((o) => {
-    if (!q.trim()) return true;
-    const haystack = [
-      o.id,
-      policyHolderName(o) ?? "",
-      insuredName(o) ?? "",
-      productMap[o.productId]?.name ?? "",
-      o.productId,
-      o.currency,
-      o.status,
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(q.toLowerCase());
-  });
+  // Client search only narrows the current server page (API has no search param).
+  const rows = useMemo(() => {
+    if (!q.trim()) return offers;
+    const needle = q.toLowerCase();
+    return offers.filter((o) => {
+      const holder = o.participants.find((p) => p.role === "policyHolder");
+      const haystack = [
+        o.id,
+        holder?.displayName ?? "",
+        holder?.uniqueIdentifier ?? "",
+        insuredName(o) ?? "",
+        productMap[o.productId]?.name ?? "",
+        o.productId,
+        o.currency,
+        o.status,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [offers, productMap, q]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalCount = offersPage?.totalCount ?? 0;
+  const totalPages = Math.max(1, offersPage?.totalPages ?? offersPage?.pageCount ?? 1);
 
-  const counts = STATUSES.reduce((acc, s) => {
-    acc[s] = offers.filter((o) => o.status === s).length;
+  const counts = STATUSES.reduce((acc, s, i) => {
+    acc[s] = statusCountQueries[i]?.data?.totalCount ?? 0;
     return acc;
   }, {} as Record<OfferStatus, number>);
-
-  const totalCount = offersPage?.totalCount ?? offers.length;
 
   return (
     <AppShell>
@@ -155,14 +162,14 @@ const OffersList = () => {
               <CardDescription>
                 {isLoading
                   ? "Loading…"
-                  : `${filtered.length} match · ${totalCount} total`}
+                  : `${totalCount} total${isFetching && !isLoading ? " · updating…" : ""}`}
               </CardDescription>
             </div>
             <div className="flex gap-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search offer, holder, product…"
+                  placeholder="Search this page…"
                   className="pl-8 h-9 w-[260px]"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -201,14 +208,14 @@ const OffersList = () => {
                       Loading data, please wait…
                     </TableCell>
                   </TableRow>
-                ) : filtered.length === 0 ? (
+                ) : rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
                       No offers match the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paged.map((o) => {
+                  rows.map((o) => {
                     const holderParticipant = o.participants.find((p) => p.role === "policyHolder");
                     const holder = holderParticipant?.displayName?.trim() || null;
                     const insured = insuredName(o);
@@ -259,42 +266,15 @@ const OffersList = () => {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono">{o.createdDate}</TableCell>
                         <TableCell className="text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1.5"
-                              onClick={() => navigate(`/offers/${o.id}`)}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              View
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => navigate(`/offers/${o.id}`)}>
-                                  <Eye className="h-4 w-4 mr-2" />View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => toast.info(`Edit ${o.id}`)}>
-                                  <Edit className="h-4 w-4 mr-2" />Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => toast.success(`${shortId(o.id)} sent for issuance`)}
-                                  disabled={
-                                    o.status === "Bound" ||
-                                    o.status === "Cancelled" ||
-                                    o.status === "Expired"
-                                  }
-                                >
-                                  <Send className="h-4 w-4 mr-2" />Issue
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={() => navigate(`/offers/${o.id}`)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -302,68 +282,15 @@ const OffersList = () => {
                 )}
               </TableBody>
             </Table>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-2.5 text-xs">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span>Rows per page</span>
-              <select
-                className="h-7 rounded border border-border bg-background px-2 text-xs"
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-              >
-                {[10, 20, 50, 100].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <span className="ml-2">
-                {filtered.length === 0
-                  ? "0 of 0"
-                  : `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length}`}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2"
-                disabled={currentPage === 1}
-                onClick={() => setPage(1)}
-              >
-                « First
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2"
-                disabled={currentPage === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                ‹ Prev
-              </Button>
-              <span className="px-2 text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2"
-                disabled={currentPage === totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next ›
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2"
-                disabled={currentPage === totalPages}
-                onClick={() => setPage(totalPages)}
-              >
-                Last »
-              </Button>
-            </div>
-          </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              disabled={isLoading}
+            />
           </div>
         </CardContent>
       </Card>

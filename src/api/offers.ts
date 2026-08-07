@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   OffersAddOfferInsuredPersonRequest,
@@ -275,6 +275,7 @@ export const useListOffers = (query?: {
     queryKey: offersKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listOffers(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** GET /api/offers/{id} */

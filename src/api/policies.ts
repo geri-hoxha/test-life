@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfPolicyResponse,
@@ -48,4 +48,5 @@ export const useListPolicies = (query?: {
     queryKey: policiesKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listPolicies(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });

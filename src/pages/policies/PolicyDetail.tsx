@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,41 +20,92 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, ShieldCheck, FileText, CreditCard, Users, History, Files } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FileText,
+  Files,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { getPolicy, policyStatusColor } from "@/data/policies";
-import { listVersions } from "@/data/productVersions";
-import { listTemplates } from "@/data/templates";
-import { fullName } from "@/data/customers";
-import PremiumBreakdownPanel from "@/components/premium/PremiumBreakdownPanel";
+import { ageFromDob } from "@/data/customers";
 import { useGetPolicy } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
 import { useGetProduct, mapApiProduct } from "@/api/products";
-import { useListPeople } from "@/api/people";
-import { useListCompanies } from "@/api/companies";
-import { customerPath, mergeCustomers } from "@/api/adapters/customers";
+import { customerPath } from "@/api/adapters/customers";
+import { useListDocumentTypes } from "@/api/document-types";
+import { downloadDocumentFile, useGetDocument } from "@/api/documents";
 
 const fmtMoney = (v: number, ccy: string) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(v);
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: ccy,
+    maximumFractionDigits: 2,
+  }).format(v);
+
+const titleCase = (s?: string) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined;
+
+const shortId = (id: string) =>
+  id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
 
 const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
     <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
-    <div className="text-sm font-medium mt-0.5">{value ?? <span className="text-muted-foreground">—</span>}</div>
+    <div className="text-sm font-medium mt-0.5">
+      {value ?? <span className="text-muted-foreground">—</span>}
+    </div>
   </div>
 );
+
+const PartyLink = ({
+  partyId,
+  partyType,
+  displayName,
+}: {
+  partyId?: string;
+  partyType?: "person" | "company";
+  displayName?: string;
+}) => {
+  if (!partyId || !displayName) return <span className="text-muted-foreground">—</span>;
+  return (
+    <Link
+      to={customerPath(partyId, partyType ?? "person")}
+      className="text-primary hover:underline"
+    >
+      {displayName}
+    </Link>
+  );
+};
+
+const formatRate = (
+  rate:
+    | {
+        isFlat?: boolean;
+        flatValue?: number | null;
+        flatValueCurrency?: string | null;
+        percentageValue?: number | null;
+      }
+    | undefined,
+  currency: string,
+) => {
+  if (!rate) return "—";
+  if (rate.isFlat) {
+    return fmtMoney(rate.flatValue ?? 0, rate.flatValueCurrency || currency);
+  }
+  if (rate.percentageValue != null) {
+    return `${rate.percentageValue * 100}%`;
+  }
+  return "—";
+};
 
 const PolicyDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const { data: apiPolicy, isLoading } = useGetPolicy(id ?? "", { enabled: Boolean(id) });
-  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
-  const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
-  const customers = useMemo(
-    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
-    [peoplePage?.items, companiesPage?.items]
-  );
-  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
+  const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
 
   const policy = useMemo(() => {
     if (apiPolicy) return mapApiPolicy(apiPolicy);
@@ -65,8 +117,22 @@ const PolicyDetail = () => {
   });
   const product = useMemo(
     () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
-    [apiProduct]
+    [apiProduct],
   );
+
+  const templateDocumentId =
+    policy?.templateId && policy.templateId !== "N/A" ? policy.templateId : "";
+  const { data: templateDocument } = useGetDocument(templateDocumentId, {
+    enabled: Boolean(templateDocumentId),
+  });
+
+  const documentTypeNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const d of documentTypesPage?.items ?? []) {
+      if (d.id) map[d.id] = d.name ?? d.id;
+    }
+    return map;
+  }, [documentTypesPage?.items]);
 
   if (isLoading) {
     return (
@@ -83,37 +149,30 @@ const PolicyDetail = () => {
       <AppShell>
         <div className="text-center py-20">
           <h1 className="text-xl font-semibold">Policy not found</h1>
-          <Button onClick={() => navigate("/policies")} className="mt-4">Back to Policies</Button>
+          <Button onClick={() => navigate("/policies")} className="mt-4">
+            Back to Policies
+          </Button>
         </div>
       </AppShell>
     );
   }
 
-  const version = listVersions(policy.productId).find((v) => v.id === policy.versionId);
-  const template = listTemplates(policy.productId, policy.versionId).find((t) => t.id === policy.templateId);
-  const holder = getCustomerLocal(policy.policyHolderId);
-  const insured = getCustomerLocal(policy.insuredId);
-  const payer = getCustomerLocal(policy.payerId);
+  const holder = policy.participants.find((p) => p.role === "policyHolder");
+  const payer = policy.participants.find((p) => p.role === "invoiced") ?? holder;
+  const insuredPerson = policy.insuredPersons[0];
+  const insuredName = insuredPerson
+    ? [insuredPerson.firstName, insuredPerson.lastName].filter(Boolean).join(" ")
+    : undefined;
 
-
-  // Mock payments — first year recorded if Active
-  const payments = policy.status === "Active" ? [
-    { id: "PAY-001", date: policy.issueDate, amount: policy.premium, method: "Bank transfer", status: "Settled", reference: `INV-${policy.number}-1` },
-  ] : [];
-
-  // Mock documents from product config
-  const docs = [
-    { name: "Application Form", status: "Uploaded", uploadedBy: policy.issuedBy, uploadedAt: policy.issueDate },
-    { name: "ID Verification", status: "Uploaded", uploadedBy: policy.issuedBy, uploadedAt: policy.issueDate },
-    { name: "Medical Declaration", status: policy.status === "Pending Payment" ? "Pending" : "Uploaded", uploadedBy: policy.issuedBy, uploadedAt: policy.issueDate },
-  ];
-
-  // Mock audit trail
-  const audit = [
-    { ts: policy.issueDate + " 09:14", user: policy.issuedBy, action: "Policy issued", details: `From offer ${policy.offerId}` },
-    { ts: policy.issueDate + " 09:14", user: policy.issuedBy, action: "Status set", details: `→ ${policy.status}` },
-    { ts: policy.issueDate + " 09:13", user: policy.issuedBy, action: "Premium confirmed", details: fmtMoney(policy.premium, policy.currency) },
-  ];
+  const handleDownload = (documentId: string | null | undefined, fileName?: string) => {
+    if (!documentId) {
+      toast.error("Document file is not available");
+      return;
+    }
+    void downloadDocumentFile(documentId, fileName).catch((err) =>
+      toast.error(err instanceof Error ? err.message : "Failed to download file"),
+    );
+  };
 
   return (
     <AppShell>
@@ -125,146 +184,534 @@ const PolicyDetail = () => {
 
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
         <div>
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Policy</div>
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+            Policy
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-semibold tracking-tight font-mono">{policy.number}</h1>
-            <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-medium ${policyStatusColor[policy.status]}`}>{policy.status}</span>
+            <h1 className="text-2xl font-semibold tracking-tight font-mono" title={policy.id}>
+              {shortId(policy.id)}
+            </h1>
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-medium ${policyStatusColor[policy.status]}`}
+            >
+              {policy.status}
+            </span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {product?.name} · issued {policy.issueDate} by {policy.issuedBy} · from offer{" "}
-            <Link to={`/offers/${policy.offerId}`} className="text-primary hover:underline font-mono">{policy.offerId}</Link>
+            {product?.name ?? policy.productId} · issued {policy.issueDate}
+            {policy.offerScheduleYear != null ? ` · schedule ${policy.offerScheduleYear}` : ""} ·
+            from offer{" "}
+            <Link
+              to={`/offers/${policy.offerId}`}
+              className="text-primary hover:underline font-mono"
+              title={policy.offerId}
+            >
+              {shortId(policy.offerId)}
+            </Link>
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <Card><CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold text-primary">{fmtMoney(policy.premium, policy.currency)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-1.5"><CardDescription>Currency</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{policy.currency}</div></CardContent></Card>
-        <Card><CardHeader className="pb-1.5"><CardDescription>Term</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{policy.termYears} yrs</div></CardContent></Card>
-        <Card><CardHeader className="pb-1.5"><CardDescription>Payment</CardDescription></CardHeader>
-          <CardContent><div className="text-sm font-semibold">{policy.paymentMode}</div></CardContent></Card>
-        <Card><CardHeader className="pb-1.5"><CardDescription>Status</CardDescription></CardHeader>
-          <CardContent><div className="text-sm font-semibold flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> {policy.status}</div></CardContent></Card>
+        <Card>
+          <CardHeader className="pb-1.5">
+            <CardDescription>Gross Premium</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-primary">
+              {fmtMoney(policy.premium, policy.currency)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1.5">
+            <CardDescription>Currency</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">{policy.currency}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1.5">
+            <CardDescription>Term</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">{policy.termYears} yrs</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1.5">
+            <CardDescription>Schedule Year</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">{policy.offerScheduleYear ?? "—"}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1.5">
+            <CardDescription>Status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm font-semibold flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              {policy.status}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
-          <TabsTrigger value="summary"><FileText className="h-3.5 w-3.5 mr-1.5" />Summary</TabsTrigger>
-          <TabsTrigger value="payments"><CreditCard className="h-3.5 w-3.5 mr-1.5" />Payments</TabsTrigger>
-          <TabsTrigger value="documents"><Files className="h-3.5 w-3.5 mr-1.5" />Documents</TabsTrigger>
-          <TabsTrigger value="beneficiaries"><Users className="h-3.5 w-3.5 mr-1.5" />Beneficiaries</TabsTrigger>
-          <TabsTrigger value="audit"><History className="h-3.5 w-3.5 mr-1.5" />Audit Trail</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 max-w-3xl">
+          <TabsTrigger value="summary">
+            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            Summary
+          </TabsTrigger>
+          <TabsTrigger value="people">
+            <Users className="h-3.5 w-3.5 mr-1.5" />
+            People
+          </TabsTrigger>
+          <TabsTrigger value="documents">
+            <Files className="h-3.5 w-3.5 mr-1.5" />
+            Documents
+          </TabsTrigger>
+          <TabsTrigger value="beneficiaries">
+            <Users className="h-3.5 w-3.5 mr-1.5" />
+            Beneficiaries
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="summary" className="mt-4">
+        <TabsContent value="summary" className="mt-4 space-y-4">
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base">Policy Details</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-base">Policy Details</CardTitle>
+              </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                <Field label="Product" value={product?.name} />
-                <Field label="Version" value={`${version?.name} (${version?.number})`} />
-                <Field label="Template" value={template?.name} />
-                <Field label="Currency" value={<Badge variant="outline">{policy.currency}</Badge>} />
-                <Field label="Start Date" value={<span className="font-mono text-xs">{policy.startDate}</span>} />
-                <Field label="End Date" value={<span className="font-mono text-xs">{policy.endDate}</span>} />
-                <Field label="Issue Date" value={<span className="font-mono text-xs">{policy.issueDate}</span>} />
-                <Field label="Issued By" value={policy.issuedBy} />
+                <Field label="Product" value={product?.name ?? policy.productId} />
+                <Field
+                  label="Printable template"
+                  value={
+                    templateDocumentId ? (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate" title={templateDocument?.originalFileName}>
+                          {templateDocument?.originalFileName ??
+                            templateDocument?.storedFileName ??
+                            shortId(templateDocumentId)}
+                        </span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                          title="Download template"
+                          onClick={() =>
+                            handleDownload(
+                              templateDocumentId,
+                              templateDocument?.originalFileName ??
+                                templateDocument?.storedFileName,
+                            )
+                          }
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : undefined
+                  }
+                />
+                <Field
+                  label="Currency"
+                  value={<Badge variant="outline">{policy.currency}</Badge>}
+                />
+                <Field
+                  label="Schedule year"
+                  value={
+                    policy.offerScheduleYear != null ? (
+                      <span className="font-mono text-xs">{policy.offerScheduleYear}</span>
+                    ) : undefined
+                  }
+                />
+                <Field
+                  label="Effective from"
+                  value={<span className="font-mono text-xs">{policy.startDate}</span>}
+                />
+                <Field
+                  label="Effective to"
+                  value={<span className="font-mono text-xs">{policy.endDate}</span>}
+                />
+                <Field
+                  label="Issued on"
+                  value={<span className="font-mono text-xs">{policy.issueDate}</span>}
+                />
+                <Field
+                  label="Offer"
+                  value={
+                    <Link
+                      to={`/offers/${policy.offerId}`}
+                      className="text-primary hover:underline font-mono text-xs"
+                      title={policy.offerId}
+                    >
+                      {shortId(policy.offerId)}
+                    </Link>
+                  }
+                />
+                <div className="col-span-2">
+                  <Field
+                    label="Coverage text"
+                    value={
+                      policy.coverageText?.trim() ? (
+                        <span className="whitespace-pre-wrap font-normal">
+                          {policy.coverageText}
+                        </span>
+                      ) : undefined
+                    }
+                  />
+                </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base">Parties</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-base">Parties</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
-                <Field label="Policy Holder" value={holder ? <Link to={customerPath(holder.id, holder.customerType)} className="text-primary hover:underline">{fullName(holder)}</Link> : "—"} />
-                <Field label="Insured Person" value={insured ? <Link to={customerPath(insured.id, insured.customerType)} className="text-primary hover:underline">{fullName(insured)}</Link> : "—"} />
-                <Field label="Payer" value={payer ? <Link to={customerPath(payer.id, payer.customerType)} className="text-primary hover:underline">{fullName(payer)}</Link> : "—"} />
+                <Field
+                  label="Policy Holder"
+                  value={
+                    <PartyLink
+                      partyId={holder?.partyId}
+                      partyType={holder?.partyType}
+                      displayName={holder?.displayName}
+                    />
+                  }
+                />
+                <Field
+                  label="Insured Person"
+                  value={
+                    <PartyLink
+                      partyId={insuredPerson?.personId}
+                      partyType="person"
+                      displayName={insuredName}
+                    />
+                  }
+                />
+                <Field
+                  label="Payer / Invoiced"
+                  value={
+                    <PartyLink
+                      partyId={payer?.partyId}
+                      partyType={payer?.partyType}
+                      displayName={payer?.displayName}
+                    />
+                  }
+                />
               </CardContent>
             </Card>
           </div>
 
-          <div className="mt-4">
-            <PremiumBreakdownPanel
-              data={{
-                currency: policy.currency,
-                grossPremium: policy.premium,
-                taxRate: 0.10,
-                bankCommissionPct: template?.bankCommission ?? product?.bankCommission ?? 0,
-                agentCommissionPct: template?.agentCommission ?? product?.agentCommission ?? 0,
-                reportingCurrency: "EUR",
-              }}
-            />
-          </div>
-        </TabsContent>
-
-
-        <TabsContent value="payments" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Payments</CardTitle>
-              <CardDescription>Recorded premium payments and settlements.</CardDescription>
+              <CardTitle className="text-base">Coverages</CardTitle>
+              <CardDescription>
+                {policy.coverages.length} coverages · total premium{" "}
+                {fmtMoney(policy.premium, policy.currency)}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payments.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">No payments recorded.</TableCell></TableRow>
-                    ) : payments.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{p.date}</TableCell>
-                        <TableCell className="font-mono text-xs">{p.reference}</TableCell>
-                        <TableCell className="text-sm">{p.method}</TableCell>
-                        <TableCell className="text-right font-mono">{fmtMoney(p.amount, policy.currency)}</TableCell>
-                        <TableCell><Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">{p.status}</Badge></TableCell>
+              {policy.coverages.length === 0 ? (
+                <span className="text-sm text-muted-foreground">No coverages on this policy.</span>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Coverage</TableHead>
+                        <TableHead className="text-right">Sum Insured</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                        <TableHead className="text-right">Multiplier</TableHead>
+                        <TableHead className="text-right">Premium</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {policy.coverages.map((c) => (
+                        <TableRow key={c.id || c.coverageId}>
+                          <TableCell>
+                            <div className="text-sm font-medium">
+                              {c.coverageName ?? c.coverageId}
+                            </div>
+                            <div className="font-mono text-[11px] text-muted-foreground">
+                              {c.coverageId}
+                            </div>
+                            {c.coverageDescription?.trim() && (
+                              <div className="text-xs text-muted-foreground mt-1 max-w-xl whitespace-pre-wrap">
+                                {c.coverageDescription}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {fmtMoney(c.sumInsured, policy.currency)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                            {formatRate(c.rateUsed, policy.currency)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                            {c.ratingTableMultiplierUsed != null
+                              ? `${c.ratingTableMultiplierUsed}x`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">
+                            {fmtMoney(c.calculatedPremium, policy.currency)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="people" className="mt-4 space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Policy Holder</CardTitle>
+                <CardDescription>Owns the policy contract</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {holder ? (
+                  <>
+                    <Field
+                      label="Name"
+                      value={
+                        <PartyLink
+                          partyId={holder.partyId}
+                          partyType={holder.partyType}
+                          displayName={holder.displayName}
+                        />
+                      }
+                    />
+                    <Field
+                      label="Identifier"
+                      value={
+                        <span className="font-mono text-xs">{holder.uniqueIdentifier}</span>
+                      }
+                    />
+                    <Field label="Party Type" value={titleCase(holder.partyType)} />
+                    <Field label="Country" value={holder.countryCode} />
+                    <Field
+                      label="Leader"
+                      value={holder.isLeader == null ? undefined : holder.isLeader ? "Yes" : "No"}
+                    />
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Not assigned</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Insured Person</CardTitle>
+                <CardDescription>Life covered by this policy</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {insuredPerson ? (
+                  <>
+                    <Field
+                      label="Name"
+                      value={
+                        <PartyLink
+                          partyId={insuredPerson.personId}
+                          partyType="person"
+                          displayName={insuredName}
+                        />
+                      }
+                    />
+                    <Field
+                      label="Personal ID"
+                      value={
+                        <span className="font-mono text-xs">
+                          {insuredPerson.personalIdentifier}
+                        </span>
+                      }
+                    />
+                    <Field
+                      label="DOB / Age"
+                      value={
+                        insuredPerson.dateOfBirth
+                          ? `${insuredPerson.dateOfBirth} (${ageFromDob(insuredPerson.dateOfBirth)} yrs)`
+                          : undefined
+                      }
+                    />
+                    <Field label="Gender" value={titleCase(insuredPerson.gender)} />
+                    <Field label="Country" value={insuredPerson.countryCode} />
+                    <Field
+                      label="PEP Status"
+                      value={
+                        <Badge
+                          variant="outline"
+                          className={
+                            insuredPerson.isPep
+                              ? "border-destructive/40 text-destructive"
+                              : "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                          }
+                        >
+                          {insuredPerson.isPep ? "Yes" : "No"}
+                        </Badge>
+                      }
+                    />
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Not assigned</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Payer / Invoice Recipient</CardTitle>
+                <CardDescription>Receives invoices, pays premiums</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {payer ? (
+                  <>
+                    <Field
+                      label="Name"
+                      value={
+                        <PartyLink
+                          partyId={payer.partyId}
+                          partyType={payer.partyType}
+                          displayName={payer.displayName}
+                        />
+                      }
+                    />
+                    <Field
+                      label="Identifier"
+                      value={
+                        <span className="font-mono text-xs">{payer.uniqueIdentifier}</span>
+                      }
+                    />
+                    <Field label="Party Type" value={titleCase(payer.partyType)} />
+                    <Field label="Country" value={payer.countryCode} />
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Not assigned</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {policy.insuredPersons.length > 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">All Insured Persons</CardTitle>
+                <CardDescription>
+                  {policy.insuredPersons.length} insured persons on this policy.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Identifier</TableHead>
+                        <TableHead>DOB</TableHead>
+                        <TableHead>Gender</TableHead>
+                        <TableHead>Country</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {policy.insuredPersons.map((ip) => {
+                        const name = [ip.firstName, ip.lastName].filter(Boolean).join(" ");
+                        return (
+                          <TableRow key={ip.id}>
+                            <TableCell>
+                              <PartyLink
+                                partyId={ip.personId}
+                                partyType="person"
+                                displayName={name}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {ip.personalIdentifier ?? "—"}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {ip.dateOfBirth ?? "—"}
+                            </TableCell>
+                            <TableCell>{titleCase(ip.gender) ?? "—"}</TableCell>
+                            <TableCell>{ip.countryCode ?? "—"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Documents</CardTitle>
-              <CardDescription>Underwriting and policy documents on file.</CardDescription>
+              <CardDescription>
+                {policy.documents.length} documents attached to this policy.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Document</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Uploaded By</TableHead>
-                      <TableHead>Uploaded At</TableHead>
+                      <TableHead>Document Type</TableHead>
+                      <TableHead>Document ID</TableHead>
+                      <TableHead className="w-[100px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {docs.map((d, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-sm">{d.name}</TableCell>
-                        <TableCell>
-                          <Badge variant={d.status === "Uploaded" ? "outline" : "secondary"}>{d.status}</Badge>
+                    {policy.documents.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center py-6 text-sm text-muted-foreground"
+                        >
+                          No documents on this policy.
                         </TableCell>
-                        <TableCell className="text-sm">{d.uploadedBy}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{d.uploadedAt}</TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      policy.documents.map((d) => {
+                        const typeName =
+                          documentTypeNameById[d.documentTypeId] ?? d.documentTypeId;
+                        return (
+                          <TableRow key={d.id || `${d.documentTypeId}-${d.documentId}`}>
+                            <TableCell>
+                              <div className="text-sm font-medium">{typeName}</div>
+                              <div className="font-mono text-[11px] text-muted-foreground">
+                                {d.documentTypeId}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs" title={d.documentId ?? undefined}>
+                              {d.documentId ? shortId(d.documentId) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                disabled={!d.documentId}
+                                onClick={() => handleDownload(d.documentId, typeName)}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                Download
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -276,7 +723,12 @@ const PolicyDetail = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Beneficiaries</CardTitle>
-              <CardDescription>{policy.beneficiaries.length} beneficiaries · total {policy.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%</CardDescription>
+              <CardDescription>
+                {policy.beneficiaries.length} beneficiaries
+                {policy.beneficiaries.length > 0
+                  ? ` · total share ${policy.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%`
+                  : ""}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -284,56 +736,39 @@ const PolicyDetail = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Customer</TableHead>
-                      <TableHead>Relationship</TableHead>
-                      <TableHead className="text-right">Percentage</TableHead>
+                      <TableHead>Identifier</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Share</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {policy.beneficiaries.length === 0 ? (
-                      <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No beneficiaries</TableCell></TableRow>
-                    ) : policy.beneficiaries.map((b) => {
-                      const c = getCustomerLocal(b.customerId);
-                      return (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-sm text-muted-foreground py-6"
+                        >
+                          No beneficiaries
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      policy.beneficiaries.map((b) => (
                         <TableRow key={b.id}>
-                          <TableCell>{c ? <Link to={customerPath(c.id, c.customerType)} className="text-primary hover:underline">{fullName(c)}</Link> : "—"}</TableCell>
-                          <TableCell>{b.relationship}</TableCell>
+                          <TableCell>
+                            <PartyLink
+                              partyId={b.customerId}
+                              partyType={b.partyType}
+                              displayName={b.displayName}
+                            />
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {b.uniqueIdentifier ?? "—"}
+                          </TableCell>
+                          <TableCell>{titleCase(b.partyType) ?? "—"}</TableCell>
                           <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="audit" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Audit Trail</CardTitle>
-              <CardDescription>Chronological history of policy events.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Timestamp</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Details</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {audit.map((a, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{a.ts}</TableCell>
-                        <TableCell className="text-sm">{a.user}</TableCell>
-                        <TableCell className="text-sm font-medium">{a.action}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{a.details}</TableCell>
-                      </TableRow>
-                    ))}
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
