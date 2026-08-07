@@ -28,8 +28,11 @@ export const useCreatePerson = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: PeopleCreatePersonRequest) => createPerson(body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
+    onSuccess: (data) => {
+      if (data.id) {
+        queryClient.setQueryData(peopleKeys.detail(data.id), data);
+      }
+      void queryClient.invalidateQueries({ queryKey: peopleKeys.lists() });
     },
   });
 };
@@ -88,8 +91,9 @@ export const useUpdatePerson = () => {
       body: PeopleUpdatePersonRequest;
     }) =>
       updatePerson(vars.id, vars.body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
+    onSuccess: (data, vars) => {
+      queryClient.setQueryData(peopleKeys.detail(vars.id), data);
+      void queryClient.invalidateQueries({ queryKey: peopleKeys.lists() });
     },
   });
 };

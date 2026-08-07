@@ -64,7 +64,7 @@ const RecentOffersTable = () => {
           {isLoading ? (
             <TableRow>
               <TableCell colSpan={4} className="text-center py-8 text-sm text-muted-foreground">
-                Loading offers…
+                Loading data, please wait…
               </TableCell>
             </TableRow>
           ) : offers.length === 0 ? (

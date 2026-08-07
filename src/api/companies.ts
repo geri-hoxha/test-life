@@ -34,8 +34,9 @@ export const useAddCompanyAddress = () => {
       body: CompaniesAddCompanyAddressRequest;
     }) =>
       addCompanyAddress(vars.companyId, vars.body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
+    onSuccess: (_data, vars) => {
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.detail(vars.companyId) });
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
     },
   });
 };
@@ -53,8 +54,11 @@ export const useCreateCompany = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CompaniesCreateCompanyRequest) => createCompany(body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
+    onSuccess: (data) => {
+      if (data.id) {
+        queryClient.setQueryData(companiesKeys.detail(data.id), data);
+      }
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
     },
   });
 };
@@ -113,8 +117,14 @@ export const useUpdateCompany = () => {
       body: CompaniesUpdateCompanyRequest;
     }) =>
       updateCompany(vars.id, vars.body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
+    onSuccess: (data, vars) => {
+      // Keep existing addresses if the PUT response omits them.
+      queryClient.setQueryData(companiesKeys.detail(vars.id), (prev: CompaniesCompanyResponse | undefined) => ({
+        ...prev,
+        ...data,
+        addresses: data.addresses ?? prev?.addresses,
+      }));
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
     },
   });
 };
@@ -135,8 +145,9 @@ export const useRemoveCompanyAddress = () => {
       addressEntryId: string;
     }) =>
       removeCompanyAddress(vars.companyId, vars.addressEntryId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
+    onSuccess: (_data, vars) => {
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.detail(vars.companyId) });
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
     },
   });
 };

@@ -114,11 +114,12 @@ export const useUpdateDocument = () => {
   });
 };
 
-/** GET /api/documents/{id}/file — OpenAPI documents this as 204 No Content. */
-export const getDocumentFile = async (id: string, signal?: AbortSignal): Promise<void> =>
-  apiRequest<void>({
+/** GET /api/documents/{id}/file */
+export const getDocumentFile = async (id: string, signal?: AbortSignal): Promise<Blob> =>
+  apiRequest<Blob>({
     method: "GET",
     path: `/api/documents/${encodeURIComponent(id)}/file`,
+    binary: true,
     signal,
   });
 
@@ -128,6 +129,20 @@ export const useGetDocumentFile = (id: string, options?: { enabled?: boolean }) 
     queryFn: ({ signal }) => getDocumentFile(id, signal),
     enabled: Boolean(id) && (options?.enabled ?? true),
   });
+
+/** Browser download for GET /api/documents/{id}/file */
+export const downloadDocumentFile = async (id: string, fileName?: string) => {
+  const blob = await getDocumentFile(id);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName?.trim() || "document";
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
 
 /** Helper to build multipart body for \`createDocument\`. */
 export const buildCreateDocumentFormData = (file: Blob, fileName?: string) => {

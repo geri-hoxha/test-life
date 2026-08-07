@@ -14,7 +14,7 @@ import {
 import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
-import { customerPath, mergeCustomers } from "@/api/adapters/customers";
+import { customerPath, mergeCustomers, newOfferPath } from "@/api/adapters/customers";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -227,8 +227,8 @@ const CustomersList = () => {
                     <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
                       <Link to={customerPath(c.id, c.customerType, { edit: true })}><Pencil className="h-3.5 w-3.5 mr-1" /> Edit</Link>
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-accent hover:text-accent hover:bg-accent-soft">
-                      <FileText className="h-3.5 w-3.5 mr-1" /> New Offer
+                    <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs text-accent hover:text-accent hover:bg-accent-soft">
+                      <Link to={newOfferPath(c.id, c.customerType)}><FileText className="h-3.5 w-3.5 mr-1" /> New Offer</Link>
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

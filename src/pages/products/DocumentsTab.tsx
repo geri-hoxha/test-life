@@ -11,9 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Trash2, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
-import {
-  ProductDocument, DocumentAppliesWhen,
-} from "@/data/documents";
+import { ProductDocument } from "@/data/documents";
 import DocumentDialog from "./DocumentDialog";
 import {
   useGetProduct,
@@ -34,16 +32,20 @@ type Props = { productId: string };
 
 const VERSION_NA = "N/A";
 
-const appliesBadge = (a: DocumentAppliesWhen) => {
-  switch (a) {
-    case "Always": return "bg-success/15 text-success";
-    case "Sum insured above threshold": return "bg-accent-soft text-accent-soft-foreground";
-    case "Total exposure above threshold": return "bg-accent-soft text-accent-soft-foreground";
-    case "Age above threshold": return "bg-accent-soft text-accent-soft-foreground";
-    case "PEP detected": return "bg-warning/20 text-warning-foreground";
-    case "Manual verification required": return "bg-destructive/10 text-destructive";
-    case "Conditional": return "bg-muted text-muted-foreground";
+const formatAmount = (value: number | null | undefined) => {
+  if (value == null) return "—";
+  return value.toLocaleString();
+};
+
+const YesNoBadge = ({ value }: { value: boolean | null | undefined }) => {
+  if (value == null) {
+    return <span className="text-muted-foreground">—</span>;
   }
+  return value ? (
+    <Badge className="bg-success/15 text-success border-0">Yes</Badge>
+  ) : (
+    <Badge className="bg-muted text-muted-foreground border-0">No</Badge>
+  );
 };
 
 const DocumentsTab = ({ productId }: Props) => {
@@ -137,8 +139,8 @@ const DocumentsTab = ({ productId }: Props) => {
     );
   }
 
-  const mandatoryCount = docs.filter((d) => d.isMandatory).length;
-  const conditionalCount = docs.filter((d) => d.appliesWhen !== "Always").length;
+  const alwaysRequiredCount = docs.filter((d) => d.isMandatory).length;
+  const conditionalCount = docs.filter((d) => !d.isMandatory).length;
 
   return (
     <>
@@ -146,7 +148,7 @@ const DocumentsTab = ({ productId }: Props) => {
         <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-xl">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
-            Document requirements use the document-types API. Versioning is not available yet (shown as {VERSION_NA}).
+            Product document types and their <span className="font-mono">requiredFor</span> rules from the product API.
           </span>
         </div>
         <Button size="sm" onClick={openNew} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
@@ -156,12 +158,12 @@ const DocumentsTab = ({ productId }: Props) => {
 
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Card className="p-4 shadow-card border-border">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Total documents</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Total</div>
           <div className="text-2xl font-semibold mt-1">{docs.length}</div>
         </Card>
         <Card className="p-4 shadow-card border-border">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Mandatory</div>
-          <div className="text-2xl font-semibold mt-1">{mandatoryCount}</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Always required</div>
+          <div className="text-2xl font-semibold mt-1">{alwaysRequiredCount}</div>
         </Card>
         <Card className="p-4 shadow-card border-border">
           <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Conditional</div>
@@ -174,7 +176,7 @@ const DocumentsTab = ({ productId }: Props) => {
           <div>
             <h3 className="text-sm font-semibold text-foreground">Required documents</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Documents collected during application. Templates inherit this list.
+              All fields from <span className="font-mono">productDocumentTypes</span> / <span className="font-mono">requiredFor</span>.
             </p>
           </div>
         </div>
@@ -183,72 +185,71 @@ const DocumentsTab = ({ productId }: Props) => {
           <div className="flex items-start gap-2 px-5 py-3 bg-accent-soft/40 border-b border-border text-xs">
             <Info className="h-4 w-4 mt-0.5 text-accent shrink-0" />
             <span className="text-accent-soft-foreground">
-              No documents configured. Add the standard ID and beneficiary documents to get started.
+              No documents configured. Add document types to get started.
             </span>
           </div>
         )}
 
-        <Table>
+        <div className="overflow-x-auto">
+          <Table>
             <TableHeader>
-            <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Document</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Document Type ID</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Always required</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Rules</TableHead>
-              <TableHead className="text-right text-xs uppercase tracking-wider font-semibold text-muted-foreground">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {docs.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-10">
-                  No documents yet. Click <span className="font-medium text-foreground">Add Document</span> to create one.
-                </TableCell>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Document</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Always required</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Insured amount over</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Total exposure over</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Age over</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">PEP</TableHead>
+                <TableHead className="text-right text-xs uppercase tracking-wider font-semibold text-muted-foreground">Actions</TableHead>
               </TableRow>
-            )}
-            {docs.map((d) => (
-              <TableRow key={d.id} className="hover:bg-accent-soft/40">
-                <TableCell>
-                  <div className="flex items-start gap-2">
-                    <FileText className="h-4 w-4 text-accent mt-0.5 shrink-0" />
-                    <div>
-                      <div className="font-medium text-foreground">{d.name}</div>
-                      {d.documentTypeId && (
-                        <div className="font-mono text-xs text-accent mt-0.5">{d.documentTypeId}</div>
-                      )}
-                      {d.notes && (
-                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1 max-w-md">{d.notes}</div>
-                      )}
+            </TableHeader>
+            <TableBody>
+              {docs.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
+                    No documents yet. Click <span className="font-medium text-foreground">Add Document</span> to create one.
+                  </TableCell>
+                </TableRow>
+              )}
+              {docs.map((d) => (
+                <TableRow key={d.id} className="hover:bg-accent-soft/40">
+                  <TableCell>
+                    <div className="flex items-start gap-2 min-w-[10rem]">
+                      <FileText className="h-4 w-4 text-accent mt-0.5 shrink-0" />
+                      <div>
+                        <div className="font-medium text-foreground">{d.name}</div>
+                        {d.notes && (
+                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2 max-w-xs">{d.notes}</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{d.documentTypeId ?? "—"}</TableCell>
-                <TableCell>
-                  {d.isMandatory ? (
-                    <Badge className="bg-success/15 text-success border-0">Required</Badge>
-                  ) : (
-                    <Badge className="bg-muted text-muted-foreground border-0">Optional</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1">
-                    <Badge className={`border-0 w-fit ${appliesBadge(d.appliesWhen)}`}>{d.appliesWhen}</Badge>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => setDeleteId(d.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                  </TableCell>
+                  <TableCell>
+                    <YesNoBadge value={d.isMandatory} />
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">{formatAmount(d.insuredAmountOver)}</TableCell>
+                  <TableCell className="font-mono text-sm">{formatAmount(d.totalExposureOver)}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {d.ageOver == null ? "—" : d.ageOver}
+                  </TableCell>
+                  <TableCell>
+                    <YesNoBadge value={d.isPep} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => setDeleteId(d.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       {dialogOpen && (

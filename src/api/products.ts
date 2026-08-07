@@ -4,9 +4,11 @@ import type {
   PaginationPagedListOfProductResponse,
   ProductsAddProductCoverageRequest,
   ProductsAddProductDocumentTypeRequest,
+  ProductsAddProductPaymentMethodRequest,
   ProductsCreateProductRequest,
   ProductsProductCoverageResponse,
   ProductsProductDocumentTypeResponse,
+  ProductsProductPaymentMethodResponse,
   ProductsProductResponse,
   ProductsUpdateProductRequest,
 } from "./types";
@@ -59,6 +61,57 @@ export const useAddProductDocumentType = () => {
       body: ProductsAddProductDocumentTypeRequest;
     }) =>
       addProductDocumentType(vars.productId, vars.body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: productsKeys.all });
+    },
+  });
+};
+
+/** POST /api/products/{productId}/payment-methods */
+export const addProductPaymentMethod = async (
+  productId: string,
+  body: ProductsAddProductPaymentMethodRequest,
+  signal?: AbortSignal,
+): Promise<ProductsProductPaymentMethodResponse> =>
+  apiRequest<ProductsProductPaymentMethodResponse>({
+    method: "POST",
+    path: `/api/products/${encodeURIComponent(productId)}/payment-methods`,
+    body,
+    signal,
+  });
+
+export const useAddProductPaymentMethod = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      productId: string;
+      body: ProductsAddProductPaymentMethodRequest;
+    }) => addProductPaymentMethod(vars.productId, vars.body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: productsKeys.all });
+    },
+  });
+};
+
+/** DELETE /api/products/{productId}/payment-methods/{paymentMethodEntryId} */
+export const removeProductPaymentMethod = async (
+  productId: string,
+  paymentMethodEntryId: string,
+  signal?: AbortSignal,
+): Promise<void> =>
+  apiRequest<void>({
+    method: "DELETE",
+    path: `/api/products/${encodeURIComponent(productId)}/payment-methods/${encodeURIComponent(paymentMethodEntryId)}`,
+    signal,
+  });
+
+export const useRemoveProductPaymentMethod = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      productId: string;
+      paymentMethodEntryId: string;
+    }) => removeProductPaymentMethod(vars.productId, vars.paymentMethodEntryId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: productsKeys.all });
     },
@@ -230,10 +283,12 @@ export type MappedProduct = {
   bankPartnerCode: string;
   productGroupId?: string;
   coverageText?: string;
+  defaultPrintableTemplateDocumentId?: string | null;
   paymentModel?: string;
   premiumTableId?: string;
   coverages?: ProductsProductCoverageResponse[];
   productDocumentTypes?: ProductsProductDocumentTypeResponse[];
+  paymentMethods?: ProductsProductPaymentMethodResponse[];
   setupDetails?: {
     legacyPacketId: number;
     bankPartnerCode: string;
@@ -296,10 +351,12 @@ export const mapApiProduct = (p: ProductsProductResponse): MappedProduct => {
     bankPartnerCode: p.bankPartnerCode?.trim() || "—",
     productGroupId: p.productGroupId,
     coverageText: p.coverageText,
+    defaultPrintableTemplateDocumentId: p.defaultPrintableTemplateDocumentId ?? null,
     paymentModel: p.paymentModel ?? undefined,
     premiumTableId: p.premiumTableId ?? undefined,
     coverages: p.coverages,
     productDocumentTypes: p.productDocumentTypes,
+    paymentMethods: p.paymentMethods,
     setupDetails: {
       legacyPacketId: 0,
       bankPartnerCode: p.bankPartnerCode?.trim() || "—",

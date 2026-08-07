@@ -19,6 +19,7 @@ import {
   customerPath,
   mapCompanyToCustomer,
   mapPersonToCustomer,
+  newOfferPath,
   parseCustomerPartyType,
 } from "@/api/adapters/customers";
 
@@ -81,6 +82,8 @@ const CustomerDetail = () => {
     return undefined;
   }, [partyType, personQ.data, companyQ.data]);
 
+  const companyAddresses = partyType !== "person" ? (companyQ.data?.addresses ?? []) : [];
+
   const isLoading =
     partyType === "company"
       ? companyQ.isLoading
@@ -135,8 +138,8 @@ const CustomerDetail = () => {
             <Button variant="outline" asChild className="gap-2">
               <Link to={customerPath(customer.id, customer.customerType, { edit: true })}><Pencil className="h-4 w-4" /> Edit</Link>
             </Button>
-            <Button className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <FileText className="h-4 w-4" /> New Offer
+            <Button asChild className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Link to={newOfferPath(customer.id, customer.customerType)}><FileText className="h-4 w-4" /> New Offer</Link>
             </Button>
           </>
         }
@@ -197,7 +200,7 @@ const CustomerDetail = () => {
           {/* <TabsTrigger value="offers">Offers</TabsTrigger>
           <TabsTrigger value="policies">Policies</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger> */}
-          <TabsTrigger value="exposure">Exposure</TabsTrigger>
+          {/* <TabsTrigger value="exposure">Exposure</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -209,6 +212,9 @@ const CustomerDetail = () => {
                   <>
                     <Field icon={BadgeCheck} label="Registration no. / NIPT" value={<span className="font-mono">{customer.nipt}</span>} />
                     <Field icon={Briefcase} label="Company type" value={customer.companyType} />
+                    {customer.tradeName ? (
+                      <Field icon={Briefcase} label="Trade name" value={customer.tradeName} />
+                    ) : null}
                     <Field icon={MapPin} label="Country" value={customer.country} />
                     <Field
                       icon={MapPin}
@@ -233,9 +239,29 @@ const CustomerDetail = () => {
                   </div>
                 </>
               )}
+              {isCompany && companyAddresses.length > 0 && (
+                <div className="border-t border-border mt-4 pt-4">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                    Addresses
+                  </div>
+                  <ul className="space-y-2">
+                    {companyAddresses.map((a) => (
+                      <li key={a.id ?? `${a.street}-${a.city}`} className="text-sm flex items-start gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-accent mt-0.5 shrink-0" />
+                        <span>
+                          {[a.street, a.city, a.postalCode, a.countryCode].filter(Boolean).join(", ")}
+                          {a.isMain ? (
+                            <Badge className="ml-2 bg-success/15 text-success border-0 text-[10px]">Main</Badge>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </Card>
 
-            <Card className="p-5 shadow-card border-border">
+            {/* <Card className="p-5 shadow-card border-border">
               <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-warning" /> Compliance
               </h3>
@@ -254,7 +280,7 @@ const CustomerDetail = () => {
                 </div>
                 <Button variant="outline" size="sm" className="w-full mt-2">Run KYC check</Button>
               </div>
-            </Card>
+            </Card> */}
           </div>
         </TabsContent>
 
@@ -298,7 +324,7 @@ const CustomerDetail = () => {
           <EmptyTab icon={FileSignature} title="No documents on file" hint="Upload identification, medical declarations and other supporting documents." cta="Upload Document" />
         </TabsContent> */}
 
-        <TabsContent value="exposure">
+        {/* <TabsContent value="exposure">
           <Card className="p-6 shadow-card border-border">
             <h3 className="text-sm font-semibold text-foreground mb-1">Aggregate exposure</h3>
             <p className="text-xs text-muted-foreground mb-5">Total sum insured across all active policies.</p>
@@ -322,7 +348,7 @@ const CustomerDetail = () => {
               Note: exposures above the configured product threshold automatically trigger underwriter review.
             </div>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </AppShell>
   );

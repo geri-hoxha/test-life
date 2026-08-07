@@ -31,11 +31,16 @@ export const offersKeys = {
 };
 
 /** POST /api/offers/{offerId}/schedules/{year}/policy */
-export const issuePolicy = async (offerId: string, year: string, body: PoliciesIssuePolicyRequest, signal?: AbortSignal): Promise<PoliciesPolicyResponse> =>
+export const issuePolicy = async (
+  offerId: string,
+  year: string,
+  body?: PoliciesIssuePolicyRequest,
+  signal?: AbortSignal
+): Promise<PoliciesPolicyResponse> =>
   apiRequest<PoliciesPolicyResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/policy`,
-    body,
+    ...(body !== undefined ? { body } : {}),
     signal,
   });
 
@@ -45,7 +50,7 @@ export const useIssuePolicy = () => {
     mutationFn: (vars: {
       offerId: string;
       year: string;
-      body: PoliciesIssuePolicyRequest;
+      body?: PoliciesIssuePolicyRequest;
     }) =>
       issuePolicy(vars.offerId, vars.year, vars.body),
     onSuccess: () => {

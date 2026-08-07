@@ -198,7 +198,7 @@ const OffersList = () => {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading offers…
+                      Loading data, please wait…
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (

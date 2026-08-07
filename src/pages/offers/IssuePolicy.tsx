@@ -218,7 +218,6 @@ const IssuePolicy = () => {
       const policy = await issuePolicy.mutateAsync({
         offerId: offer.id,
         year: scheduleYear,
-        body: {},
       });
       const policyId = policy.id ?? offer.id;
       toast.success(`Policy ${policyId} issued successfully`);

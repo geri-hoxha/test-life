@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { format, parseISO } from "date-fns";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,9 +53,14 @@ import { ageFromDob } from "@/data/customers";
 import { Beneficiary, PaymentMode } from "@/data/offers";
 import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListProductGroups } from "@/api/product-groups";
-import { useListPeople } from "@/api/people";
-import { useListCompanies } from "@/api/companies";
-import { mergeCustomers } from "@/api/adapters/customers";
+import { useListPeople, useGetPerson } from "@/api/people";
+import { useListCompanies, useGetCompany } from "@/api/companies";
+import {
+  mapCompanyToCustomer,
+  mapPersonToCustomer,
+  mergeCustomers,
+  parseCustomerPartyType,
+} from "@/api/adapters/customers";
 import {
   useCreateOffer,
   useAddOfferParticipant,
@@ -203,6 +208,9 @@ const SectionNav = () => (
 
 const CreateOffer = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const prefillCustomerId = searchParams.get("customerId")?.trim() ?? "";
+  const prefillPartyType = parseCustomerPartyType(searchParams.get("type"));
   const createOffer = useCreateOffer();
   const addParticipant = useAddOfferParticipant();
   const addInsured = useAddOfferInsuredPerson();
@@ -220,6 +228,12 @@ const CreateOffer = () => {
     pageNumber: 1,
     pageSize: 200,
   });
+  const prefillPersonQ = useGetPerson(prefillCustomerId, {
+    enabled: Boolean(prefillCustomerId) && prefillPartyType !== "company",
+  });
+  const prefillCompanyQ = useGetCompany(prefillCustomerId, {
+    enabled: Boolean(prefillCustomerId) && prefillPartyType === "company",
+  });
   const { data: productGroupsPage } = useListProductGroups({
     pageNumber: 1,
     pageSize: 200,
@@ -228,10 +242,25 @@ const CreateOffer = () => {
     pageNumber: 1,
     pageSize: 200,
   });
-  const customers = useMemo(
-    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
-    [peoplePage?.items, companiesPage?.items],
-  );
+  const customers = useMemo(() => {
+    const merged = mergeCustomers(peoplePage?.items, companiesPage?.items);
+    const byId = new Map(merged.map((c) => [c.id, c]));
+    if (prefillPartyType !== "company" && prefillPersonQ.data?.id) {
+      const mapped = mapPersonToCustomer(prefillPersonQ.data);
+      if (!byId.has(mapped.id)) byId.set(mapped.id, mapped);
+    }
+    if (prefillPartyType === "company" && prefillCompanyQ.data?.id) {
+      const mapped = mapCompanyToCustomer(prefillCompanyQ.data);
+      if (!byId.has(mapped.id)) byId.set(mapped.id, mapped);
+    }
+    return Array.from(byId.values());
+  }, [
+    peoplePage?.items,
+    companiesPage?.items,
+    prefillPartyType,
+    prefillPersonQ.data,
+    prefillCompanyQ.data,
+  ]);
   /** Insured persons API only accepts people (not companies). */
   const peopleOnly = useMemo(
     () => customers.filter((c) => c.customerType === "Individual"),
@@ -262,7 +291,32 @@ const CreateOffer = () => {
   const [policyHolderId, setPolicyHolderId] = useState("");
   const [payerId, setPayerId] = useState("");
   const [insuredId, setInsuredId] = useState("");
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const prefillApplied = useRef(false);
+
+  useEffect(() => {
+    if (prefillApplied.current || !prefillCustomerId) return;
+    const customer = getCustomerLocal(prefillCustomerId);
+    if (!customer) return;
+
+    prefillApplied.current = true;
+    setPolicyHolderId(customer.id);
+    setPayerId(customer.id);
+    if (customer.customerType === "Individual") {
+      setInsuredId(customer.id);
+    }
+  }, [prefillCustomerId, customers]);
+
+  type BeneficiaryDraft = Omit<Beneficiary, "percentage"> & {
+    percentage: number | "";
+  };
+  const [beneficiaries, setBeneficiaries] = useState<BeneficiaryDraft[]>([
+    {
+      id: `b-${Date.now()}`,
+      customerId: "",
+      relationship: "",
+      percentage: "",
+    },
+  ]);
   type CreateCustomerTarget =
     | "policyHolder"
     | "payer"
@@ -290,7 +344,6 @@ const CreateOffer = () => {
   const [hasLoan, setHasLoan] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
-  const [loanTermYears, setLoanTermYears] = useState("");
   const [outstandingBalance, setOutstandingBalance] = useState("");
   const loanFileRef = useRef<HTMLInputElement>(null);
   const [loanFileName, setLoanFileName] = useState<string | null>(null);
@@ -359,19 +412,17 @@ const CreateOffer = () => {
 
       const amt = pick("loan amount", "amount", "principal");
       const ir = pick("interest rate", "mortgage interest rate", "rate");
-      const term = pick("loan term", "loan term (years)", "term", "term years");
       const out = pick("outstanding balance", "outstanding", "balance");
 
       if (amt) setLoanAmount(amt);
       if (ir) setInterestRate(ir);
-      if (term) setLoanTermYears(term);
       if (out) setOutstandingBalance(out);
       setManualLoans(false);
       setManualLoanRows([]);
       setHasLoan(true);
       setLoanFileName(file.name);
 
-      const filled = [amt, ir, term, out].filter(Boolean).length;
+      const filled = [amt, ir, out].filter(Boolean).length;
       if (filled === 0) {
         toast.error(
           "No loan fields recognized in the file. Use a two-column sheet: Field | Value.",
@@ -430,11 +481,11 @@ const CreateOffer = () => {
         id: `b-${Date.now()}`,
         customerId: "",
         relationship: "",
-        percentage: 0,
+        percentage: "",
       },
     ]);
   };
-  const updateBeneficiary = (id: string, patch: Partial<Beneficiary>) => {
+  const updateBeneficiary = (id: string, patch: Partial<BeneficiaryDraft>) => {
     setBeneficiaries((prev) =>
       prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
     );
@@ -525,7 +576,7 @@ const CreateOffer = () => {
         : hasLoan
           ? buildLoanDisbursements({
               startDate,
-              loanTermYears: Number(loanTermYears) || 0,
+              loanTermYears: termYears,
               principal:
                 Number(outstandingBalance) || Number(loanAmount) || 0,
             })
@@ -869,18 +920,34 @@ const CreateOffer = () => {
                                 placeholder="Select customer"
                                 triggerClassName="h-9"
                               />
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="px-0 absolute left-0 top-full h-7 text-xs text-blue-400 hover:text-blue-500"
-                                onClick={() =>
-                                  setCreateCustomerTarget({
-                                    beneficiaryId: b.id,
-                                  })
-                                }
-                              >
-                                Create a new customer
-                              </Button>
+                              <div className="absolute left-0 top-full flex flex-wrap items-center gap-x-3">
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                                  onClick={() =>
+                                    setCreateCustomerTarget({
+                                      beneficiaryId: b.id,
+                                    })
+                                  }
+                                >
+                                  Create a new customer
+                                </Button>
+                                {policyHolderId && (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="px-0 h-7 text-xs"
+                                    onClick={() =>
+                                      updateBeneficiary(b.id, {
+                                        customerId: policyHolderId,
+                                      })
+                                    }
+                                  >
+                                    Same as policy holder
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -890,11 +957,13 @@ const CreateOffer = () => {
                                 min={0}
                                 max={100}
                                 value={b.percentage}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  const raw = e.target.value;
                                   updateBeneficiary(b.id, {
-                                    percentage: Number(e.target.value),
-                                  })
-                                }
+                                    percentage:
+                                      raw === "" ? "" : Number(raw),
+                                  });
+                                }}
                                 className="h-9 pr-7"
                               />
                               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -1058,8 +1127,9 @@ const CreateOffer = () => {
                   <Label>Loan Term (Years)</Label>
                   <Input
                     type="number"
-                    value={loanTermYears}
-                    onChange={(e) => setLoanTermYears(e.target.value)}
+                    value={termYears}
+                    readOnly
+                    className="bg-muted"
                   />
                 </div>
                 <div>
@@ -1242,7 +1312,7 @@ const CreateOffer = () => {
                 ? {
                     amount: Number(loanAmount) || 0,
                     interestRate: Number(interestRate) || 0,
-                    loanTermYears: Number(loanTermYears) || 0,
+                    loanTermYears: termYears,
                     outstandingBalance: Number(outstandingBalance) || 0,
                   }
                 : undefined

@@ -5,7 +5,6 @@ import PageHeader from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,96 +12,76 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 import {
-  ProductStatus, Product,
-  POLICY_TYPES, INSURANCE_AMOUNT_TYPES,
-  PREMIUM_PAYMENT_TYPES, PACKET_PAYMENT_TYPES, PACKET_RENEWAL_TYPES,
-  PACKET_LOAN_TYPES, LOAN_PRODUCT_TYPES, ACTUARIAL_CODES,
-  PAYMENT_MODELS,
-  listPremiumTables, addPremiumTable, updatePremiumTable,
-  PremiumTableItem,
-  ProductSetupDetails, ProductPaymentDetails, ProductLoanDetails,
-  ProductInternalDetails, ProductExternalDetails, PaymentModel,
-} from "@/data/products";
-import { useGetProduct, useUpdateProduct, mapApiProduct, type MappedProduct } from "@/api/products";
+  useGetProduct,
+  useUpdateProduct,
+  mapApiProduct,
+  useAddProductPaymentMethod,
+  useRemoveProductPaymentMethod,
+} from "@/api/products";
 import { useListProductGroups } from "@/api/product-groups";
-import { Check, AlertCircle, ScrollText, Save, X, Plus, Trash2 } from "lucide-react";
+import { useListDocuments } from "@/api/documents";
+import { useListBankAccounts } from "@/api/bank-accounts";
+import { BankAccountCombobox } from "@/components/BankAccountCombobox";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
 import CoveragesTab from "./CoveragesTab";
 import DocumentsTab from "./DocumentsTab";
-import CurrenciesTab from "./CurrenciesTab";
-
-const statusClass: Record<ProductStatus, string> = {
-  Active: "bg-success/15 text-success",
-  Draft: "bg-muted text-muted-foreground",
-  Inactive: "bg-destructive/10 text-destructive",
-};
 
 const ALL_CURRENCIES = ["EUR", "ALL", "USD", "GBP", "CHF"];
 
-
-const FLAG_DEFS: { key: keyof Product["flags"]; label: string; hint: string }[] = [
-  { key: "pep", label: "PEP check required", hint: "Politically Exposed Persons trigger enhanced due-diligence." },
-  { key: "highInsuredAmount", label: "High insured amount requires review", hint: "Sum insured above the product threshold goes to manual review." },
-  { key: "totalExposure", label: "Total customer exposure requires review", hint: "If the customer's combined exposure across policies exceeds the limit." },
-  { key: "manualUnderwriting", label: "Manual underwriting required", hint: "Every application is routed to an underwriter regardless of other rules." },
-  { key: "compliance", label: "Compliance review required", hint: "An additional compliance officer sign-off is mandatory before issuance." },
-];
-
 type EditableFields = {
   name: string;
-  code: string;
-  status: ProductStatus;
-  type: string;
-  description: string;
+  coverageText: string;
   currencies: string[];
-  requiredDocuments: string[];
-  agentCommissionPct: string;
-  bankCommissionPct: string;
+  defaultPrintableTemplateDocumentId: string;
+  bankAccountId: string;
 };
 
 const ProductDetail = () => {
   const { id } = useParams();
   const { data: apiProduct, isLoading, isError } = useGetProduct(id ?? "", { enabled: Boolean(id) });
   const updateProductMutation = useUpdateProduct();
+  const addPaymentMethod = useAddProductPaymentMethod();
+  const removePaymentMethod = useRemoveProductPaymentMethod();
   const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
+  const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
+  const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
 
   const product = useMemo(
     () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
     [apiProduct]
   );
 
+  const templateDocuments = documentsPage?.items ?? [];
+  const bankAccounts = bankAccountsPage?.items ?? [];
+
   const productGroupName = useMemo(() => {
     const gid = product?.productGroupId;
     if (!gid) return "—";
     const match = (groupsPage?.items ?? []).find((g) => g.id === gid);
-    return match?.name?.trim() || gid;
+    return match?.english?.trim() || match?.name?.trim() || gid;
   }, [product?.productGroupId, groupsPage?.items]);
 
-  const [flags, setFlags] = useState<Product["flags"] | null>(null);
+  const currentPayment = apiProduct?.paymentMethods?.[0];
+  const currentBankAccountId = currentPayment?.bankAccountId ?? "";
+
   const [fields, setFields] = useState<EditableFields | null>(null);
-  const [newDoc, setNewDoc] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!product) {
-      setFlags(null);
       setFields(null);
       return;
     }
-    setFlags({ ...product.flags });
     setFields({
       name: product.name,
-      code: product.code,
-      status: product.status,
-      type: product.type,
-      description: product.coverageText ?? product.description,
+      coverageText: product.coverageText ?? "",
       currencies: [...product.currencies],
-      requiredDocuments: [...product.requiredDocuments],
-      agentCommissionPct: parseFloat((product.agentCommission * 100).toFixed(6)).toString(),
-      bankCommissionPct: parseFloat((product.bankCommission * 100).toFixed(6)).toString(),
+      defaultPrintableTemplateDocumentId: product.defaultPrintableTemplateDocumentId ?? "",
+      bankAccountId: currentBankAccountId,
     });
-  }, [product]);
+  }, [product, currentBankAccountId]);
 
   if (isLoading) {
     return (
@@ -116,7 +95,7 @@ const ProductDetail = () => {
     );
   }
 
-  if (isError || !product || !flags || !fields) {
+  if (isError || !product || !fields) {
     return (
       <AppShell>
         <PageHeader
@@ -131,36 +110,12 @@ const ProductDetail = () => {
     );
   }
 
-  const dirty = JSON.stringify(flags) !== JSON.stringify(product.flags);
-  // Only fields returned/accepted by GET/PUT product are considered for Save.
   const fieldsDirty =
     fields.name !== product.name ||
-    fields.description !== (product.coverageText ?? product.description) ||
-    JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies);
-
-  const toggleFlag = (key: keyof Product["flags"]) =>
-    setFlags((f) => (f ? { ...f, [key]: !f[key] } : f));
-
-  const saveFlags = () => {
-    toast.message("Verification rules are not persisted yet — API support coming later.");
-  };
-
-  const saveFields = () => {
-    updateProductMutation.mutate(
-      {
-        id: product.id,
-        body: {
-          name: fields.name.trim(),
-          supportedCurrencies: fields.currencies,
-          coverageText: fields.description.trim() || undefined,
-        },
-      },
-      {
-        onSuccess: () => toast.success("Product details saved"),
-        onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to save"),
-      }
-    );
-  };
+    fields.coverageText !== (product.coverageText ?? "") ||
+    JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
+    fields.defaultPrintableTemplateDocumentId !== (product.defaultPrintableTemplateDocumentId ?? "") ||
+    fields.bankAccountId !== currentBankAccountId;
 
   const toggleCurrency = (c: string) =>
     setFields((f) =>
@@ -169,27 +124,76 @@ const ProductDetail = () => {
         : f
     );
 
-  const addDoc = () => {
-    const v = newDoc.trim();
-    if (!v) return;
-    setFields((f) => (f ? { ...f, requiredDocuments: [...f.requiredDocuments, v] } : f));
-    setNewDoc("");
+  const saveFields = async () => {
+    if (!fields.name.trim()) {
+      toast.error("Product name is required");
+      return;
+    }
+    if (fields.currencies.length === 0) {
+      toast.error("Select at least one currency");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateProductMutation.mutateAsync({
+        id: product.id,
+        body: {
+          name: fields.name.trim(),
+          supportedCurrencies: fields.currencies,
+          coverageText: fields.coverageText.trim() || undefined,
+          defaultPrintableTemplateDocumentId: fields.defaultPrintableTemplateDocumentId || null,
+        },
+      });
+
+      if (fields.bankAccountId !== currentBankAccountId) {
+        if (currentPayment?.id != null) {
+          await removePaymentMethod.mutateAsync({
+            productId: product.id,
+            paymentMethodEntryId: String(currentPayment.id),
+          });
+        }
+        if (fields.bankAccountId) {
+          await addPaymentMethod.mutateAsync({
+            productId: product.id,
+            body: { bankAccountId: fields.bankAccountId },
+          });
+        }
+      }
+
+      toast.success("Product details saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const removeDoc = (d: string) =>
-    setFields((f) => (f ? { ...f, requiredDocuments: f.requiredDocuments.filter((x) => x !== d) } : f));
+  const templateLabel = (docId: string) => {
+    if (!docId) return "—";
+    const doc = templateDocuments.find((d) => d.id === docId);
+    return doc?.originalFileName ?? doc?.storedFileName ?? docId;
+  };
 
-  const flagList = FLAG_DEFS.map((f) => ({ ...f, on: flags[f.key] }));
+  const paymentLabel = () => {
+    if (!currentBankAccountId) return "—";
+    const account = bankAccounts.find((a) => a.id === currentBankAccountId);
+    if (!account) {
+      return [currentPayment?.currency, currentBankAccountId].filter(Boolean).join(" · ") || "—";
+    }
+    return [account.bankName, account.currency ?? currentPayment?.currency, account.iban || account.accountNumber]
+      .filter(Boolean)
+      .join(" · ");
+  };
 
   return (
     <AppShell>
       <PageHeader
         breadcrumbs={[{ label: "Products", to: "/products" }, { label: product.name }]}
         title={product.name}
-        description={product.coverageText?.trim() || product.description || undefined}
+        description={product.coverageText?.trim() || undefined}
       />
 
-      {/* Summary strip */}
       <Card className="p-5 mb-6 shadow-card border-border">
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
           <div>
@@ -217,32 +221,14 @@ const ProductDetail = () => {
             <div className="text-sm mt-0.5">{apiProduct?.productDocumentTypes?.length ?? 0}</div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Code</div>
-            <div className="font-mono text-sm text-accent mt-0.5">{product.code}</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Payment method</div>
+            <div className="text-sm mt-0.5 max-w-xs truncate" title={paymentLabel()}>{paymentLabel()}</div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</div>
-            <Badge className={`mt-0.5 font-medium border-0 ${statusClass[product.status]}`}>{product.status}</Badge>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Type</div>
-            <div className="text-sm mt-0.5">{product.type}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Active Version</div>
-            <div className="font-mono text-sm mt-0.5">{product.activeVersion}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Created</div>
-            <div className="text-sm mt-0.5">{product.createdDate}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Agent Comm.</div>
-            <div className="font-mono text-sm mt-0.5">{(product.agentCommission * 100).toFixed(2)}%</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Bank Comm.</div>
-            <div className="font-mono text-sm mt-0.5">{(product.bankCommission * 100).toFixed(2)}%</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Default template</div>
+            <div className="text-sm mt-0.5 max-w-xs truncate" title={templateLabel(product.defaultPrintableTemplateDocumentId ?? "")}>
+              {templateLabel(product.defaultPrintableTemplateDocumentId ?? "")}
+            </div>
           </div>
         </div>
       </Card>
@@ -250,16 +236,8 @@ const ProductDetail = () => {
       <Tabs defaultValue="overview" className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          {/* <TabsTrigger value="setup">Setup</TabsTrigger>
-          <TabsTrigger value="payment">Payment</TabsTrigger>
-          <TabsTrigger value="loan">Loan</TabsTrigger>
-          <TabsTrigger value="premium-table">Premium Table</TabsTrigger> */}
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
-          {/* <TabsTrigger value="internal">Internal</TabsTrigger>
-          <TabsTrigger value="external">External</TabsTrigger> */}
           <TabsTrigger value="documents">Documents</TabsTrigger>
-          {/* <TabsTrigger value="currencies">Currencies</TabsTrigger>
-          <TabsTrigger value="verification">Verification</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -268,90 +246,71 @@ const ProductDetail = () => {
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Product details</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Name, coverage text, and currencies are saved to the product API.
+                  Fields from GET/PUT product, plus payment method.
                 </p>
               </div>
               <Button
                 size="sm"
-                onClick={saveFields}
-                disabled={!fieldsDirty}
+                onClick={() => void saveFields()}
+                disabled={!fieldsDirty || saving}
                 className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
               >
-                <Save className="h-4 w-4" /> Save changes
+                <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save changes"}
               </Button>
             </div>
 
             <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <Label htmlFor="p-name">Name</Label>
-                <Input id="p-name" value={fields.name} onChange={(e) => setFields({ ...fields, name: e.target.value })} />
+                <Input
+                  id="p-name"
+                  value={fields.name}
+                  onChange={(e) => setFields({ ...fields, name: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Product family</Label>
                 <Input value={productGroupName} readOnly className="bg-muted/40" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="p-code">Code</Label>
-                <Input id="p-code" value={fields.code} onChange={(e) => setFields({ ...fields, code: e.target.value })} className="font-mono" />
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={fields.status} onValueChange={(v) => setFields({ ...fields, status: v as ProductStatus })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="p-type">Type</Label>
-                <Input id="p-type" value={fields.type} onChange={(e) => setFields({ ...fields, type: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="p-agent-comm">Agent Commission (%)</Label>
-                <div className="relative">
-                  <Input
-                    id="p-agent-comm"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={fields.agentCommissionPct}
-                    onChange={(e) => setFields({ ...fields, agentCommissionPct: e.target.value })}
-                    className="pr-7 font-mono"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="p-bank-comm">Bank Commission (%)</Label>
-                <div className="relative">
-                  <Input
-                    id="p-bank-comm"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={fields.bankCommissionPct}
-                    onChange={(e) => setFields({ ...fields, bankCommissionPct: e.target.value })}
-                    className="pr-7 font-mono"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                </div>
-              </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="p-desc">Coverage text</Label>
+                <Label htmlFor="p-coverage">Coverage text</Label>
                 <Textarea
-                  id="p-desc"
+                  id="p-coverage"
                   rows={4}
-                  value={fields.description}
-                  onChange={(e) => setFields({ ...fields, description: e.target.value })}
+                  value={fields.coverageText}
+                  onChange={(e) => setFields({ ...fields, coverageText: e.target.value })}
                   placeholder="Printable coverage text for this product"
                 />
               </div>
-
+              <div className="space-y-2 md:col-span-2">
+                <Label>Default printable template</Label>
+                <Select
+                  value={fields.defaultPrintableTemplateDocumentId || "none"}
+                  onValueChange={(v) =>
+                    setFields({ ...fields, defaultPrintableTemplateDocumentId: v === "none" ? "" : v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select document…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {templateDocuments.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id ?? ""}>
+                        {doc.originalFileName ?? doc.storedFileName ?? doc.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Payment method</Label>
+                <BankAccountCombobox
+                  accounts={bankAccounts}
+                  value={fields.bankAccountId}
+                  onValueChange={(bankAccountId) => setFields({ ...fields, bankAccountId })}
+                />
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Currencies</Label>
                 <div className="flex flex-wrap gap-2">
@@ -374,81 +333,9 @@ const ProductDetail = () => {
                   })}
                 </div>
               </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label>Required documents</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {fields.requiredDocuments.map((d) => (
-                    <Badge key={d} className="bg-accent-soft text-accent-soft-foreground border-0 gap-1 pr-1">
-                      {d}
-                      <button
-                        type="button"
-                        onClick={() => removeDoc(d)}
-                        className="rounded-sm hover:bg-background/50 p-0.5"
-                        aria-label={`Remove ${d}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Input
-                    placeholder="Add required document…"
-                    value={newDoc}
-                    onChange={(e) => setNewDoc(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addDoc();
-                      }
-                    }}
-                    className="max-w-xs h-9"
-                  />
-                  <Button type="button" variant="outline" size="sm" onClick={addDoc} className="gap-1">
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
-                </div>
-              </div>
             </div>
           </Card>
-
-          <Card className="p-5 shadow-card border-border">
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-warning" /> Verification flags (summary)
-            </h3>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {flagList.map((f) => (
-                <li key={f.key} className="flex items-start gap-2 text-sm">
-                  <span className={`mt-0.5 h-4 w-4 rounded-sm flex items-center justify-center ${f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
-                    {f.on && <Check className="h-3 w-3" />}
-                  </span>
-                  <span className={f.on ? "text-foreground" : "text-muted-foreground"}>{f.label}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
         </TabsContent>
-
-        {/* <TabsContent value="setup">
-          <SetupTab product={product} />
-        </TabsContent>
-        <TabsContent value="payment">
-          <PaymentTab product={product} />
-        </TabsContent>
-        <TabsContent value="loan">
-          <LoanTab product={product} />
-        </TabsContent>
-        <TabsContent value="premium-table">
-          <PremiumTableTab product={product} />
-        </TabsContent>
-        <TabsContent value="internal">
-          <InternalTab product={product} />
-        </TabsContent>
-        <TabsContent value="external">
-          <ExternalTab product={product} />
-        </TabsContent> */}
-
 
         <TabsContent value="coverages">
           <CoveragesTab productId={product.id} />
@@ -457,427 +344,9 @@ const ProductDetail = () => {
         <TabsContent value="documents">
           <DocumentsTab productId={product.id} />
         </TabsContent>
-
-        {/* <TabsContent value="currencies">
-          <CurrenciesTab productId={product.id} currencies={fields.currencies} />
-        </TabsContent>
-
-
-        <TabsContent value="verification">
-          <Card className="shadow-card border-border overflow-hidden">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <ScrollText className="h-4 w-4 text-accent" /> Verification rules
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Toggle the conditions that route an application to manual review.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={saveFlags}
-                disabled={!dirty}
-                className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                <Save className="h-4 w-4" /> Save changes
-              </Button>
-            </div>
-            <div className="divide-y divide-border">
-              {flagList.map((f) => (
-                <label
-                  key={f.key}
-                  htmlFor={`flag-${f.key}`}
-                  className="flex items-center justify-between px-5 py-4 gap-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <span
-                      className={`mt-0.5 h-7 w-7 shrink-0 rounded-md flex items-center justify-center ${
-                        f.on ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      <Check className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-foreground">{f.label}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{f.hint}</div>
-                    </div>
-                  </div>
-                  <Switch
-                    id={`flag-${f.key}`}
-                    checked={f.on}
-                    onCheckedChange={() => toggleFlag(f.key)}
-                  />
-                </label>
-              ))}
-            </div>
-          </Card>
-        </TabsContent> */}
       </Tabs>
     </AppShell>
   );
 };
 
-// ===== Editable grouped detail tabs =====
-
-const SectionShell = ({
-  title, description, onSave, dirty, children,
-}: {
-  title: string; description?: string; onSave: () => void; dirty: boolean; children: React.ReactNode;
-}) => (
-  <Card className="shadow-card border-border overflow-hidden">
-    <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
-      <div>
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
-      </div>
-      <Button
-        size="sm"
-        onClick={onSave}
-        disabled={!dirty}
-        className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
-      >
-        <Save className="h-4 w-4" /> Save changes
-      </Button>
-    </div>
-    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">{children}</div>
-  </Card>
-);
-
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div className="space-y-2">
-    <Label className="text-xs">{label}</Label>
-    {children}
-  </div>
-);
-
-const SelectField = <T extends { value: string; label: string }>({
-  options, value, onChange,
-}: { options: readonly T[]; value: string; onChange: (v: string) => void }) => (
-  <Select value={value} onValueChange={onChange}>
-    <SelectTrigger><SelectValue /></SelectTrigger>
-    <SelectContent>
-      {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-    </SelectContent>
-  </Select>
-);
-
-const defaultSetup: ProductSetupDetails = {
-  legacyPacketId: 0, bankPartnerCode: "ISP", policyType: "WithTable",
-  insuranceAmountType: "TotalAmount", legacyTariffId: 0, maxTenorMonths: 240,
-  isObsolete: false, apiSubject: false, apiStraight: false,
-};
-
-const SetupTab = ({ product }: { product: MappedProduct }) => {
-  const initial = product.setupDetails ?? defaultSetup;
-  const [s, setS] = useState<ProductSetupDetails>(initial);
-  const dirty = JSON.stringify(s) !== JSON.stringify(initial);
-  const save = () => { toast.message("Setup details are not persisted yet — API support coming later."); };
-  return (
-    <SectionShell title="Setup details" onSave={save} dirty={dirty}>
-      <Field label="Legacy packet ID">
-        <Input type="number" value={s.legacyPacketId} onChange={(e) => setS({ ...s, legacyPacketId: +e.target.value })} className="font-mono" />
-      </Field>
-      <Field label="Bank partner">
-        <Input value={s.bankPartnerCode} onChange={(e) => setS({ ...s, bankPartnerCode: e.target.value })} className="font-mono" />
-      </Field>
-      <Field label="Policy type">
-        <SelectField options={POLICY_TYPES} value={s.policyType} onChange={(v) => setS({ ...s, policyType: v })} />
-      </Field>
-      <Field label="Insurance amount type">
-        <SelectField options={INSURANCE_AMOUNT_TYPES} value={s.insuranceAmountType} onChange={(v) => setS({ ...s, insuranceAmountType: v })} />
-      </Field>
-      <Field label="Legacy tariff ID">
-        <Input type="number" value={s.legacyTariffId} onChange={(e) => setS({ ...s, legacyTariffId: +e.target.value })} className="font-mono" />
-      </Field>
-      <Field label="Max tenor (months)">
-        <Input type="number" value={s.maxTenorMonths} onChange={(e) => setS({ ...s, maxTenorMonths: +e.target.value })} className="font-mono" />
-      </Field>
-    </SectionShell>
-  );
-};
-
-const defaultPayment: ProductPaymentDetails = {
-  premiumPaymentType: "NotApplicable", packetPaymentType: "NotApplicable", renewalType: "NotApplicable",
-};
-
-const PaymentTab = ({ product }: { product: MappedProduct }) => {
-  const initial = product.paymentDetails ?? defaultPayment;
-  const [p, setP] = useState<ProductPaymentDetails>(initial);
-  const [model, setModel] = useState<PaymentModel | undefined>(
-    product.paymentModel as PaymentModel | undefined
-  );
-  const dirty = JSON.stringify(p) !== JSON.stringify(initial) || model !== product.paymentModel;
-  const save = () => {
-    toast.message("Payment details are not persisted yet — API support coming later.");
-  };
-  const applyModel = (v: PaymentModel) => {
-    setModel(v);
-    const m = PAYMENT_MODELS.find((x) => x.value === v);
-    if (m) setP({
-      premiumPaymentType: m.defaults.premiumPaymentType,
-      packetPaymentType: m.defaults.packetPaymentType,
-      renewalType: m.defaults.renewalType,
-    });
-  };
-  return (
-    <SectionShell title="Payment details" description="Choose a behavior model to seed defaults, then override individual fields." onSave={save} dirty={dirty}>
-      <div className="md:col-span-2">
-        <Field label="Payment behavior model">
-          <Select value={model ?? ""} onValueChange={(v) => applyModel(v as PaymentModel)}>
-            <SelectTrigger><SelectValue placeholder="Select a model" /></SelectTrigger>
-            <SelectContent>
-              {PAYMENT_MODELS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        {model && (
-          <p className="text-xs text-muted-foreground mt-2">{PAYMENT_MODELS.find((m) => m.value === model)?.description}</p>
-        )}
-      </div>
-      <Field label="Premium payment type">
-        <SelectField options={PREMIUM_PAYMENT_TYPES} value={p.premiumPaymentType} onChange={(v) => setP({ ...p, premiumPaymentType: v })} />
-      </Field>
-      <Field label="Packet payment type">
-        <SelectField options={PACKET_PAYMENT_TYPES} value={p.packetPaymentType} onChange={(v) => setP({ ...p, packetPaymentType: v })} />
-      </Field>
-      <Field label="Renewal type">
-        <SelectField options={PACKET_RENEWAL_TYPES} value={p.renewalType} onChange={(v) => setP({ ...p, renewalType: v })} />
-      </Field>
-    </SectionShell>
-  );
-};
-
-const defaultLoan: ProductLoanDetails = { packetLoanType: "NotApplicable", loanProductType: "NotApplicable" };
-
-const LoanTab = ({ product }: { product: MappedProduct }) => {
-  const initial = product.loanDetails ?? defaultLoan;
-  const [l, setL] = useState<ProductLoanDetails>(initial);
-  const dirty = JSON.stringify(l) !== JSON.stringify(initial);
-  const save = () => { toast.message("Loan details are not persisted yet — API support coming later."); };
-  return (
-    <SectionShell title="Loan details" onSave={save} dirty={dirty}>
-      <Field label="Packet loan type">
-        <SelectField options={PACKET_LOAN_TYPES} value={l.packetLoanType} onChange={(v) => setL({ ...l, packetLoanType: v })} />
-      </Field>
-      <Field label="Loan product type">
-        <SelectField options={LOAN_PRODUCT_TYPES} value={l.loanProductType} onChange={(v) => setL({ ...l, loanProductType: v })} />
-      </Field>
-    </SectionShell>
-  );
-};
-
-const PremiumTableTab = ({ product }: { product: MappedProduct }) => {
-  const tables = listPremiumTables();
-  const [selectedId, setSelectedId] = useState<string>(product.premiumTableId ?? "");
-  const [tick, setTick] = useState(0); // force re-render after item edits
-  const selected = tables.find((t) => t.id === selectedId);
-  const [items, setItems] = useState<PremiumTableItem[]>(selected?.items ?? []);
-  const [name, setName] = useState(selected?.name ?? "");
-  const [newOpen, setNewOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-
-  // when selected table changes, hydrate local state
-  const ensureHydrated = (id: string) => {
-    setSelectedId(id);
-    const t = listPremiumTables().find((x) => x.id === id);
-    setItems(t?.items ?? []);
-    setName(t?.name ?? "");
-  };
-
-  const linkDirty = selectedId !== (product.premiumTableId ?? "");
-  const tableDirty = !!selected && (
-    name !== selected.name ||
-    JSON.stringify(items) !== JSON.stringify(selected.items)
-  );
-
-  const saveLink = () => { toast.message("Premium table link is not persisted yet — API support coming later."); };
-  const saveTable = () => {
-    if (!selected) return;
-    updatePremiumTable(selected.id, { name, items });
-    setTick((n) => n + 1);
-    toast.success("Premium table updated");
-  };
-
-  const updateItem = (id: string, patch: Partial<PremiumTableItem>) =>
-    setItems((arr) => arr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
-  const addItem = () =>
-    setItems((arr) => [...arr, { id: `row-${Date.now()}`, gender: "Any", minAge: 0, maxAge: 0, coefficient: 0 }]);
-  const removeItem = (id: string) => setItems((arr) => arr.filter((i) => i.id !== id));
-
-  const createTable = () => {
-    if (!newName.trim()) return;
-    const created = addPremiumTable(newName.trim());
-    setNewName(""); setNewOpen(false);
-    ensureHydrated(created.id);
-    toast.success("Premium table created");
-  };
-
-  return (
-    <div className="space-y-5">
-      <Card className="shadow-card border-border overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Linked premium table</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Pick an existing table or create a new one.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setNewOpen((v) => !v)}>
-              <Plus className="h-4 w-4" /> New table
-            </Button>
-            <Button size="sm" onClick={saveLink} disabled={!linkDirty} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Save className="h-4 w-4" /> Save link
-            </Button>
-          </div>
-        </div>
-        <div className="p-5 space-y-4">
-          <Select value={selectedId} onValueChange={ensureHydrated}>
-            <SelectTrigger className="max-w-md"><SelectValue placeholder="Select a premium table" /></SelectTrigger>
-            <SelectContent>
-              {tables.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.id})</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {newOpen && (
-            <div className="flex gap-2 items-end pt-2 border-t border-border">
-              <div className="flex-1 max-w-md">
-                <Label className="text-xs">New table name</Label>
-                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Mortality 2027 — EUR" />
-              </div>
-              <Button size="sm" onClick={createTable} className="bg-accent hover:bg-accent/90 text-accent-foreground">Create</Button>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {selected && (
-        <Card className="shadow-card border-border overflow-hidden" key={`${selected.id}-${tick}`}>
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
-            <div className="flex-1">
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="font-semibold max-w-md" />
-              <p className="text-xs text-muted-foreground mt-1">Legacy ID {selected.legacyId} · {items.length} rows</p>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="gap-2" onClick={addItem}>
-                <Plus className="h-4 w-4" /> Add row
-              </Button>
-              <Button size="sm" onClick={saveTable} disabled={!tableDirty} className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Save className="h-4 w-4" /> Save table
-              </Button>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="text-left p-3">Gender</th>
-                  <th className="text-left p-3">Min age</th>
-                  <th className="text-left p-3">Max age</th>
-                  <th className="text-left p-3">Coefficient</th>
-                  <th className="w-12"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((i) => (
-                  <tr key={i.id} className="border-t border-border">
-                    <td className="p-2">
-                      <Select value={i.gender} onValueChange={(v) => updateItem(i.id, { gender: v as PremiumTableItem["gender"] })}>
-                        <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Any">Any</SelectItem>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="p-2"><Input type="number" value={i.minAge} onChange={(e) => updateItem(i.id, { minAge: +e.target.value })} className="h-8 w-24 font-mono" /></td>
-                    <td className="p-2"><Input type="number" value={i.maxAge} onChange={(e) => updateItem(i.id, { maxAge: +e.target.value })} className="h-8 w-24 font-mono" /></td>
-                    <td className="p-2"><Input type="number" step="0.0001" value={i.coefficient} onChange={(e) => updateItem(i.id, { coefficient: +e.target.value })} className="h-8 w-32 font-mono" /></td>
-                    <td className="p-2"><Button size="icon" variant="ghost" onClick={() => removeItem(i.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></td>
-                  </tr>
-                ))}
-                {!items.length && (
-                  <tr><td colSpan={5} className="p-6 text-center text-sm text-muted-foreground">No rows yet — click "Add row".</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-};
-
-const defaultInternal: ProductInternalDetails = { coveragePrintableText: "", packetFinType: null };
-const InternalTab = ({ product }: { product: MappedProduct }) => {
-  const updateProductMutation = useUpdateProduct();
-  const initial = product.internalDetails ?? defaultInternal;
-  const [i, setI] = useState<ProductInternalDetails>(initial);
-  useEffect(() => {
-    setI({
-      coveragePrintableText: product.coverageText ?? product.internalDetails?.coveragePrintableText ?? "",
-      packetFinType: product.internalDetails?.packetFinType ?? null,
-    });
-  }, [product.id, product.coverageText]);
-  const dirty = i.coveragePrintableText !== (product.coverageText ?? product.internalDetails?.coveragePrintableText ?? "");
-  const save = () => {
-    updateProductMutation.mutate(
-      {
-        id: product.id,
-        body: {
-          name: product.name,
-          supportedCurrencies: product.currencies,
-          coverageText: i.coveragePrintableText.trim() || undefined,
-        },
-      },
-      {
-        onSuccess: () => toast.success("Coverage text saved"),
-        onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to save"),
-      }
-    );
-  };
-  return (
-    <SectionShell title="Internal details" onSave={save} dirty={dirty}>
-      <div className="md:col-span-2">
-        <Field label="Coverage printable text">
-          <Textarea rows={3} value={i.coveragePrintableText} onChange={(e) => setI({ ...i, coveragePrintableText: e.target.value })} />
-        </Field>
-      </div>
-      <div className="md:col-span-2">
-        <Field label="Packet fin type (legacy)">
-          <Input
-            type="number"
-            value={i.packetFinType ?? ""}
-            onChange={(e) => setI({ ...i, packetFinType: e.target.value === "" ? null : Number(e.target.value) })}
-            className="font-mono"
-            placeholder="Not persisted yet"
-          />
-        </Field>
-      </div>
-    </SectionShell>
-  );
-};
-
-const defaultExternal: ProductExternalDetails = {
-  sapProductCode: "", sapChannelCode: "", f5ProductCode: "", actuarialProductCode: "RegularPersonal",
-};
-const ExternalTab = ({ product }: { product: MappedProduct }) => {
-  const initial = product.externalDetails ?? defaultExternal;
-  const [e, setE] = useState<ProductExternalDetails>(initial);
-  const dirty = JSON.stringify(e) !== JSON.stringify(initial);
-  const save = () => { toast.message("External details are not persisted yet — API support coming later."); };
-  return (
-    <SectionShell title="External details" onSave={save} dirty={dirty}>
-      <Field label="SAP product code"><Input value={e.sapProductCode} onChange={(ev) => setE({ ...e, sapProductCode: ev.target.value })} className="font-mono" /></Field>
-      <Field label="SAP channel code"><Input value={e.sapChannelCode} onChange={(ev) => setE({ ...e, sapChannelCode: ev.target.value })} className="font-mono" /></Field>
-      <Field label="F5 product code"><Input value={e.f5ProductCode} onChange={(ev) => setE({ ...e, f5ProductCode: ev.target.value })} className="font-mono" /></Field>
-      <Field label="Actuarial product code">
-        <SelectField options={ACTUARIAL_CODES} value={e.actuarialProductCode} onChange={(v) => setE({ ...e, actuarialProductCode: v })} />
-      </Field>
-    </SectionShell>
-  );
-};
-
 export default ProductDetail;
-

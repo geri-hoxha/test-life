@@ -54,6 +54,7 @@ export type Customer = {
 
   // Company fields
   companyName?: string;
+  tradeName?: string;
   nipt?: string;
   companyType?: CompanyType;
   registrationDate?: string;
@@ -62,9 +63,9 @@ export type Customer = {
   // Shared
   f5Location?: string; // F5 location code
   address?: string;
-  city?: string;       // company only
-  postalCode?: string; // company address
-  country?: string;    // company only
+  city?: string;       // company only (main address summary)
+  postalCode?: string; // company address (main address summary)
+  country?: string;    // company countryCode
   phone?: string;
   email?: string;
   occupation?: string;

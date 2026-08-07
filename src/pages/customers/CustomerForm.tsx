@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
-import { User, Building2 } from "lucide-react";
+import { User, Building2, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
@@ -9,25 +9,40 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   Customer, customerSchema, ageFromDob,
-  Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPES, F5_LOCATIONS,
+  Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPES,
   SSN_ISSUING_COUNTRIES,
 } from "@/data/customers";
 import { useCreatePerson, useGetPerson, useUpdatePerson } from "@/api/people";
-import { useAddCompanyAddress, useCreateCompany, useGetCompany, useUpdateCompany } from "@/api/companies";
+import {
+  useAddCompanyAddress,
+  useCreateCompany,
+  useGetCompany,
+  useRemoveCompanyAddress,
+  useUpdateCompany,
+} from "@/api/companies";
+import type { CompaniesAddCompanyAddressRequest, CompaniesCompanyAddressResponse } from "@/api/types";
 import {
   customerPath,
   customerToCreateCompany,
   customerToCreatePerson,
   customerToUpdateCompany,
   customerToUpdatePerson,
+  fromCountryCode,
   mapCompanyToCustomer,
   mapPersonToCustomer,
   parseCustomerPartyType,
@@ -36,6 +51,49 @@ import {
 
 const NA = "N/A";
 
+type AddressRow = {
+  /** Client key for drafts; server id string when persisted. */
+  key: string;
+  entryId?: number;
+  street: string;
+  city: string;
+  country: string;
+  postalCode: string;
+  isMain: boolean;
+  persisted: boolean;
+};
+
+const blankAddress = (overrides?: Partial<AddressRow>): AddressRow => ({
+  key: `draft-${crypto.randomUUID()}`,
+  street: "",
+  city: "",
+  country: "Albania",
+  postalCode: "",
+  isMain: false,
+  persisted: false,
+  ...overrides,
+});
+
+const fromApiAddress = (a: CompaniesCompanyAddressResponse): AddressRow =>
+  blankAddress({
+    key: a.id != null ? `addr-${a.id}` : `draft-${crypto.randomUUID()}`,
+    entryId: a.id,
+    street: a.street ?? "",
+    city: a.city ?? "",
+    country: fromCountryCode(a.countryCode) === NA ? "Albania" : fromCountryCode(a.countryCode),
+    postalCode: a.postalCode ?? "",
+    isMain: Boolean(a.isMain),
+    persisted: a.id != null,
+  });
+
+const toAddressBody = (a: AddressRow): CompaniesAddCompanyAddressRequest => ({
+  street: a.street.trim(),
+  city: a.city.trim(),
+  countryCode: toCountryCode(a.country),
+  isMain: a.isMain,
+  postalCode: a.postalCode.trim() || null,
+});
+
 const blank = (): Customer => ({
   id: "",
   customerType: "Individual",
@@ -43,10 +101,10 @@ const blank = (): Customer => ({
   ssnIssuingCountry: NA,
   dateOfBirth: "", gender: "Other",
   nationality: NA, placeOfBirth: "",
-  companyName: "", nipt: "", companyType: undefined,
+  companyName: "", tradeName: "", nipt: "", companyType: undefined,
   registrationDate: "", legalRepresentative: "",
   f5Location: NA,
-  address: "", city: "", country: NA,
+  address: "", city: "", country: "Albania",
   phone: "", email: "", occupation: "",
   pepStatus: "Unknown", notes: "",
   totalExposure: 0,
@@ -89,21 +147,39 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
   const createCompany = useCreateCompany();
   const updateCompany = useUpdateCompany();
   const addCompanyAddress = useAddCompanyAddress();
+  const removeCompanyAddress = useRemoveCompanyAddress();
 
   const [c, setC] = useState<Customer>(blank());
   const set = <K extends keyof Customer>(k: K, v: Customer[K]) => setC((s) => ({ ...s, [k]: v }));
   const isCompany = c.customerType === "Company";
 
+  const [addresses, setAddresses] = useState<AddressRow[]>([]);
+  const [draft, setDraft] = useState<AddressRow>(blankAddress({ isMain: true }));
+  const [deleteKey, setDeleteKey] = useState<string | null>(null);
+  const [addressBusy, setAddressBusy] = useState(false);
+
   useEffect(() => {
     if (existing) setC(existing);
   }, [existing]);
+
+  useEffect(() => {
+    if (!isEdit || !companyQ.data) return;
+    const rows = (companyQ.data.addresses ?? []).map(fromApiAddress);
+    setAddresses(rows);
+    setDraft(blankAddress({ isMain: rows.length === 0 }));
+  }, [isEdit, companyQ.data]);
+
+  const setMainExclusive = (rows: AddressRow[], mainKey: string) =>
+    rows.map((r) => ({ ...r, isMain: r.key === mainKey }));
 
   const saving =
     createPerson.isPending ||
     updatePerson.isPending ||
     createCompany.isPending ||
     updateCompany.isPending ||
-    addCompanyAddress.isPending;
+    addCompanyAddress.isPending ||
+    removeCompanyAddress.isPending ||
+    addressBusy;
 
   const finishCreate = (createdId: string, customerType: CustomerType) => {
     toast.success(isEdit ? "Customer updated" : "Customer created");
@@ -112,6 +188,102 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
       return;
     }
     navigate(customerPath(createdId, customerType === "Company" ? "company" : "person"));
+  };
+
+  const validateDraftAddress = (row: AddressRow) => {
+    if (!row.street.trim()) {
+      toast.error("Street is required");
+      return false;
+    }
+    if (!row.city.trim()) {
+      toast.error("City is required");
+      return false;
+    }
+    if (!row.country || row.country === NA) {
+      toast.error("Address country is required");
+      return false;
+    }
+    return true;
+  };
+
+  const handleAddDraftAddress = () => {
+    if (!validateDraftAddress(draft)) return;
+    setAddresses((prev) => {
+      const next = [...prev, { ...draft, key: `draft-${crypto.randomUUID()}`, persisted: false }];
+      return draft.isMain ? setMainExclusive(next, next[next.length - 1].key) : next;
+    });
+    setDraft(blankAddress({ isMain: false }));
+  };
+
+  const handleAddPersistedAddress = async () => {
+    if (!c.id) return;
+    if (!validateDraftAddress(draft)) return;
+    setAddressBusy(true);
+    try {
+      await addCompanyAddress.mutateAsync({
+        companyId: c.id,
+        body: toAddressBody(draft),
+      });
+      toast.success("Address added");
+      setDraft(blankAddress({ isMain: false }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add address");
+    } finally {
+      setAddressBusy(false);
+    }
+  };
+
+  const handleToggleMain = (key: string, checked: boolean) => {
+    if (!checked) return; // only one may be main — turning off is done by selecting another
+    setAddresses((prev) => setMainExclusive(prev, key));
+  };
+
+  const confirmDeleteAddress = async () => {
+    if (!deleteKey) return;
+    const row = addresses.find((a) => a.key === deleteKey);
+    if (!row) {
+      setDeleteKey(null);
+      return;
+    }
+
+    if (row.persisted && c.id && row.entryId != null) {
+      setAddressBusy(true);
+      try {
+        await removeCompanyAddress.mutateAsync({
+          companyId: c.id,
+          addressEntryId: String(row.entryId),
+        });
+        toast.success("Address removed");
+        setDeleteKey(null);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to remove address");
+      } finally {
+        setAddressBusy(false);
+      }
+      return;
+    }
+
+    setAddresses((prev) => {
+      const next = prev.filter((a) => a.key !== deleteKey);
+      if (row.isMain && next.length > 0 && !next.some((a) => a.isMain)) {
+        next[0] = { ...next[0], isMain: true };
+      }
+      return next;
+    });
+    setDeleteKey(null);
+  };
+
+  const persistDraftAddresses = async (companyId: string, rows: AddressRow[]) => {
+    const withMain =
+      rows.length > 0 && !rows.some((r) => r.isMain)
+        ? setMainExclusive(rows, rows[0].key)
+        : rows;
+    for (const row of withMain) {
+      await addCompanyAddress.mutateAsync({
+        companyId,
+        body: toAddressBody(row),
+      });
+    }
   };
 
   const handleSave = () => {
@@ -153,6 +325,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
 
     // Company
     if (isEdit && c.id) {
+
       updateCompany.mutate(
         { id: c.id, body: customerToUpdateCompany(c) },
         {
@@ -164,33 +337,23 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
       );
     } else {
       createCompany.mutate(customerToCreateCompany(c), {
-        onSuccess: (res) => {
+        onSuccess: async (res) => {
           const companyId = res.id;
           if (!companyId) {
             toast.error("Customer created without id");
             return;
           }
-          const street = c.address?.trim();
-          const city = c.city?.trim();
-          if (street && city && c.country && c.country !== NA) {
-            addCompanyAddress.mutate(
-              {
-                companyId,
-                body: {
-                  street,
-                  city,
-                  countryCode: toCountryCode(c.country),
-                  isMain: true,
-                },
-              },
-              {
-                onSettled: () => {
-                  finishCreate(companyId, "Company");
-                },
-              }
-            );
-          } else {
+          setAddressBusy(true);
+          try {
+            if (addresses.length > 0) {
+              await persistDraftAddresses(companyId, addresses);
+            }
             finishCreate(companyId, "Company");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Company created, but saving addresses failed");
+            finishCreate(companyId, "Company");
+          } finally {
+            setAddressBusy(false);
           }
         },
         onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to create"),
@@ -225,14 +388,154 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
   }
 
   const dob = c.dateOfBirth ? parseISO(c.dateOfBirth) : undefined;
-  const regDate = c.registrationDate ? parseISO(c.registrationDate) : undefined;
 
   const headerTitle = isEdit
     ? (isCompany ? `Edit ${c.companyName || ""}`.trim() : `Edit ${c.firstName} ${c.lastName}`.trim())
     : "New Customer";
 
+  const countryOptions = SSN_ISSUING_COUNTRIES.filter((x) => x !== "Other");
+
+  const addressesSection = (
+    <Card className="shadow-card border-border overflow-hidden">
+      <div className="p-6 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground">Addresses</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {isEdit
+            ? "Add or remove addresses. Only one can be main."
+            : "Saved after the company is created. Only one can be main."}
+        </p>
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Address</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Main</TableHead>
+              <TableHead className="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {addresses.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-8">
+                  No addresses yet.
+                </TableCell>
+              </TableRow>
+            )}
+            {addresses.map((row) => (
+              <TableRow key={row.key} className="hover:bg-accent-soft/40">
+                <TableCell className="text-sm align-top">
+                  <div className="font-medium text-foreground">{row.street}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {[row.city, row.postalCode, row.country].filter(Boolean).join(", ")}
+                  </div>
+                </TableCell>
+                <TableCell className="align-top ">
+                  <Checkbox
+                    checked={row.isMain}
+                    disabled={row.persisted}
+                    onCheckedChange={(v) => handleToggleMain(row.key, v === true)}
+                    aria-label="Main address"
+                    className="h-4 w-4 mt-2 border-success data-[state=checked]:bg-success data-[state=checked]:border-success data-[state=checked]:text-success-foreground"
+                  />
+                </TableCell>
+                <TableCell className="align-top text-right">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    disabled={addressBusy}
+                    onClick={() => setDeleteKey(row.key)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="p-6 border-t border-border bg-muted/20 space-y-3">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add address</div>
+        <div className="space-y-1.5">
+          <Label htmlFor="addr-street">Street *</Label>
+          <Input
+            id="addr-street"
+            value={draft.street}
+            maxLength={200}
+            onChange={(e) => setDraft((s) => ({ ...s, street: e.target.value }))}
+            placeholder="Rruga e Durrësit 12"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="addr-city">City *</Label>
+            <Input
+              id="addr-city"
+              value={draft.city}
+              maxLength={80}
+              onChange={(e) => setDraft((s) => ({ ...s, city: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="addr-postal">Postal code</Label>
+            <Input
+              id="addr-postal"
+              value={draft.postalCode}
+              maxLength={20}
+              onChange={(e) => setDraft((s) => ({ ...s, postalCode: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Country *</Label>
+          <Select
+            value={draft.country}
+            onValueChange={(v) => setDraft((s) => ({ ...s, country: v }))}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {countryOptions.map((country) => (
+                <SelectItem key={country} value={country}>{country}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="addr-main"
+              checked={draft.isMain}
+              onCheckedChange={(v) => setDraft((s) => ({ ...s, isMain: v === true }))}
+              className="h-4 w-4 border-success data-[state=checked]:bg-success data-[state=checked]:border-success data-[state=checked]:text-success-foreground"
+            />
+            <Label htmlFor="addr-main" className="text-sm">Main</Label>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1.5 bg-accent hover:bg-accent/90 text-accent-foreground"
+            disabled={addressBusy}
+            onClick={() => {
+              if (isEdit && c.id) void handleAddPersistedAddress();
+              else handleAddDraftAddress();
+            }}
+          >
+            <Plus className="h-4 w-4" /> Add
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+
   const formBody = (
-      <div className={cn("grid grid-cols-1 gap-6", embedded ? "lg:grid-cols-1" : "lg:grid-cols-3")}>
+      <div className={cn(
+        "grid grid-cols-1 gap-6",
+        !embedded && "lg:grid-cols-3",
+      )}>
         <div className={cn("space-y-6", !embedded && "lg:col-span-2")}>
           {/* Customer type switch */}
           <Card className="p-4 shadow-card border-border">
@@ -248,7 +551,12 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                   <button
                     type="button"
                     key={opt.v}
-                    onClick={() => set("customerType", opt.v)}
+                    onClick={() => {
+                      set("customerType", opt.v);
+                      if (opt.v === "Company" && addresses.length === 0) {
+                        setDraft(blankAddress({ isMain: true }));
+                      }
+                    }}
                     disabled={isEdit}
                     className={cn(
                       "flex items-center gap-3 p-3 rounded-md border text-left transition-colors",
@@ -276,15 +584,19 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
               <p className="text-xs text-muted-foreground mb-5">Legal entity registration and identification.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5 md:col-span-2">
-                  <Label htmlFor="cname">Company Name *</Label>
+                  <Label htmlFor="cname">Legal name *</Label>
                   <Input id="cname" value={c.companyName ?? ""} maxLength={160} onChange={(e) => set("companyName", e.target.value)} />
                 </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label htmlFor="tname">Trade name</Label>
+                  <Input id="tname" value={c.tradeName ?? ""} maxLength={160} onChange={(e) => set("tradeName", e.target.value)} placeholder="Optional commercial name" />
+                </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="nipt">NIPT *</Label>
+                  <Label htmlFor="nipt">Registration number / NIPT *</Label>
                   <Input id="nipt" className="font-mono" value={c.nipt ?? ""} maxLength={30} onChange={(e) => set("nipt", e.target.value)} placeholder="L72416502K" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Type</Label>
+                  <Label>Company type</Label>
                   <Select value={c.companyType ?? NA} onValueChange={(v) => set("companyType", v === NA ? undefined : v as CompanyType)}>
                     <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
@@ -294,41 +606,15 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" value={c.city ?? ""} maxLength={80} onChange={(e) => set("city", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="country">Country</Label>
-                  <Input id="country" value={c.country ?? ""} maxLength={80} onChange={(e) => set("country", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>F5 Location</Label>
-                  <Select value={c.f5Location || NA} onValueChange={(v) => set("f5Location", v)}>
-                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
+                  <Label>Country *</Label>
+                  <Select value={c.country && c.country !== NA ? c.country : "Albania"} onValueChange={(v) => set("country", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NA}>N/A</SelectItem>
-                      {F5_LOCATIONS.map((l) => (
-                        <SelectItem key={l.code} value={l.code}>
-                          <span className="font-mono text-xs text-accent mr-2">{l.code}</span>
-                          {l.label}
-                        </SelectItem>
+                      {countryOptions.map((country) => (
+                        <SelectItem key={country} value={country}>{country}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Registration Date</Label>
-                  <DatePicker
-                    value={regDate}
-                    onChange={(d) => set("registrationDate", d ? format(d, "yyyy-MM-dd") : "")}
-                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                    fromYear={1900}
-                    toYear={new Date().getFullYear()}
-                  />
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label htmlFor="legalrep">Legal Representative</Label>
-                  <Input id="legalrep" value={c.legalRepresentative ?? ""} maxLength={120} onChange={(e) => set("legalRepresentative", e.target.value)} placeholder="Full name of the authorized signatory" />
                 </div>
               </div>
             </Card>
@@ -342,7 +628,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                   <Input id="pid" className="font-mono" value={c.personalId} maxLength={40} onChange={(e) => set("personalId", e.target.value)} placeholder="AL-TR-J70412900A" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Issuing Country</Label>
+                  <Label>Country *</Label>
                   <Select value={c.ssnIssuingCountry || NA} onValueChange={(v) => set("ssnIssuingCountry", v)}>
                     <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
@@ -362,10 +648,6 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                   <Input id="ln" value={c.lastName} maxLength={80} onChange={(e) => set("lastName", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="fath">Father's Name</Label>
-                  <Input id="fath" value={c.fatherName ?? ""} maxLength={80} onChange={(e) => set("fatherName", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
                   <Label>Date of Birth *</Label>
                   <DatePicker
                     value={dob}
@@ -374,25 +656,6 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                     fromYear={1900}
                     toYear={new Date().getFullYear()}
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>F5 Location</Label>
-                  <Select value={c.f5Location || NA} onValueChange={(v) => set("f5Location", v)}>
-                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NA}>N/A</SelectItem>
-                      {F5_LOCATIONS.map((l) => (
-                        <SelectItem key={l.code} value={l.code}>
-                          <span className="font-mono text-xs text-accent mr-2">{l.code}</span>
-                          {l.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="nat">Nationality</Label>
-                  <Input id="nat" value={c.nationality ?? ""} maxLength={80} onChange={(e) => set("nationality", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Gender</Label>
@@ -405,60 +668,60 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="pob">Place of Birth</Label>
-                  <Input id="pob" value={c.placeOfBirth ?? ""} maxLength={120} onChange={(e) => set("placeOfBirth", e.target.value)} />
-                </div>
               </div>
             </Card>
           )}
-
-          {/* Contact */}
-          <Card className="p-6 shadow-card border-border">
-            <h3 className="text-sm font-semibold text-foreground mb-1">Contact</h3>
-            <p className="text-xs text-muted-foreground mb-5">How to reach the {isCompany ? "company" : "customer"}.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={c.phone ?? ""} maxLength={40} onChange={(e) => set("phone", e.target.value)} placeholder="+355 69 ..." />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={c.email ?? ""} maxLength={255} onChange={(e) => set("email", e.target.value)} placeholder="name@example.com" />
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label htmlFor="addr">Address</Label>
-                <Input id="addr" value={c.address ?? ""} maxLength={200} onChange={(e) => set("address", e.target.value)} />
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea id="notes" rows={4} maxLength={1000} value={c.notes ?? ""} onChange={(e) => set("notes", e.target.value)} placeholder="Internal notes — visible to operators only." />
-              </div>
-            </div>
-          </Card>
         </div>
 
         <div className="space-y-6">
-          <Card className="p-6 shadow-card border-border">
-            <h3 className="text-sm font-semibold text-foreground mb-1">Compliance</h3>
-            <p className="text-xs text-muted-foreground mb-4">PEP status drives manual review on offers.</p>
-            <div className="space-y-1.5">
-              <Label>PEP Status</Label>
-              <Select value={c.pepStatus} onValueChange={(v) => set("pepStatus", v as PEPStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Unknown">Unknown</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                Politically Exposed Persons require enhanced due diligence and trigger compliance review on every new offer.
-              </p>
-            </div>
-          </Card>
+          {isCompany ? (
+            addressesSection
+          ) : (
+            <Card className="p-6 shadow-card border-border">
+              <h3 className="text-sm font-semibold text-foreground mb-1">Compliance</h3>
+              <p className="text-xs text-muted-foreground mb-4">PEP status drives manual review on offers.</p>
+              <div className="space-y-1.5">
+                <Label>PEP Status</Label>
+                <Select value={c.pepStatus} onValueChange={(v) => set("pepStatus", v as PEPStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Unknown">Unknown</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                    <SelectItem value="Yes">Yes</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                  Politically Exposed Persons require enhanced due diligence and trigger compliance review on every new offer.
+                </p>
+              </div>
+            </Card>
+          )}
         </div>
       </div>
+  );
+
+  const deleteDialog = (
+    <AlertDialog open={!!deleteKey} onOpenChange={(o) => !o && setDeleteKey(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this address?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {isEdit
+              ? "The address will be removed from this company."
+              : "This draft address will be removed before the company is created."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => void confirmDeleteAddress()}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 
   if (embedded) {
@@ -478,6 +741,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
             {saving ? "Saving…" : "Create customer"}
           </Button>
         </div>
+        {deleteDialog}
       </div>
     );
   }
@@ -506,6 +770,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
       />
 
       {formBody}
+      {deleteDialog}
     </AppShell>
   );
 };

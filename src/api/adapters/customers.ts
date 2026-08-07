@@ -126,6 +126,7 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
     dateOfBirth: "",
     gender: "Other",
     companyName: c.legalName ?? c.tradeName ?? "",
+    tradeName: c.tradeName ?? "",
     nipt: c.registrationNumber ?? "",
     companyType: c.companyType ? companyTypeFromApi[c.companyType] : undefined,
     registrationDate: "",
@@ -146,21 +147,27 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
   };
 };
 
-export const customerToCreatePerson = (c: Customer): PeopleCreatePersonRequest => ({
-  firstName: c.firstName.trim(),
-  lastName: c.lastName.trim(),
-  personalIdentifier: c.personalId.trim(),
-  countryCode: toCountryCode(c.ssnIssuingCountry || c.country),
-  dateOfBirth: c.dateOfBirth || undefined,
-  gender: toApiGender(c.gender),
-  isPep: toApiPep(c.pepStatus),
-});
+/** POST/PUT /api/people body — only fields accepted by the API. */
+export const customerToCreatePerson = (c: Customer): PeopleCreatePersonRequest => {
+  const body: PeopleCreatePersonRequest = {
+    firstName: c.firstName.trim(),
+    lastName: c.lastName.trim(),
+    personalIdentifier: c.personalId.trim(),
+    countryCode: toCountryCode(c.ssnIssuingCountry || c.country),
+    isPep: toApiPep(c.pepStatus),
+  };
+  if (c.dateOfBirth) body.dateOfBirth = c.dateOfBirth;
+  const gender = toApiGender(c.gender);
+  if (gender) body.gender = gender;
+  return body;
+};
 
 export const customerToUpdatePerson = (c: Customer): PeopleUpdatePersonRequest =>
   customerToCreatePerson(c);
 
 export const customerToCreateCompany = (c: Customer): CompaniesCreateCompanyRequest => ({
   legalName: (c.companyName ?? "").trim(),
+  tradeName: (c.tradeName ?? "").trim() || null,
   registrationNumber: (c.nipt ?? "").trim(),
   countryCode: toCountryCode(c.country),
   companyType:
@@ -169,16 +176,8 @@ export const customerToCreateCompany = (c: Customer): CompaniesCreateCompanyRequ
       : undefined,
 });
 
-export const customerToUpdateCompany = (c: Customer): CompaniesUpdateCompanyRequest => ({
-  legalName: (c.companyName ?? "").trim(),
-  tradeName: null,
-  registrationNumber: (c.nipt ?? "").trim(),
-  countryCode: toCountryCode(c.country),
-  companyType:
-    c.companyType && c.companyType !== (NA as CompanyType)
-      ? companyTypeToApi[c.companyType]
-      : undefined,
-});
+export const customerToUpdateCompany = (c: Customer): CompaniesUpdateCompanyRequest =>
+  customerToCreateCompany(c);
 
 export const mergeCustomers = (
   people: PeoplePersonResponse[] = [],
@@ -210,3 +209,10 @@ export const customerPath = (
   const base = opts?.edit ? `/customers/${id}/edit` : `/customers/${id}`;
   return `${base}?type=${toCustomerPartyType(type)}`;
 };
+
+/** `/offers/new` prefilled with a customer as participant (and insured when person). */
+export const newOfferPath = (
+  id: string,
+  type: Customer["customerType"] | CustomerPartyType,
+) =>
+  `/offers/new?customerId=${encodeURIComponent(id)}&type=${toCustomerPartyType(type)}#people`;

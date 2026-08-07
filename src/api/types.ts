@@ -111,6 +111,16 @@ export type ProductsAddProductDocumentTypeRequest = {
   isPep?: boolean | null;
 };
 
+export type ProductsAddProductPaymentMethodRequest = {
+  bankAccountId?: string;
+};
+
+export type ProductsProductPaymentMethodResponse = {
+  id?: string | number;
+  bankAccountId?: string;
+  currency?: string;
+};
+
 export type ProductsProductResponse = {
   id?: string;
   name?: string;
@@ -119,6 +129,8 @@ export type ProductsProductResponse = {
   supportedCurrencies?: string[];
   coverages?: ProductsProductCoverageResponse[];
   productDocumentTypes?: ProductsProductDocumentTypeResponse[];
+  paymentMethods?: ProductsProductPaymentMethodResponse[];
+  defaultPrintableTemplateDocumentId?: string | null;
   /** Not yet returned by API — will be added later. */
   code?: string | null;
   status?: string | null;
@@ -146,6 +158,7 @@ export type ProductsCreateProductRequest = {
   productGroupId?: string;
   supportedCurrencies: string[];
   coverageText?: string;
+  defaultPrintableTemplateDocumentId?: string | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;
   status?: string;
@@ -174,10 +187,13 @@ export type ProductsRemoveProductCoverageRequest = Record<string, unknown>;
 
 export type ProductsRemoveProductDocumentTypeRequest = Record<string, unknown>;
 
+export type ProductsRemoveProductPaymentMethodRequest = Record<string, unknown>;
+
 export type ProductsUpdateProductRequest = {
   name: string;
   supportedCurrencies: string[];
   coverageText?: string;
+  defaultPrintableTemplateDocumentId?: string | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;
   status?: string;
@@ -421,6 +437,7 @@ export type CompaniesCompanyResponse = {
 
 export type CompaniesCreateCompanyRequest = {
   legalName: string;
+  tradeName?: string | null;
   registrationNumber: string;
   countryCode: string;
   companyType?: DomainPartiesEnumsCompanyType;
@@ -692,4 +709,48 @@ export type DocumentsListDocumentsRequest = PaginationPagedRequest & Record<stri
 
 export type DocumentsUpdateDocumentRequest = {
   originalFileName: string;
+};
+
+export type BankAccountsBankAccountResponse = {
+  id?: string;
+  currency?: string;
+  bankCode?: string;
+  bankName?: string;
+  accountNumber?: string;
+  iban?: string;
+  swiftCode?: string;
+};
+
+export type BankAccountsCreateBankAccountRequest = {
+  currency: string;
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
+  iban: string;
+  swiftCode: string;
+};
+
+export type BankAccountsDeleteBankAccountRequest = Record<string, unknown>;
+
+export type BankAccountsGetBankAccountRequest = Record<string, unknown>;
+
+export type PaginationPagedListOfBankAccountResponse = {
+  items?: BankAccountsBankAccountResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type BankAccountsListBankAccountsRequest = PaginationPagedRequest & Record<string, unknown>;
+
+export type BankAccountsUpdateBankAccountRequest = {
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
+  iban: string;
+  swiftCode: string;
 };

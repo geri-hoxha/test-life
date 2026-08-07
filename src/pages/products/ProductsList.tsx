@@ -23,11 +23,15 @@ import {
   useListProductGroups, useCreateProductGroup, useDeleteProductGroup,
 } from "@/api/product-groups";
 import {
-  useListProducts, mapApiProduct,
+  useListProducts, mapApiProduct, useDeleteProduct,
 } from "@/api/products";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
@@ -50,11 +54,13 @@ const ProductsList = () => {
   const [ngEnglish, setNgEnglish] = useState("");
   const [ngLabel, setNgLabel] = useState("");
   const [ngCode, setNgCode] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: groupsPage, isLoading: groupsLoading } = useListProductGroups({ pageNumber: 1, pageSize: 100 });
   const { data: productsPage, isLoading: productsLoading } = useListProducts({ pageNumber: 1, pageSize: 500 });
   const createGroup = useCreateProductGroup();
   const deleteGroup = useDeleteProductGroup();
+  const deleteProduct = useDeleteProduct();
 
   const allProducts = useMemo(
     () => (productsPage?.items ?? []).map(mapApiProduct),
@@ -488,10 +494,13 @@ const ProductsList = () => {
                           <DropdownMenuItem onClick={() => navigate(`/products/${p.id}`)}>
                             <Settings2 className="h-4 w-4 mr-2" />Open
                           </DropdownMenuItem>
-                          <DropdownMenuItem>Manage versions</DropdownMenuItem>
-                          <DropdownMenuItem>Clone product</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive focus:text-destructive">Archive</DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setDeleteTarget({ id: p.id, name: p.name })}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -534,7 +543,35 @@ const ProductsList = () => {
         </div>
       </Card>
 
-
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete product?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{deleteTarget ? ` “${deleteTarget.name}”` : " this product"}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteProduct.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteProduct.isPending}
+              onClick={() => {
+                if (!deleteTarget) return;
+                deleteProduct.mutate(deleteTarget.id, {
+                  onSuccess: () => {
+                    toast.success(`Product deleted: ${deleteTarget.name}`);
+                    setDeleteTarget(null);
+                  },
+                  onError: (err) =>
+                    toast.error(err instanceof Error ? err.message : "Failed to delete product"),
+                });
+              }}
+            >
+              {deleteProduct.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </AppShell>
   );

@@ -47,13 +47,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ArrowLeft,
   Edit,
   RefreshCw,
@@ -73,6 +66,7 @@ import {
   Upload,
   ChevronRight,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import { getOffer, statusColor } from "@/data/offers";
 import { ageFromDob } from "@/data/customers";
@@ -97,12 +91,19 @@ import {
   useRejectOfferScheduleDocument,
   useSubmitOfferScheduleDocument,
   useListOfferScheduleDocuments,
+  useIssuePolicy,
 } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useGetProduct, mapApiProduct } from "@/api/products";
 import { useListCoverages } from "@/api/coverages";
 import { useListDocumentTypes } from "@/api/document-types";
-import { useListDocuments } from "@/api/documents";
+import {
+  buildCreateDocumentFormData,
+  createDocument,
+  downloadDocumentFile,
+  useGetDocument,
+} from "@/api/documents";
+import { useGetBankAccount } from "@/api/bank-accounts";
 import { customerPath } from "@/api/adapters/customers";
 
 const fmtMoney = (v: number, ccy: string) =>
@@ -365,9 +366,9 @@ const OfferDetail = () => {
   const approveScheduleDocument = useApproveOfferScheduleDocument();
   const rejectScheduleDocument = useRejectOfferScheduleDocument();
   const submitScheduleDocument = useSubmitOfferScheduleDocument();
+  const issuePolicy = useIssuePolicy();
   const { data: coveragesPage } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
-  const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
 
   const [pendingRemove, setPendingRemove] = useState<
     | { kind: "insured"; id: string; label: string }
@@ -389,7 +390,8 @@ const OfferDetail = () => {
     year: number;
     label: string;
   } | null>(null);
-  const [docSubmitDocumentId, setDocSubmitDocumentId] = useState("");
+  const [docSubmitFile, setDocSubmitFile] = useState<File | null>(null);
+  const [docSubmitPending, setDocSubmitPending] = useState(false);
   const [pendingDocApprove, setPendingDocApprove] = useState<{
     requirementId: string;
     year: number;
@@ -398,6 +400,7 @@ const OfferDetail = () => {
   const [expandedScheduleYears, setExpandedScheduleYears] = useState<Set<number>>(
     () => new Set()
   );
+  const [approvingScheduleYear, setApprovingScheduleYear] = useState<number | null>(null);
 
   const toggleScheduleExpanded = (year: number) => {
     setExpandedScheduleYears((prev) => {
@@ -435,6 +438,19 @@ const OfferDetail = () => {
     return undefined;
   }, [apiProduct]);
 
+  const templateDocumentId = product?.defaultPrintableTemplateDocumentId?.trim() || "";
+  const { data: templateDocument } = useGetDocument(templateDocumentId, {
+    enabled: Boolean(templateDocumentId),
+  });
+
+  const paymentMethod =
+    product?.paymentMethods?.find((pm) => pm.currency === offer?.currency) ??
+    product?.paymentMethods?.[0];
+  const paymentBankAccountId = paymentMethod?.bankAccountId?.trim() || "";
+  const { data: paymentBankAccount } = useGetBankAccount(paymentBankAccountId, {
+    enabled: Boolean(paymentBankAccountId),
+  });
+
   // const [notes, setNotes] = useState("");
 
   if (isLoading) {
@@ -463,9 +479,6 @@ const OfferDetail = () => {
   const payer = offer.participants.find((p) => p.role === "invoiced") ?? holder;
   const insuredPerson = offer.insuredPersons[0];
   const scheduleCoverages = offer.schedules.flatMap((s) => s.coverages);
-  const insuredAmount =
-    offer.schedules.reduce((sum, s) => sum + (s.insuredAmount || 0), 0) ||
-    scheduleCoverages.reduce((sum, c) => sum + (c.sumInsured || 0), 0);
 
   const verificationChecks: VerificationCheck[] = offer.schedules.flatMap((s) =>
     computeScheduleVerification(s.documents, {
@@ -534,6 +547,21 @@ const OfferDetail = () => {
       setCancelScheduleYear(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to cancel schedule");
+    }
+  };
+
+  const handleApproveSchedule = async (year: number) => {
+    try {
+      setApprovingScheduleYear(year);
+      await issuePolicy.mutateAsync({
+        offerId: offer.id,
+        year: String(year),
+      });
+      toast.success(`Schedule ${year} approved`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to approve schedule");
+    } finally {
+      setApprovingScheduleYear(null);
     }
   };
 
@@ -632,22 +660,29 @@ const OfferDetail = () => {
 
   const handleSubmitScheduleDocument = async () => {
     if (!docSubmitDialog) return;
-    if (!docSubmitDocumentId) {
-      toast.error("Select a document");
+    if (!docSubmitFile) {
+      toast.error("Choose a file to upload");
       return;
     }
     try {
+      setDocSubmitPending(true);
+      const uploaded = await createDocument(
+        buildCreateDocumentFormData(docSubmitFile, docSubmitFile.name)
+      );
+      if (!uploaded.id) throw new Error("Upload did not return a document id");
       await submitScheduleDocument.mutateAsync({
         offerId: offer.id,
         year: String(docSubmitDialog.year),
         requirementId: docSubmitDialog.requirementId,
-        body: { documentId: docSubmitDocumentId },
+        body: { documentId: uploaded.id },
       });
       toast.success(`Document submitted: ${docSubmitDialog.label}`);
       setDocSubmitDialog(null);
-      setDocSubmitDocumentId("");
+      setDocSubmitFile(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit document");
+    } finally {
+      setDocSubmitPending(false);
     }
   };
 
@@ -752,8 +787,15 @@ const OfferDetail = () => {
           <CardContent><div className="text-lg font-semibold">{offer.currency}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1.5"><CardDescription>Insured Amount</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{fmtMoney(insuredAmount, offer.currency)}</div></CardContent>
+          <CardHeader className="pb-1.5"><CardDescription>Schedules</CardDescription></CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">
+              {offer.schedules.length}
+              <span className="text-sm font-normal text-muted-foreground ml-1">
+                {offer.schedules.length === 1 ? "schedule" : "schedules"}
+              </span>
+            </div>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Term</CardDescription></CardHeader>
@@ -793,10 +835,64 @@ const OfferDetail = () => {
             <Card className="lg:col-span-2">
               <CardHeader><CardTitle className="text-base">Product & Coverage</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                <Field label="Product" value={product?.name} />
-                <Field label="Product Code" value={<span className="font-mono text-xs">{product?.code}</span>} />
-                <Field label="Product ID" value={<span className="font-mono text-xs">{offer.productId}</span>} />
-                <Field label="Currency" value={offer.currency} />
+                <Field label="Name" value={product?.name} />
+                <Field
+                  label="Printable template"
+                  value={
+                    templateDocumentId ? (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate" title={templateDocument?.originalFileName}>
+                          {templateDocument?.originalFileName ??
+                            templateDocument?.storedFileName ??
+                            "Loading…"}
+                        </span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                          title="Download template"
+                          onClick={() => {
+                            void downloadDocumentFile(
+                              templateDocumentId,
+                              templateDocument?.originalFileName ??
+                                templateDocument?.storedFileName,
+                            ).catch((err) =>
+                              toast.error(
+                                err instanceof Error ? err.message : "Failed to download file",
+                              ),
+                            );
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : undefined
+                  }
+                />
+                <div className="col-span-2">
+                  <Field
+                    label="Coverage text"
+                    value={
+                      product?.coverageText?.trim() ? (
+                        <span className="whitespace-pre-wrap font-normal">{product.coverageText}</span>
+                      ) : undefined
+                    }
+                  />
+                </div>
+                <Field
+                  label="Currency"
+                  value={paymentMethod?.currency ?? offer.currency}
+                />
+                <Field
+                  label="Bank"
+                  value={
+                    paymentBankAccount
+                      ? [paymentBankAccount.bankName, paymentBankAccount.iban || paymentBankAccount.accountNumber]
+                          .filter(Boolean)
+                          .join(" · ") || paymentBankAccountId
+                      : paymentBankAccountId || undefined
+                  }
+                />
                 <div className="col-span-2">
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Schedule Coverages</div>
                   {scheduleCoverages.length === 0 ? (
@@ -850,7 +946,6 @@ const OfferDetail = () => {
                 <Field label="Start Date" value={<span className="font-mono text-xs">{offer.startDate}</span>} />
                 <Field label="End Date" value={<span className="font-mono text-xs">{offer.endDate}</span>} />
                 <Field label="Term" value={`${offer.termYears} years`} />
-                <Field label="Insured Amount" value={fmtMoney(insuredAmount, offer.currency)} />
                 {offer.loanDisbursements.length > 0 && (
                   <div className="col-span-2 mt-2 pt-3 border-t space-y-3">
                     <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -962,7 +1057,7 @@ const OfferDetail = () => {
                         const docActionPending =
                           approveScheduleDocument.isPending ||
                           rejectScheduleDocument.isPending ||
-                          submitScheduleDocument.isPending;
+                          docSubmitPending;
 
                         return (
                           <Fragment key={s.id || s.year}>
@@ -1022,6 +1117,16 @@ const OfferDetail = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    className="gap-1.5 h-8 border-blue-500 text-blue-600 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                    disabled={isCancelled || issuePolicy.isPending}
+                                    onClick={() => void handleApproveSchedule(s.year)}
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    {approvingScheduleYear === s.year ? "Approving…" : "Approve"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
                                     disabled={isCancelled}
                                     onClick={() => {
@@ -1057,7 +1162,7 @@ const OfferDetail = () => {
                                     documentTypeNameById={documentTypeNameById}
                                     docActionPending={docActionPending}
                                     onSubmit={(args) => {
-                                      setDocSubmitDocumentId("");
+                                      setDocSubmitFile(null);
                                       setDocSubmitDialog(args);
                                     }}
                                     onApprove={setPendingDocApprove}
@@ -1267,7 +1372,7 @@ const OfferDetail = () => {
             onOpenChange={(open) => {
               if (!open) {
                 setDocSubmitDialog(null);
-                setDocSubmitDocumentId("");
+                setDocSubmitFile(null);
               }
             }}
           >
@@ -1275,42 +1380,39 @@ const OfferDetail = () => {
               <DialogHeader>
                 <DialogTitle>Submit document · {docSubmitDialog?.label}</DialogTitle>
                 <DialogDescription>
-                  Select a document to submit for schedule year {docSubmitDialog?.year}.
+                  Upload a file to submit for schedule year {docSubmitDialog?.year}.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2 py-2">
-                <Label>Document</Label>
-                <Select value={docSubmitDocumentId} onValueChange={setDocSubmitDocumentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select document…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(documentsPage?.items ?? [])
-                      .filter((doc) => Boolean(doc.id))
-                      .map((doc) => (
-                        <SelectItem key={doc.id!} value={doc.id!}>
-                          {doc.originalFileName ?? doc.storedFileName ?? doc.id}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="doc-submit-file">File</Label>
+                <Input
+                  id="doc-submit-file"
+                  type="file"
+                  disabled={docSubmitPending}
+                  onChange={(e) => setDocSubmitFile(e.target.files?.[0] ?? null)}
+                />
+                {docSubmitFile && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    Selected: {docSubmitFile.name}
+                  </p>
+                )}
               </div>
               <DialogFooter>
                 <Button
                   variant="outline"
                   onClick={() => {
                     setDocSubmitDialog(null);
-                    setDocSubmitDocumentId("");
+                    setDocSubmitFile(null);
                   }}
-                  disabled={submitScheduleDocument.isPending}
+                  disabled={docSubmitPending}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={() => void handleSubmitScheduleDocument()}
-                  disabled={submitScheduleDocument.isPending || !docSubmitDocumentId}
+                  disabled={docSubmitPending || !docSubmitFile}
                 >
-                  {submitScheduleDocument.isPending ? "Submitting…" : "Submit"}
+                  {docSubmitPending ? "Submitting…" : "Submit"}
                 </Button>
               </DialogFooter>
             </DialogContent>
