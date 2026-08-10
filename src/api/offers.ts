@@ -12,6 +12,8 @@ import type {
   OffersOfferScheduleDiscountRequestResponse,
   OffersOfferScheduleDocumentResponse,
   OffersOfferScheduleResponse,
+  OffersOfferScheduleReviewFlagResponse,
+  OffersOfferPremiumPreview,
   OffersRejectOfferScheduleDocumentRequest,
   OffersRequestOfferScheduleDiscountRequest,
   OffersSubmitOfferScheduleDocumentRequest,
@@ -26,6 +28,7 @@ export const offersKeys = {
   list: (params?: Record<string, unknown>) => [...offersKeys.lists(), params ?? {}] as const,
   details: () => [...offersKeys.all, "detail"] as const,
   detail: (id: string) => [...offersKeys.details(), id] as const,
+  premium: (offerId: string) => [...offersKeys.detail(offerId), "premium"] as const,
   scheduleDocuments: (offerId: string, year: string) =>
     [...offersKeys.detail(offerId), "schedules", year, "documents"] as const,
 };
@@ -53,6 +56,54 @@ export const useIssuePolicy = () => {
       body?: PoliciesIssuePolicyRequest;
     }) =>
       issuePolicy(vars.offerId, vars.year, vars.body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: offersKeys.all });
+      void queryClient.invalidateQueries({ queryKey: [...apiKeys.all, "policies"] });
+    },
+  });
+};
+
+/** POST /api/offers/{offerId}/policy */
+export const issueOfferPolicy = async (
+  offerId: string,
+  body?: PoliciesIssuePolicyRequest,
+  signal?: AbortSignal
+): Promise<PoliciesPolicyResponse> =>
+  apiRequest<PoliciesPolicyResponse>({
+    method: "POST",
+    path: `/api/offers/${encodeURIComponent(offerId)}/policy`,
+    ...(body !== undefined ? { body } : {}),
+    signal,
+  });
+
+export const useIssueOfferPolicy = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { offerId: string; body?: PoliciesIssuePolicyRequest }) =>
+      issueOfferPolicy(vars.offerId, vars.body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: offersKeys.all });
+      void queryClient.invalidateQueries({ queryKey: [...apiKeys.all, "policies"] });
+    },
+  });
+};
+
+/** POST /api/offers/{offerId}/renewal */
+export const renewOffer = async (
+  offerId: string,
+  signal?: AbortSignal
+): Promise<PoliciesPolicyResponse> =>
+  apiRequest<PoliciesPolicyResponse>({
+    method: "POST",
+    path: `/api/offers/${encodeURIComponent(offerId)}/renewal`,
+    signal,
+    body: {}
+  });
+
+export const useRenewOffer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (offerId: string) => renewOffer(offerId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
       void queryClient.invalidateQueries({ queryKey: [...apiKeys.all, "policies"] });
@@ -174,6 +225,62 @@ export const useApproveOfferScheduleDocument = () => {
     },
   });
 };
+
+/** POST /api/offers/{offerId}/schedules/{year}/review-flags/{flagId}/approval */
+export const approveOfferScheduleReviewFlag = async (
+  offerId: string,
+  year: string,
+  flagId: string,
+  signal?: AbortSignal
+): Promise<OffersOfferScheduleReviewFlagResponse> =>
+  apiRequest<OffersOfferScheduleReviewFlagResponse>({
+    method: "POST",
+    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/review-flags/${encodeURIComponent(flagId)}/approval`,
+    signal,
+  });
+
+export const useApproveOfferScheduleReviewFlag = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { offerId: string; year: string; flagId: string }) =>
+      approveOfferScheduleReviewFlag(vars.offerId, vars.year, vars.flagId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: offersKeys.all });
+    },
+  });
+};
+
+/**
+ * POST /api/offers/{offerId}/premium
+ * Non-persisting premium preview for a draft offer (per loan-disbursement year).
+ * Only insuredAmount + premium are kept from the schedule response.
+ */
+export const previewOfferPremium = async (
+  offerId: string,
+  signal?: AbortSignal
+): Promise<OffersOfferPremiumPreview[]> => {
+  const rows = await apiRequest<OffersOfferScheduleResponse[]>({
+    method: "POST",
+    path: `/api/offers/${encodeURIComponent(offerId)}/premium`,
+    signal,
+    body: {},
+  });
+  return (rows ?? []).map((s) => ({
+    insuredAmount: s.insuredAmount ?? 0,
+    premium: s.premium ?? 0,
+  }));
+};
+
+export const usePreviewOfferPremium = (
+  offerId: string,
+  options?: { enabled?: boolean }
+) =>
+  useQuery({
+    queryKey: offersKeys.premium(offerId),
+    queryFn: ({ signal }) => previewOfferPremium(offerId, signal),
+    enabled: Boolean(offerId) && (options?.enabled ?? true),
+    retry: false,
+  });
 
 /** POST /api/offers/{offerId}/schedules */
 export const calculateOfferSchedules = async (offerId: string, signal?: AbortSignal): Promise<OffersOfferResponse> =>
@@ -357,6 +464,30 @@ export const useRejectOfferScheduleDocument = () => {
       body: OffersRejectOfferScheduleDocumentRequest;
     }) =>
       rejectOfferScheduleDocument(vars.offerId, vars.year, vars.requirementId, vars.body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: offersKeys.all });
+    },
+  });
+};
+
+/** POST /api/offers/{offerId}/schedules/{year}/review-flags/{flagId}/rejection */
+export const rejectOfferScheduleReviewFlag = async (
+  offerId: string,
+  year: string,
+  flagId: string,
+  signal?: AbortSignal
+): Promise<OffersOfferScheduleReviewFlagResponse> =>
+  apiRequest<OffersOfferScheduleReviewFlagResponse>({
+    method: "POST",
+    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/review-flags/${encodeURIComponent(flagId)}/rejection`,
+    signal,
+  });
+
+export const useRejectOfferScheduleReviewFlag = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { offerId: string; year: string; flagId: string }) =>
+      rejectOfferScheduleReviewFlag(vars.offerId, vars.year, vars.flagId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },

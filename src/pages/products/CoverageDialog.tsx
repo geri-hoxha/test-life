@@ -33,6 +33,8 @@ type FormState = {
   ratingTableId: string;
   ratingTableMultiplier: number;
   isMandatory: boolean;
+  isSumInsuredFixed: boolean;
+  sumInsuredPercentage: number;
 };
 
 const blankForm = (): FormState => ({
@@ -43,6 +45,8 @@ const blankForm = (): FormState => ({
   ratingTableId: "",
   ratingTableMultiplier: 1,
   isMandatory: true,
+  isSumInsuredFixed: true,
+  sumInsuredPercentage: 1,
 });
 
 const CoverageDialog = ({
@@ -112,6 +116,10 @@ const CoverageDialog = ({
       isActive: true,
       ratingTableId: form.ratingTableId,
       ratingTableMultiplier: form.ratingTableMultiplier || 1,
+      isSumInsuredFixed: form.isSumInsuredFixed,
+      sumInsuredPercentage: form.isSumInsuredFixed
+        ? undefined
+        : form.sumInsuredPercentage || 1,
     });
     onOpenChange(false);
   };
@@ -138,6 +146,8 @@ const CoverageDialog = ({
                   ratingTableId: s.ratingTableId,
                   ratingTableMultiplier: s.ratingTableMultiplier,
                   isMandatory: s.isMandatory,
+                  isSumInsuredFixed: s.isSumInsuredFixed,
+                  sumInsuredPercentage: s.sumInsuredPercentage,
                 }))
               }
             >
@@ -266,6 +276,34 @@ const CoverageDialog = ({
               />
             </label>
           </div>
+
+          <div className="space-y-1.5">
+            <Label className="block">Sum insured fixed</Label>
+            <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+              <span className="text-sm">{form.isSumInsuredFixed ? "Fixed" : "Not fixed"}</span>
+              <Switch
+                checked={form.isSumInsuredFixed}
+                onCheckedChange={(v) => setForm((s) => ({ ...s, isSumInsuredFixed: v }))}
+              />
+            </label>
+          </div>
+
+          {!form.isSumInsuredFixed && (
+            <div className="space-y-1.5">
+              <Label htmlFor="sip">Sum insured percentage</Label>
+              <Input
+                id="sip"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.sumInsuredPercentage}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, sumInsuredPercentage: +e.target.value }))
+                }
+                className="font-mono"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter>

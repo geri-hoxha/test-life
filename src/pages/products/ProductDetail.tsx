@@ -51,6 +51,7 @@ type EditableFields = {
   sumInsuredBasis: string;
   issuanceMode: ProductsIssuanceMode | "";
   calculationMethod: ProductsCalculationMethod | "";
+  maxCoveredYears: string;
   bankAccountIds: string[];
 };
 
@@ -110,6 +111,10 @@ const ProductDetail = () => {
       sumInsuredBasis: product.sumInsuredBasis ?? "",
       issuanceMode: (product.issuanceMode as ProductsIssuanceMode | null) ?? "",
       calculationMethod: (product.calculationMethod as ProductsCalculationMethod | null) ?? "",
+      maxCoveredYears:
+        product.maxCoveredYears != null && product.maxCoveredYears !== undefined
+          ? String(product.maxCoveredYears)
+          : "",
       bankAccountIds: [...currentBankAccountIds],
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when product or payment method ids change by value
@@ -154,6 +159,10 @@ const ProductDetail = () => {
     fields.sumInsuredBasis !== (product.sumInsuredBasis ?? "") ||
     fields.issuanceMode !== (product.issuanceMode ?? "") ||
     fields.calculationMethod !== (product.calculationMethod ?? "") ||
+    fields.maxCoveredYears !==
+      (product.maxCoveredYears != null && product.maxCoveredYears !== undefined
+        ? String(product.maxCoveredYears)
+        : "") ||
     paymentDirty;
 
   const toggleCurrency = (c: string) =>
@@ -185,6 +194,7 @@ const ProductDetail = () => {
           sumInsuredBasis: fields.sumInsuredBasis || null,
           issuanceMode: fields.issuanceMode || null,
           calculationMethod: fields.calculationMethod || null,
+          maxCoveredYears: fields.maxCoveredYears === "" ? null : Number(fields.maxCoveredYears),
         },
       });
 
@@ -425,6 +435,19 @@ const ProductDetail = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-max-covered-years">Max covered years</Label>
+                <Input
+                  id="p-max-covered-years"
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="font-mono"
+                  value={fields.maxCoveredYears}
+                  onChange={(e) => setFields({ ...fields, maxCoveredYears: e.target.value })}
+                  placeholder="e.g. 30"
+                />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Payment method</Label>

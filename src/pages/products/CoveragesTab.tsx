@@ -88,6 +88,10 @@ const CoveragesTab = ({ productId }: Props) => {
           ratingTableId: c.ratingTableId,
           ratingTableMultiplier: c.ratingTableMultiplier ?? 1,
           isMandatory: c.coverageType === "Mandatory",
+          isSumInsuredFixed: c.isSumInsuredFixed ?? true,
+          ...((c.isSumInsuredFixed ?? true)
+            ? {}
+            : { sumInsuredPercentage: c.sumInsuredPercentage ?? 1 }),
         },
       });
       toast.success(`Coverage ${c.name} linked to product`);
@@ -143,6 +147,7 @@ const CoveragesTab = ({ productId }: Props) => {
                 <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Coverage</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Rating table</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Multiplier</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Sum insured</TableHead>
                 <TableHead className="text-right text-xs uppercase tracking-wider font-semibold text-muted-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -164,6 +169,14 @@ const CoveragesTab = ({ productId }: Props) => {
                   </TableCell>
                   <TableCell className="font-mono text-sm">
                     {c.ratingTableMultiplier ?? 1}x
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    <div>{c.isSumInsuredFixed ?? true ? "Fixed" : "Not fixed"}</div>
+                    {!(c.isSumInsuredFixed ?? true) && (
+                      <div className="font-mono text-xs text-muted-foreground mt-0.5">
+                        {c.sumInsuredPercentage ?? 1}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

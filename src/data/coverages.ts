@@ -21,6 +21,8 @@ export type Coverage = {
   /** Product-coverage link: rating table used for premium calculation. */
   ratingTableId?: string;
   ratingTableMultiplier?: number;
+  isSumInsuredFixed?: boolean;
+  sumInsuredPercentage?: number;
   /** Product-coverage link sort order from API. */
   sortOrder?: number;
 };

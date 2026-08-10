@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,6 +21,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { seedProducts } from "@/data/products";
 import { getCustomer, fullName } from "@/data/customers";
@@ -31,10 +33,13 @@ import type { PremiumResult } from "./PremiumCalculation";
 export type CheckResult = "Passed" | "Warning" | "Requires Review";
 
 export type VerificationCheck = {
+  id?: string;
   name: string;
   result: CheckResult;
   reason: string;
   action: string;
+  /** Raw backend review-flag status when sourced from `reviewFlags`. */
+  flagStatus?: string;
 };
 
 type Props = {
@@ -70,136 +75,54 @@ export const resultStyle: Record<CheckResult, { badge: string; row: string; icon
   },
 };
 
-type ScheduleDocLike = {
-  documentTypeId: string;
-  status: "required" | "submitted" | "accepted" | "refused";
-  refusalReason?: string | null;
-};
-
-/** Per-schedule verification derived from that schedule's document requirements. */
-export const computeScheduleVerification = (
-  documents: ScheduleDocLike[],
-  opts?: {
-    insuredAmount?: number;
-    currency?: string;
-    documentTypeNameById?: Record<string, string>;
-    internalStatus?: string;
-  }
-): VerificationCheck[] => {
-  const nameOf = (id: string) => opts?.documentTypeNameById?.[id] ?? id;
-  const checks: VerificationCheck[] = [];
-  const currency = opts?.currency ?? "EUR";
-
-  if (opts?.internalStatus === "cancelled") {
-    checks.push({
-      name: "Schedule Status",
-      result: "Warning",
-      reason: "This schedule has been cancelled.",
-      action: "No further document collection or issuance for this year.",
-    });
-  }
-
-  if (documents.length === 0) {
-    checks.push({
-      name: "Document Requirements",
-      result: "Passed",
-      reason: "No document requirements on this schedule.",
-      action: "No action required.",
-    });
-  } else {
-    const required = documents.filter((d) => d.status === "required");
-    const refused = documents.filter((d) => d.status === "refused");
-    const submitted = documents.filter((d) => d.status === "submitted");
-    const accepted = documents.filter((d) => d.status === "accepted");
-
-    if (required.length > 0) {
-      checks.push({
-        name: "Missing Documents",
-        result: "Requires Review",
-        reason: `${required.length} document(s) still required: ${required.map((d) => nameOf(d.documentTypeId)).join(", ")}.`,
-        action: "Collect and submit outstanding documents.",
-      });
-    } else {
-      checks.push({
-        name: "Missing Documents",
-        result: "Passed",
-        reason: "No outstanding required documents.",
-        action: "No action required.",
-      });
+/** Map backend schedule `reviewFlags` into verification table rows. */
+export const mapReviewFlagsToChecks = (
+  flags: {
+    id?: string;
+    type?: string;
+    reason?: string;
+    status?: string;
+  }[]
+): VerificationCheck[] =>
+  flags.map((f) => {
+    const status = (f.status ?? "pending").toLowerCase();
+    let result: CheckResult = "Requires Review";
+    let action = "Resolve this review flag.";
+    if (status === "approved") {
+      result = "Passed";
+      action = "No action required.";
+    } else if (status === "rejected") {
+      result = "Warning";
+      action = "Flag was rejected — escalate or revise the offer.";
     }
 
-    if (refused.length > 0) {
-      checks.push({
-        name: "Refused Documents",
-        result: "Requires Review",
-        reason: `${refused.length} document(s) refused: ${refused
-          .map((d) => `${nameOf(d.documentTypeId)}${d.refusalReason ? ` (${d.refusalReason})` : ""}`)
-          .join("; ")}.`,
-        action: "Resubmit corrected documents.",
-      });
-    } else {
-      checks.push({
-        name: "Refused Documents",
-        result: "Passed",
-        reason: "No refused documents on this schedule.",
-        action: "No action required.",
-      });
-    }
+    const rawType = (f.type ?? "Review").trim() || "Review";
+    const name = rawType
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
 
-    if (submitted.length > 0) {
-      checks.push({
-        name: "Pending Document Review",
-        result: "Warning",
-        reason: `${submitted.length} document(s) awaiting review: ${submitted.map((d) => nameOf(d.documentTypeId)).join(", ")}.`,
-        action: "Approve or reject submitted documents.",
-      });
-    } else {
-      checks.push({
-        name: "Pending Document Review",
-        result: "Passed",
-        reason: "No documents awaiting review.",
-        action: "No action required.",
-      });
-    }
+    return {
+      id: f.id,
+      name,
+      result,
+      reason: f.reason?.trim() || "No reason provided.",
+      action,
+      flagStatus: status,
+    };
+  });
 
-    if (accepted.length === documents.length) {
-      checks.push({
-        name: "Document Completion",
-        result: "Passed",
-        reason: `All ${accepted.length} schedule document(s) accepted.`,
-        action: "No action required.",
-      });
-    } else {
-      checks.push({
-        name: "Document Completion",
-        result: "Requires Review",
-        reason: `${accepted.length} of ${documents.length} document(s) accepted.`,
-        action: "Complete remaining document workflow before issuance.",
-      });
-    }
-  }
-
-  const amount = opts?.insuredAmount ?? 0;
-  if (amount >= HIGH_INSURED_THRESHOLD) {
-    checks.push({
-      name: "Insured Amount Threshold",
-      result: "Requires Review",
-      reason: `Schedule insured amount ${amount.toLocaleString()} ${currency} ≥ ${HIGH_INSURED_THRESHOLD.toLocaleString()}.`,
-      action: "Underwriter sign-off required for high coverage.",
-    });
-  } else if (amount > 0) {
-    checks.push({
-      name: "Insured Amount Threshold",
-      result: "Passed",
-      reason: `Schedule insured amount ${amount.toLocaleString()} ${currency} below threshold.`,
-      action: "No action required.",
-    });
-  }
-
-  return checks;
-};
-
-export const VerificationChecksTable = ({ checks }: { checks: VerificationCheck[] }) => (
+export const VerificationChecksTable = ({
+  checks,
+  actionPending,
+  onApprove,
+  onReject,
+}: {
+  checks: VerificationCheck[];
+  actionPending?: boolean;
+  onApprove?: (flagId: string) => void;
+  onReject?: (flagId: string) => void;
+}) => (
   <div className="rounded-md border overflow-x-auto">
     <Table className="text-xs">
       <TableHeader>
@@ -217,14 +140,19 @@ export const VerificationChecksTable = ({ checks }: { checks: VerificationCheck[
               colSpan={4}
               className="px-2 py-4 text-center text-xs text-muted-foreground"
             >
-              No verification checks for this schedule.
+              No review flags for this schedule.
             </TableCell>
           </TableRow>
         ) : (
           checks.map((c, i) => {
             const s = resultStyle[c.result];
+            const canResolve =
+              Boolean(c.id) &&
+              Boolean(onApprove || onReject) &&
+              c.flagStatus !== "approved" &&
+              c.flagStatus !== "rejected";
             return (
-              <TableRow key={`${c.name}-${i}`} className={s.row}>
+              <TableRow key={`${c.id ?? c.name}-${i}`} className={s.row}>
                 <TableCell className="w-1/3 px-2 py-1.5">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="[&>svg]:h-3.5 [&>svg]:w-3.5 shrink-0">{s.icon}</span>
@@ -243,7 +171,36 @@ export const VerificationChecksTable = ({ checks }: { checks: VerificationCheck[
                   {c.reason}
                 </TableCell>
                 <TableCell className="px-2 py-1.5 text-xs leading-snug">
-                  {c.action === "No action required." ? "—" : c.action}
+                  {canResolve ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {onApprove ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 h-7 px-2 text-[11px] border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                          disabled={actionPending}
+                          onClick={() => onApprove(c.id!)}
+                        >
+                          <CheckCircle2 className="h-3 w-3" /> Approve
+                        </Button>
+                      ) : null}
+                      {onReject ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 h-7 px-2 text-[11px] text-destructive hover:text-destructive"
+                          disabled={actionPending}
+                          onClick={() => onReject(c.id!)}
+                        >
+                          <XCircle className="h-3 w-3" /> Reject
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : c.action === "No action required." ? (
+                    "—"
+                  ) : (
+                    c.action
+                  )}
                 </TableCell>
               </TableRow>
             );

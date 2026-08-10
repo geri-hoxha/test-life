@@ -76,6 +76,7 @@ const mapSchedule = (s: OffersOfferScheduleResponse): OfferSchedule => ({
   insuredAmount: s.insuredAmount ?? 0,
   premium: s.premium ?? 0,
   internalStatus: s.internalStatus,
+  policyId: s.policyId ?? null,
   coverages:
     s.coverages?.map((c) => ({
       id: String(c.id ?? ""),
@@ -99,6 +100,15 @@ const mapSchedule = (s: OffersOfferScheduleResponse): OfferSchedule => ({
       requestedDiscountPercentage: r.requestedDiscountPercentage ?? 0,
       reason: r.reason ?? "",
       status: r.status ?? "requested",
+    })) ?? [],
+  reviewFlags:
+    s.reviewFlags?.map((f) => ({
+      id: String(f.id ?? ""),
+      type: f.type ?? "",
+      reason: f.reason ?? "",
+      status: f.status ?? "pending",
+      raisedOnUtc: f.raisedOnUtc,
+      resolvedOnUtc: f.resolvedOnUtc ?? null,
     })) ?? [],
 });
 

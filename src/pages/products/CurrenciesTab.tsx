@@ -9,7 +9,10 @@ import {
   useGetProduct,
   useAddProductPaymentMethod,
   useRemoveProductPaymentMethod,
+  useAddProductCoverageCurrencyLimit,
+  useRemoveProductCoverageCurrencyLimit,
 } from "@/api/products";
+import { useListCoverages } from "@/api/coverages";
 import { useListBankAccounts } from "@/api/bank-accounts";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
 import type { BankAccountsBankAccountResponse } from "@/api/types";
@@ -48,15 +51,27 @@ const fromBankAccount = (account?: BankAccountsBankAccountResponse | null): Curr
 
 const CurrenciesTab = ({ productId, currencies }: { productId: string; currencies: string[] }) => {
   const { data: apiProduct, isLoading: productLoading } = useGetProduct(productId);
+  const { data: catalogPage, isLoading: catalogLoading } = useListCoverages({
+    pageNumber: 1,
+    pageSize: 200,
+  });
   const { data: bankAccountsPage, isLoading: accountsLoading } = useListBankAccounts({
     pageNumber: 1,
     pageSize: 200,
   });
   const addPaymentMethod = useAddProductPaymentMethod();
   const removePaymentMethod = useRemoveProductPaymentMethod();
+  const addCurrencyLimit = useAddProductCoverageCurrencyLimit();
+  const removeCurrencyLimit = useRemoveProductCoverageCurrencyLimit();
 
   const bankAccounts = bankAccountsPage?.items ?? [];
   const paymentMethods = apiProduct?.paymentMethods ?? [];
+  const productCoverages = apiProduct?.coverages ?? [];
+
+  const catalogById = useMemo(
+    () => Object.fromEntries((catalogPage?.items ?? []).map((c) => [c.id ?? "", c])),
+    [catalogPage?.items]
+  );
 
   const accountsById = useMemo(
     () => Object.fromEntries(bankAccounts.map((a) => [a.id ?? "", a])),
@@ -94,6 +109,8 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
     Record<string, string>
   >({});
   const [savingCurrency, setSavingCurrency] = useState<string | null>(null);
+  const [draftLimitValues, setDraftLimitValues] = useState<Record<string, string>>({});
+  const [busyLimitKey, setBusyLimitKey] = useState<string | null>(null);
 
   useEffect(() => {
     const next: Record<string, string> = {};
@@ -178,7 +195,64 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
     }
   };
 
-  if (productLoading || accountsLoading) {
+  const limitDraftKey = (currency: string, coverageEntryId: string) =>
+    `${currency}:${coverageEntryId}`;
+
+  const addLimit = async (currency: string, coverageEntryId: string) => {
+    const key = limitDraftKey(currency, coverageEntryId);
+    const raw = draftLimitValues[key]?.trim() ?? "";
+    const value = Number(raw);
+    if (!raw || Number.isNaN(value)) {
+      toast.error("Enter a valid limit value");
+      return;
+    }
+
+    setBusyLimitKey(key);
+    try {
+      await addCurrencyLimit.mutateAsync({
+        productId,
+        coverageEntryId,
+        body: {
+          currency,
+          type: "fixedSumInsuredAmount",
+          value,
+        },
+      });
+      setDraftLimitValues((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      toast.success(`${currency} currency limit added`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add currency limit");
+    } finally {
+      setBusyLimitKey(null);
+    }
+  };
+
+  const deleteLimit = async (
+    currency: string,
+    coverageEntryId: string,
+    currencyLimitEntryId: string,
+  ) => {
+    const key = `${limitDraftKey(currency, coverageEntryId)}:del:${currencyLimitEntryId}`;
+    setBusyLimitKey(key);
+    try {
+      await removeCurrencyLimit.mutateAsync({
+        productId,
+        coverageEntryId,
+        currencyLimitEntryId,
+      });
+      toast.success(`${currency} currency limit removed`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove currency limit");
+    } finally {
+      setBusyLimitKey(null);
+    }
+  };
+
+  if (productLoading || accountsLoading || catalogLoading) {
     return (
       <Card className="p-10 text-center shadow-card border-border">
         <p className="text-sm text-muted-foreground">Loading currency bank configurations…</p>
@@ -329,6 +403,123 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
                   <Plus className="h-4 w-4" /> {busy ? "Adding…" : "Add payment method"}
                 </Button>
               )}
+
+              <div className="space-y-3 pt-2 border-t border-border">
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground">Coverage currency limits</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Fixed sum insured amount limits per coverage for {cur}.
+                  </p>
+                </div>
+
+                {productCoverages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No coverages linked to this product yet.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {productCoverages.map((entry) => {
+                      const coverageEntryId = entry.id != null ? String(entry.id) : "";
+                      if (!coverageEntryId) return null;
+
+                      const catalog = catalogById[entry.coverageId ?? ""];
+                      const coverageName =
+                        catalog?.name?.trim() || entry.coverageId || coverageEntryId;
+                      const limitsForCurrency = (entry.currencyLimits ?? []).filter(
+                        (l) => (l.currency ?? "").trim() === cur
+                      );
+                      const draftKey = limitDraftKey(cur, coverageEntryId);
+                      const adding = busyLimitKey === draftKey;
+
+                      return (
+                        <div
+                          key={`${cur}-${coverageEntryId}`}
+                          className="rounded-md border border-border p-3 space-y-3"
+                        >
+                          <div>
+                            <div className="text-sm font-medium text-foreground">{coverageName}</div>
+                            <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                              {entry.coverageId ?? coverageEntryId}
+                            </div>
+                          </div>
+
+                          {limitsForCurrency.length > 0 ? (
+                            <div className="space-y-2">
+                              {limitsForCurrency.map((limit) => {
+                                const limitId = limit.id != null ? String(limit.id) : "";
+                                const deleting =
+                                  busyLimitKey === `${draftKey}:del:${limitId}`;
+                                return (
+                                  <div
+                                    key={limitId || `${limit.type}-${limit.value}`}
+                                    className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-3 py-2"
+                                  >
+                                    <div className="text-sm">
+                                      <span className="text-muted-foreground">
+                                        {limit.type ?? "fixedSumInsuredAmount"}
+                                      </span>
+                                      <span className="font-mono ml-2">
+                                        {(limit.value ?? 0).toLocaleString()} {cur}
+                                      </span>
+                                    </div>
+                                    {limitId && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="gap-1.5 h-8"
+                                        disabled={deleting}
+                                        onClick={() =>
+                                          void deleteLimit(cur, coverageEntryId, limitId)
+                                        }
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        {deleting ? "Removing…" : "Remove"}
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                              <div className="space-y-1.5 flex-1">
+                                <Label htmlFor={`limit-${draftKey}`}>
+                                  Fixed sum insured amount
+                                </Label>
+                                <Input
+                                  id={`limit-${draftKey}`}
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="font-mono"
+                                  value={draftLimitValues[draftKey] ?? ""}
+                                  onChange={(e) =>
+                                    setDraftLimitValues((prev) => ({
+                                      ...prev,
+                                      [draftKey]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="0"
+                                  disabled={adding}
+                                />
+                              </div>
+                              <Button
+                                size="sm"
+                                className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+                                disabled={adding || !(draftLimitValues[draftKey] ?? "").trim()}
+                                onClick={() => void addLimit(cur, coverageEntryId)}
+                              >
+                                <Plus className="h-4 w-4" />
+                                {adding ? "Adding…" : "Add limit"}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         );

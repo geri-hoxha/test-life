@@ -34,7 +34,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -67,20 +66,24 @@ import {
   ChevronRight,
   ChevronDown,
   Download,
+  Calculator,
+  Loader2,
 } from "lucide-react";
 import { getOffer, statusColor } from "@/data/offers";
 import { ageFromDob } from "@/data/customers";
 import {
   VerificationCheck,
   VerificationChecksTable,
-  computeScheduleVerification,
+  mapReviewFlagsToChecks,
   overallStatus,
 } from "./VerificationStep";
 import { toast } from "sonner";
+import { toastApiError } from "@/lib/api-error";
 import {
   useGetOffer,
   useCancelOffer,
   useCalculateOfferSchedules,
+  usePreviewOfferPremium,
   useRemoveOfferInsuredPerson,
   useRemoveOfferParticipant,
   useCancelOfferSchedule,
@@ -91,7 +94,10 @@ import {
   useRejectOfferScheduleDocument,
   useSubmitOfferScheduleDocument,
   useListOfferScheduleDocuments,
-  useIssuePolicy,
+  useApproveOfferScheduleReviewFlag,
+  useRejectOfferScheduleReviewFlag,
+  useIssueOfferPolicy,
+  useRenewOffer,
 } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useGetProduct, mapApiProduct } from "@/api/products";
@@ -178,25 +184,32 @@ type ScheduleDocAction = {
 const ScheduleExpandedPanel = ({
   offerId,
   year,
-  currency,
-  insuredAmount,
-  internalStatus,
+  reviewFlags,
   documentTypeNameById,
   docActionPending,
+  flagActionPending,
   onSubmit,
   onApprove,
   onReject,
+  onApproveFlag,
+  onRejectFlag,
 }: {
   offerId: string;
   year: number;
-  currency: string;
-  insuredAmount: number;
-  internalStatus?: string;
+  reviewFlags: {
+    id: string;
+    type: string;
+    reason: string;
+    status: string;
+  }[];
   documentTypeNameById: Record<string, string>;
   docActionPending: boolean;
+  flagActionPending: boolean;
   onSubmit: (args: ScheduleDocAction) => void;
   onApprove: (args: ScheduleDocAction) => void;
   onReject: (args: ScheduleDocAction) => void;
+  onApproveFlag: (flagId: string) => void;
+  onRejectFlag: (flagId: string) => void;
 }) => {
   const { data, isLoading, isError, error } = useListOfferScheduleDocuments(
     offerId,
@@ -216,14 +229,8 @@ const ScheduleExpandedPanel = ({
   );
 
   const scheduleChecks = useMemo(
-    () =>
-      computeScheduleVerification(documents, {
-        insuredAmount,
-        currency,
-        documentTypeNameById,
-        internalStatus,
-      }),
-    [documents, insuredAmount, currency, documentTypeNameById, internalStatus]
+    () => mapReviewFlagsToChecks(reviewFlags),
+    [reviewFlags]
   );
 
   return (
@@ -343,7 +350,12 @@ const ScheduleExpandedPanel = ({
           <h4 className="text-sm font-semibold">Verification</h4>
         </div>
         <div className="bg-background rounded-md">
-          <VerificationChecksTable checks={scheduleChecks} />
+          <VerificationChecksTable
+            checks={scheduleChecks}
+            actionPending={flagActionPending}
+            onApprove={onApproveFlag}
+            onReject={onRejectFlag}
+          />
         </div>
       </div>
     </div>
@@ -355,6 +367,13 @@ const OfferDetail = () => {
   const navigate = useNavigate();
 
   const { data: apiOffer, isLoading } = useGetOffer(id ?? "", { enabled: Boolean(id) });
+  const {
+    data: premiumPreview,
+    isFetching: premiumPreviewLoading,
+    isError: premiumPreviewError,
+    error: premiumPreviewErr,
+    refetch: refetchPremiumPreview,
+  } = usePreviewOfferPremium(id ?? "", { enabled: Boolean(id) });
   const cancelOffer = useCancelOffer();
   const calculateSchedules = useCalculateOfferSchedules();
   const removeInsuredPerson = useRemoveOfferInsuredPerson();
@@ -366,9 +385,21 @@ const OfferDetail = () => {
   const approveScheduleDocument = useApproveOfferScheduleDocument();
   const rejectScheduleDocument = useRejectOfferScheduleDocument();
   const submitScheduleDocument = useSubmitOfferScheduleDocument();
-  const issuePolicy = useIssuePolicy();
+  const approveReviewFlag = useApproveOfferScheduleReviewFlag();
+  const rejectReviewFlag = useRejectOfferScheduleReviewFlag();
+  const issueOfferPolicy = useIssueOfferPolicy();
+  const renewOffer = useRenewOffer();
   const { data: coveragesPage } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
+
+  const previewPremiumTotal = useMemo(
+    () => (premiumPreview ?? []).reduce((sum, s) => sum + s.premium, 0),
+    [premiumPreview],
+  );
+  const previewInsuredTotal = useMemo(
+    () => (premiumPreview ?? []).reduce((sum, s) => sum + s.insuredAmount, 0),
+    [premiumPreview],
+  );
 
   const [pendingRemove, setPendingRemove] = useState<
     | { kind: "insured"; id: string; label: string }
@@ -397,10 +428,27 @@ const OfferDetail = () => {
     year: number;
     label: string;
   } | null>(null);
+  const [pendingFlagAction, setPendingFlagAction] = useState<{
+    kind: "approve" | "reject";
+    flagId: string;
+    year: number;
+    label: string;
+  } | null>(null);
   const [expandedScheduleYears, setExpandedScheduleYears] = useState<Set<number>>(
     () => new Set()
   );
-  const [approvingScheduleYear, setApprovingScheduleYear] = useState<number | null>(null);
+  const [issuancePending, setIssuancePending] = useState<"issue" | "renew" | null>(
+    null
+  );
+  const [confirmAction, setConfirmAction] = useState<"reject" | "renew" | "issue" | null>(
+    null
+  );
+  const [discountConfirm, setDiscountConfirm] = useState<{
+    kind: "approve" | "reject";
+    year: number;
+    requestId: string;
+    pctLabel: string;
+  } | null>(null);
 
   const toggleScheduleExpanded = (year: number) => {
     setExpandedScheduleYears((prev) => {
@@ -481,12 +529,7 @@ const OfferDetail = () => {
   const scheduleCoverages = offer.schedules.flatMap((s) => s.coverages);
 
   const verificationChecks: VerificationCheck[] = offer.schedules.flatMap((s) =>
-    computeScheduleVerification(s.documents, {
-      insuredAmount: s.insuredAmount,
-      currency: offer.currency,
-      documentTypeNameById,
-      internalStatus: s.internalStatus,
-    })
+    mapReviewFlagsToChecks(s.reviewFlags)
   );
   const verifOverall = overallStatus(verificationChecks);
   const reviewCount = verificationChecks.filter((c) => c.result === "Requires Review").length;
@@ -497,20 +540,103 @@ const OfferDetail = () => {
       await cancelOffer.mutateAsync(offer.id);
       toast.success(`${offer.number} rejected`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reject offer");
+      toastApiError(err, "Failed to reject offer");
     }
   };
 
-  const handleApprove = () => {
-    toast.info("Offer approval is not yet available from the API");
+  const issuePolicyBody = product?.defaultPrintableTemplateDocumentId
+    ? { printableTemplateDocumentId: product.defaultPrintableTemplateDocumentId }
+    : undefined;
+
+  const issuanceMode = product?.issuanceMode ?? null;
+
+  const orderedSchedules = [...offer.schedules]
+    .filter((s) => s.internalStatus !== "cancelled")
+    .sort((a, b) => a.year - b.year);
+
+  const isScheduleApproved = (s: (typeof orderedSchedules)[number]) =>
+    Boolean(s.policyId) || s.internalStatus === "active";
+
+  const firstScheduleApproved = orderedSchedules[0]
+    ? isScheduleApproved(orderedSchedules[0])
+    : false;
+
+  /** wholeOfTerm: issue once only, no renew. annualRenewable: issue then renew. */
+  const isWholeOfTerm = issuanceMode === "wholeOfTerm";
+  const showRenewButton = !isWholeOfTerm;
+  const canIssuePolicy = !firstScheduleApproved;
+  const canRenew = showRenewButton && firstScheduleApproved;
+
+  const scheduleIssueTargets = orderedSchedules.filter((s) => !s.policyId);
+
+  const handleIssueOfferPolicy = async () => {
+    try {
+      setIssuancePending("issue");
+      if (issuanceMode === "annualRenewable") {
+        const targets =
+          scheduleIssueTargets.length > 0 ? scheduleIssueTargets : [null];
+        let issued = 0;
+        for (const _schedule of targets) {
+          await issueOfferPolicy.mutateAsync({
+            offerId: offer.id,
+            body: issuePolicyBody,
+          });
+          issued += 1;
+        }
+        toast.success(
+          issued === 1 ? "Policy issued" : `${issued} policies issued`
+        );
+      } else {
+        // wholeOfTerm: single policy issuance only
+        await issueOfferPolicy.mutateAsync({
+          offerId: offer.id,
+          body: issuePolicyBody,
+        });
+        toast.success("Policy issued");
+      }
+    } catch (err) {
+      toastApiError(err, "Failed to issue policy");
+    } finally {
+      setIssuancePending(null);
+    }
+  };
+
+  const handleRenewOffer = async () => {
+    try {
+      setIssuancePending("renew");
+      const targets =
+        scheduleIssueTargets.length > 0 ? scheduleIssueTargets : [null];
+      let renewed = 0;
+      for (const _schedule of targets) {
+        await renewOffer.mutateAsync(offer.id);
+        renewed += 1;
+      }
+      toast.success(
+        renewed === 1 ? "Renewal issued" : `${renewed} renewals issued`
+      );
+    } catch (err) {
+      toastApiError(err, "Failed to renew");
+    } finally {
+      setIssuancePending(null);
+    }
   };
 
   const handleRecalculate = async () => {
     try {
-      await calculateSchedules.mutateAsync(offer.id);
-      toast.success("Premium recalculated");
+      await refetchPremiumPreview();
+      toast.success("Premium preview updated");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to recalculate premium");
+      toastApiError(err, "Failed to preview premium");
+    }
+  };
+
+  const handleCommitSchedules = async () => {
+    try {
+      await calculateSchedules.mutateAsync(offer.id);
+      toast.success("Schedules calculated");
+      void refetchPremiumPreview();
+    } catch (err) {
+      toastApiError(err, "Failed to calculate schedules");
     }
   };
 
@@ -532,7 +658,7 @@ const OfferDetail = () => {
       }
       setPendingRemove(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to remove");
+      toastApiError(err, "Failed to remove");
     }
   };
 
@@ -546,22 +672,7 @@ const OfferDetail = () => {
       toast.success(`Schedule ${cancelScheduleYear} cancelled`);
       setCancelScheduleYear(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to cancel schedule");
-    }
-  };
-
-  const handleApproveSchedule = async (year: number) => {
-    try {
-      setApprovingScheduleYear(year);
-      await issuePolicy.mutateAsync({
-        offerId: offer.id,
-        year: String(year),
-      });
-      toast.success(`Schedule ${year} approved`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to approve schedule");
-    } finally {
-      setApprovingScheduleYear(null);
+      toastApiError(err, "Failed to cancel schedule");
     }
   };
 
@@ -590,7 +701,7 @@ const OfferDetail = () => {
       setDiscountPct("50");
       setDiscountReason("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to request discount");
+      toastApiError(err, "Failed to request discount");
     }
   };
 
@@ -603,7 +714,7 @@ const OfferDetail = () => {
       });
       toast.success("Discount request approved");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to approve discount");
+      toastApiError(err, "Failed to approve discount");
     }
   };
 
@@ -616,11 +727,9 @@ const OfferDetail = () => {
       });
       toast.success("Discount request rejected");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reject discount");
+      toastApiError(err, "Failed to reject discount");
     }
   };
-
-  const discountActionPending = approveDiscount.isPending || rejectDiscount.isPending;
 
   const handleApproveScheduleDocument = async () => {
     if (!pendingDocApprove) return;
@@ -633,7 +742,7 @@ const OfferDetail = () => {
       toast.success(`Document approved: ${pendingDocApprove.label}`);
       setPendingDocApprove(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to approve document");
+      toastApiError(err, "Failed to approve document");
     }
   };
 
@@ -654,7 +763,7 @@ const OfferDetail = () => {
       setDocRejectDialog(null);
       setDocRejectReason("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reject document");
+      toastApiError(err, "Failed to reject document");
     }
   };
 
@@ -680,25 +789,146 @@ const OfferDetail = () => {
       setDocSubmitDialog(null);
       setDocSubmitFile(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit document");
+      toastApiError(err, "Failed to submit document");
     } finally {
       setDocSubmitPending(false);
     }
   };
 
+  const handleConfirmFlagAction = async () => {
+    if (!pendingFlagAction) return;
+    try {
+      if (pendingFlagAction.kind === "approve") {
+        await approveReviewFlag.mutateAsync({
+          offerId: offer.id,
+          year: String(pendingFlagAction.year),
+          flagId: pendingFlagAction.flagId,
+        });
+        toast.success(`Review flag approved: ${pendingFlagAction.label}`);
+      } else {
+        await rejectReviewFlag.mutateAsync({
+          offerId: offer.id,
+          year: String(pendingFlagAction.year),
+          flagId: pendingFlagAction.flagId,
+        });
+        toast.success(`Review flag rejected: ${pendingFlagAction.label}`);
+      }
+      setPendingFlagAction(null);
+    } catch (err) {
+      toastApiError(
+        err,
+        pendingFlagAction.kind === "approve"
+          ? "Failed to approve review flag"
+          : "Failed to reject review flag"
+      );
+    }
+  };
+
+  const flagActionPending = approveReviewFlag.isPending || rejectReviewFlag.isPending;
+
   const removing =
     removeInsuredPerson.isPending || removeParticipant.isPending;
 
-  const canApprove = offer.status === "Quoted" || offer.status === "Partially Bound";
   const canReject =
     offer.status !== "Bound" &&
     offer.status !== "Cancelled" &&
     offer.status !== "Expired";
-  const canIssue =
-    offer.status === "Quoted" || offer.status === "Partially Bound";
+
+  const discountActionPending = approveDiscount.isPending || rejectDiscount.isPending;
+
+  const pageBusy =
+    cancelOffer.isPending || issuancePending != null || discountActionPending;
+  const pageBusyLabel =
+    issuancePending === "issue"
+      ? "Issuing policy…"
+      : issuancePending === "renew"
+        ? "Renewing…"
+        : cancelOffer.isPending
+          ? "Rejecting offer…"
+          : approveDiscount.isPending
+            ? "Approving discount…"
+            : rejectDiscount.isPending
+              ? "Rejecting discount…"
+              : "Working…";
+
+  const confirmCopy =
+    confirmAction === "reject"
+      ? {
+          title: "Reject this offer?",
+          description: `${offer.number} will be marked as Cancelled.`,
+          confirmLabel: "Reject offer",
+          destructive: true,
+        }
+      : confirmAction === "renew"
+        ? {
+            title: "Renew this offer?",
+            description:
+              "This will create a renewal for the next eligible schedule year.",
+            confirmLabel: "Renew",
+            destructive: false,
+          }
+        : confirmAction === "issue"
+          ? {
+              title: "Issue policy?",
+              description: isWholeOfTerm
+                ? "This will issue the policy for this whole-of-term offer. This can only be done once."
+                : issuanceMode === "annualRenewable"
+                  ? "This will issue a policy for each eligible schedule on this offer."
+                  : "This will issue the initial policy for this offer.",
+              confirmLabel: "Issue policy",
+              destructive: false,
+            }
+          : null;
+
+  const discountConfirmCopy = discountConfirm
+    ? discountConfirm.kind === "approve"
+      ? {
+          title: "Approve discount request?",
+          description: `Approve the ${discountConfirm.pctLabel} discount for schedule year ${discountConfirm.year}.`,
+          confirmLabel: "Approve",
+          destructive: false,
+        }
+      : {
+          title: "Reject discount request?",
+          description: `Reject the ${discountConfirm.pctLabel} discount for schedule year ${discountConfirm.year}.`,
+          confirmLabel: "Reject",
+          destructive: true,
+        }
+    : null;
+
+  const handleConfirmAction = () => {
+    const action = confirmAction;
+    setConfirmAction(null);
+    if (action === "reject") void handleReject();
+    else if (action === "renew") void handleRenewOffer();
+    else if (action === "issue") void handleIssueOfferPolicy();
+  };
+
+  const handleConfirmDiscountAction = () => {
+    if (!discountConfirm) return;
+    const { kind, year, requestId } = discountConfirm;
+    setDiscountConfirm(null);
+    if (kind === "approve") void handleApproveDiscount(year, requestId);
+    else void handleRejectDiscount(year, requestId);
+  };
 
   return (
     <AppShell>
+      {pageBusy ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-[2px]"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div className="flex min-w-[14rem] flex-col items-center gap-3 rounded-md border bg-card px-6 py-5 shadow-md">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="text-sm font-medium text-foreground">{pageBusyLabel}</div>
+            <div className="text-xs text-muted-foreground">Please wait…</div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/offers")} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Offers
@@ -727,59 +957,153 @@ const OfferDetail = () => {
         <div className="flex flex-wrap items-center gap-2">
           {/* <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Open editor (demo)")}>
             <Edit className="h-4 w-4" /> Edit Offer
-          </Button>
+          </Button> */}
           <Button
-            variant="outline" size="sm" className="gap-2"
+            variant="outline"
+            size="sm"
+            className="gap-2"
             onClick={() => void handleRecalculate()}
-            disabled={calculateSchedules.isPending}
+            disabled={premiumPreviewLoading}
           >
-            <RefreshCw className="h-4 w-4" /> Recalculate Premium
-          </Button> */}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" disabled={!canReject}>
-                <XCircle className="h-4 w-4" /> Reject
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reject this offer?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {offer.number} will be marked as Cancelled.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => void handleReject()} disabled={cancelOffer.isPending}>
-                  Reject Offer
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          {/* <Button
-            size="sm" variant="secondary" className="gap-2"
-            onClick={handleApprove}
-            disabled={!canApprove}
-          >
-            <CheckCircle2 className="h-4 w-4" /> Approve
+            <RefreshCw className={`h-4 w-4 ${premiumPreviewLoading ? "animate-spin" : ""}`} />
+            Preview Premium
           </Button>
+          {offer.schedules.length === 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => void handleCommitSchedules()}
+              disabled={calculateSchedules.isPending}
+            >
+              <Calculator className="h-4 w-4" />
+              {calculateSchedules.isPending ? "Calculating…" : "Commit Schedules"}
+            </Button>
+          )}
           <Button
-            size="sm" className="gap-2"
-            onClick={() => navigate(`/offers/${offer.id}/issue`)}
-            disabled={!canIssue}
+            variant="secondary"
+            size="sm"
+            className="gap-2 text-destructive hover:text-destructive"
+            disabled={!canReject || pageBusy}
+            onClick={() => setConfirmAction("reject")}
           >
-            <Send className="h-4 w-4" /> Issue Policy
-          </Button> */}
+            <XCircle className="h-4 w-4" /> Reject
+          </Button>
+          {showRenewButton ? (
+            <Button
+              size="sm"
+              className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={!canRenew || pageBusy}
+              onClick={() => setConfirmAction("renew")}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Renew
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            className="gap-2"
+            disabled={!canIssuePolicy || pageBusy}
+            onClick={() => setConfirmAction("issue")}
+          >
+            <Send className="h-4 w-4" />
+            Issue policy
+          </Button>
         </div>
       </div>
+
+      <AlertDialog
+        open={confirmAction != null}
+        onOpenChange={(open) => {
+          if (!open && !pageBusy) setConfirmAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmCopy?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pageBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={pageBusy}
+              className={
+                confirmCopy?.destructive
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : undefined
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmAction();
+              }}
+            >
+              {confirmCopy?.confirmLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={discountConfirm != null}
+        onOpenChange={(open) => {
+          if (!open && !pageBusy) setDiscountConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{discountConfirmCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {discountConfirmCopy?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pageBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={pageBusy}
+              className={
+                discountConfirmCopy?.destructive
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : undefined
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmDiscountAction();
+              }}
+            >
+              {discountConfirmCopy?.confirmLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
           <CardContent>
             <div className="text-lg font-semibold text-primary">
-              {fmtMoney(offer.premium || 0, offer.currency)}
+              {premiumPreviewLoading && !premiumPreview && offer.schedules.length === 0
+                ? "…"
+                : fmtMoney(
+                    offer.schedules.length > 0
+                      ? offer.premium || 0
+                      : premiumPreview
+                        ? previewPremiumTotal
+                        : offer.premium || 0,
+                    offer.currency,
+                  )}
             </div>
+            {offer.schedules.length === 0 && premiumPreview && (
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                Preview · not committed
+              </div>
+            )}
+            {offer.schedules.length === 0 && premiumPreviewError && (
+              <div className="text-[11px] text-destructive mt-0.5">
+                {premiumPreviewErr instanceof Error
+                  ? premiumPreviewErr.message
+                  : "Preview unavailable"}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -857,9 +1181,7 @@ const OfferDetail = () => {
                               templateDocument?.originalFileName ??
                                 templateDocument?.storedFileName,
                             ).catch((err) =>
-                              toast.error(
-                                err instanceof Error ? err.message : "Failed to download file",
-                              ),
+                              toastApiError(err, "Failed to download file"),
                             );
                           }}
                         >
@@ -1030,9 +1352,35 @@ const OfferDetail = () => {
             </CardHeader>
             <CardContent>
               {offer.schedules.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-6 text-center">
-                  No schedules calculated for this offer yet.
-                </div>
+                premiumPreview && premiumPreview.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Premium preview (not committed). Commit schedules to persist these amounts.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 max-w-md">
+                      <div className="rounded-md border p-3">
+                        <div className="text-xs text-muted-foreground">Insured Amount</div>
+                        <div className="text-lg font-semibold font-mono mt-1">
+                          {fmtMoney(previewInsuredTotal, offer.currency)}
+                        </div>
+                      </div>
+                      <div className="rounded-md border p-3">
+                        <div className="text-xs text-muted-foreground">Premium</div>
+                        <div className="text-lg font-semibold font-mono text-primary mt-1">
+                          {fmtMoney(previewPremiumTotal, offer.currency)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground py-6 text-center">
+                    {premiumPreviewLoading
+                      ? "Loading premium preview…"
+                      : premiumPreviewError
+                        ? "Premium preview unavailable — add loan disbursements and an insured person, then retry."
+                        : "No schedules calculated for this offer yet."}
+                  </div>
+                )
               ) : (
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
@@ -1117,16 +1465,6 @@ const OfferDetail = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="gap-1.5 h-8 border-blue-500 text-blue-600 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                                    disabled={isCancelled || issuePolicy.isPending}
-                                    onClick={() => void handleApproveSchedule(s.year)}
-                                  >
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                    {approvingScheduleYear === s.year ? "Approving…" : "Approve"}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
                                     className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
                                     disabled={isCancelled}
                                     onClick={() => {
@@ -1156,11 +1494,10 @@ const OfferDetail = () => {
                                   <ScheduleExpandedPanel
                                     offerId={offer.id}
                                     year={s.year}
-                                    currency={offer.currency}
-                                    insuredAmount={s.insuredAmount}
-                                    internalStatus={s.internalStatus}
+                                    reviewFlags={s.reviewFlags}
                                     documentTypeNameById={documentTypeNameById}
                                     docActionPending={docActionPending}
+                                    flagActionPending={flagActionPending}
                                     onSubmit={(args) => {
                                       setDocSubmitFile(null);
                                       setDocSubmitDialog(args);
@@ -1169,6 +1506,24 @@ const OfferDetail = () => {
                                     onReject={(args) => {
                                       setDocRejectReason("");
                                       setDocRejectDialog(args);
+                                    }}
+                                    onApproveFlag={(flagId) => {
+                                      const flag = s.reviewFlags.find((f) => f.id === flagId);
+                                      setPendingFlagAction({
+                                        kind: "approve",
+                                        flagId,
+                                        year: s.year,
+                                        label: flag?.type?.trim() || flagId,
+                                      });
+                                    }}
+                                    onRejectFlag={(flagId) => {
+                                      const flag = s.reviewFlags.find((f) => f.id === flagId);
+                                      setPendingFlagAction({
+                                        kind: "reject",
+                                        flagId,
+                                        year: s.year,
+                                        label: flag?.type?.trim() || flagId,
+                                      });
                                     }}
                                   />
                                 </TableCell>
@@ -1314,6 +1669,47 @@ const OfferDetail = () => {
                   }}
                 >
                   {approveScheduleDocument.isPending ? "Approving…" : "Approve"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog
+            open={!!pendingFlagAction}
+            onOpenChange={(open) => !open && setPendingFlagAction(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {pendingFlagAction?.kind === "reject" ? "Reject review flag?" : "Approve review flag?"}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {pendingFlagAction?.kind === "reject" ? "Reject" : "Approve"}{" "}
+                  <span className="font-medium text-foreground">{pendingFlagAction?.label}</span> for
+                  schedule year {pendingFlagAction?.year}.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={flagActionPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={flagActionPending}
+                  className={
+                    pendingFlagAction?.kind === "reject"
+                      ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      : undefined
+                  }
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleConfirmFlagAction();
+                  }}
+                >
+                  {flagActionPending
+                    ? pendingFlagAction?.kind === "reject"
+                      ? "Rejecting…"
+                      : "Approving…"
+                    : pendingFlagAction?.kind === "reject"
+                      ? "Reject"
+                      : "Approve"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -1480,8 +1876,15 @@ const OfferDetail = () => {
                                       size="sm"
                                       variant="outline"
                                       className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                      disabled={!canAct || discountActionPending}
-                                      onClick={() => void handleApproveDiscount(r.scheduleYear, r.id)}
+                                      disabled={!canAct || pageBusy}
+                                      onClick={() =>
+                                        setDiscountConfirm({
+                                          kind: "approve",
+                                          year: r.scheduleYear,
+                                          requestId: r.id,
+                                          pctLabel: `${Math.round(r.requestedDiscountPercentage * 10000) / 100}%`,
+                                        })
+                                      }
                                     >
                                       <CheckCircle2 className="h-3.5 w-3.5" /> Approve
                                     </Button>
@@ -1489,8 +1892,15 @@ const OfferDetail = () => {
                                       size="sm"
                                       variant="secondary"
                                       className="gap-1.5 h-8 text-destructive hover:text-destructive"
-                                      disabled={!canAct || discountActionPending}
-                                      onClick={() => void handleRejectDiscount(r.scheduleYear, r.id)}
+                                      disabled={!canAct || pageBusy}
+                                      onClick={() =>
+                                        setDiscountConfirm({
+                                          kind: "reject",
+                                          year: r.scheduleYear,
+                                          requestId: r.id,
+                                          pctLabel: `${Math.round(r.requestedDiscountPercentage * 10000) / 100}%`,
+                                        })
+                                      }
                                     >
                                       <XCircle className="h-3.5 w-3.5" /> Reject
                                     </Button>

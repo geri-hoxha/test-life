@@ -72,13 +72,23 @@ export type RatingTablesUpdateRatingTableRequest = {
   name: string;
 };
 
+export type ProductsProductCoverageCurrencyLimitResponse = {
+  id?: string | number;
+  currency?: string;
+  type?: string;
+  value?: number;
+};
+
 export type ProductsProductCoverageResponse = {
   id?: number;
   coverageId?: string;
   ratingTableId?: string;
   ratingTableMultiplier?: number;
   isMandatory?: boolean;
+  isSumInsuredFixed?: boolean;
+  sumInsuredPercentage?: number;
   sortOrder?: number;
+  currencyLimits?: ProductsProductCoverageCurrencyLimitResponse[];
 };
 
 export type ProductsAddProductCoverageRequest = {
@@ -86,7 +96,17 @@ export type ProductsAddProductCoverageRequest = {
   ratingTableId?: string;
   ratingTableMultiplier?: number;
   isMandatory?: boolean;
+  isSumInsuredFixed?: boolean;
+  sumInsuredPercentage?: number;
 };
+
+export type ProductsAddProductCoverageCurrencyLimitRequest = {
+  currency: string;
+  type: string;
+  value: number;
+};
+
+export type ProductsCurrencyLimitType = "fixedSumInsuredAmount";
 
 export type ProductsProductDocumentTypeRequiredForResponse = {
   insuredAmountOver?: number | null;
@@ -130,6 +150,7 @@ export type ProductsProductResponse = {
   sumInsuredBasis?: string | null;
   issuanceMode?: string | null;
   calculationMethod?: string | null;
+  maxCoveredYears?: number | null;
   coverages?: ProductsProductCoverageResponse[];
   productDocumentTypes?: ProductsProductDocumentTypeResponse[];
   paymentMethods?: ProductsProductPaymentMethodResponse[];
@@ -168,6 +189,7 @@ export type ProductsCreateProductRequest = {
   sumInsuredBasis?: string | null;
   issuanceMode?: ProductsIssuanceMode | null;
   calculationMethod?: ProductsCalculationMethod | null;
+  maxCoveredYears?: number | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;
   status?: string;
@@ -206,6 +228,7 @@ export type ProductsUpdateProductRequest = {
   sumInsuredBasis?: string | null;
   issuanceMode?: ProductsIssuanceMode | null;
   calculationMethod?: ProductsCalculationMethod | null;
+  maxCoveredYears?: number | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;
   status?: string;
@@ -576,6 +599,17 @@ export type OffersOfferScheduleDiscountRequestResponse = {
   status?: DomainOffersOfferScheduleDiscountRequestStatus;
 };
 
+export type DomainOffersOfferScheduleReviewFlagStatus = "pending" | "approved" | "rejected";
+
+export type OffersOfferScheduleReviewFlagResponse = {
+  id?: number;
+  type?: string;
+  reason?: string;
+  status?: DomainOffersOfferScheduleReviewFlagStatus | string;
+  raisedOnUtc?: string;
+  resolvedOnUtc?: string | null;
+};
+
 export type OffersOfferScheduleResponse = {
   id?: number;
   year?: number;
@@ -587,11 +621,20 @@ export type OffersOfferScheduleResponse = {
   coverages?: OffersOfferScheduleCoverageResponse[];
   documents?: OffersOfferScheduleDocumentResponse[];
   discountRequests?: OffersOfferScheduleDiscountRequestResponse[];
+  reviewFlags?: OffersOfferScheduleReviewFlagResponse[];
+};
+
+/** Slim shape used by POST /offers/{offerId}/premium preview UI. */
+export type OffersOfferPremiumPreview = {
+  insuredAmount: number;
+  premium: number;
 };
 
 export type OffersApproveOfferScheduleDiscountRequest = Record<string, unknown>;
 
 export type OffersApproveOfferScheduleDocumentRequest = Record<string, unknown>;
+
+export type OffersApproveOfferScheduleReviewFlagRequest = Record<string, unknown>;
 
 export type DomainOffersOfferStatus = "draft" | "quoted" | "partiallyBound" | "bound" | "cancelled" | "expired";
 
@@ -640,6 +683,8 @@ export type OffersRejectOfferScheduleDiscountRequest = Record<string, unknown>;
 export type OffersRejectOfferScheduleDocumentRequest = {
   reason: string;
 };
+
+export type OffersRejectOfferScheduleReviewFlagRequest = Record<string, unknown>;
 
 export type OffersRemoveOfferInsuredPersonRequest = Record<string, unknown>;
 

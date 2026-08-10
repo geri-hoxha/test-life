@@ -58,6 +58,8 @@ type DraftCoverage = {
   ratingTableId: string;
   ratingTableMultiplier: string;
   isMandatory: boolean;
+  isSumInsuredFixed: boolean;
+  sumInsuredPercentage: string;
 };
 const blankCoverage = (overrides?: Partial<DraftCoverage>): DraftCoverage => ({
   coverageId: "",
@@ -66,6 +68,8 @@ const blankCoverage = (overrides?: Partial<DraftCoverage>): DraftCoverage => ({
   ratingTableId: "",
   ratingTableMultiplier: "1",
   isMandatory: true,
+  isSumInsuredFixed: true,
+  sumInsuredPercentage: "1",
   ...overrides,
 });
 
@@ -122,6 +126,7 @@ const CreateProduct = () => {
   const [sumInsuredBasis, setSumInsuredBasis] = useState("");
   const [issuanceMode, setIssuanceMode] = useState<ProductsIssuanceMode | "">("");
   const [calculationMethod, setCalculationMethod] = useState<ProductsCalculationMethod | "">("");
+  const [maxCoveredYears, setMaxCoveredYears] = useState("");
   // Payment methods — POST /api/products/{id}/payment-methods (one per account)
   const [bankAccountIds, setBankAccountIds] = useState<string[]>([]);
   const [coverageModalOpen, setCoverageModalOpen] = useState(false);
@@ -214,6 +219,7 @@ const CreateProduct = () => {
         sumInsuredBasis: sumInsuredBasis || null,
         issuanceMode: issuanceMode || null,
         calculationMethod: calculationMethod || null,
+        maxCoveredYears: maxCoveredYears === "" ? null : Number(maxCoveredYears),
       });
       if (!created.id) throw new Error("Product created without id");
 
@@ -223,6 +229,10 @@ const CreateProduct = () => {
           ratingTableId: c.ratingTableId,
           ratingTableMultiplier: parseFloat(c.ratingTableMultiplier) || 1,
           isMandatory: c.isMandatory,
+          isSumInsuredFixed: c.isSumInsuredFixed,
+          ...(c.isSumInsuredFixed
+            ? {}
+            : { sumInsuredPercentage: parseFloat(c.sumInsuredPercentage) || 1 }),
         });
       }
 
@@ -383,6 +393,19 @@ const CreateProduct = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="max-covered-years">Max covered years</Label>
+                <Input
+                  id="max-covered-years"
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="font-mono"
+                  value={maxCoveredYears}
+                  onChange={(e) => setMaxCoveredYears(e.target.value)}
+                  placeholder="e.g. 30"
+                />
+              </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label>Payment method</Label>
                 <BankAccountCombobox
@@ -486,6 +509,26 @@ const CreateProduct = () => {
                               />
                               <span className="text-sm">Mandatory</span>
                             </label>
+                            <label className="flex items-center gap-2 p-2 rounded-md border border-border cursor-pointer">
+                              <Checkbox
+                                checked={draft.isSumInsuredFixed}
+                                onCheckedChange={(v) => setCovField(draftIdx, { isSumInsuredFixed: !!v })}
+                              />
+                              <span className="text-sm">Sum insured fixed</span>
+                            </label>
+                            {!draft.isSumInsuredFixed && (
+                              <div className="space-y-1.5">
+                                <Label>Sum insured %</Label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="font-mono"
+                                  value={draft.sumInsuredPercentage}
+                                  onChange={(e) => setCovField(draftIdx, { sumInsuredPercentage: e.target.value })}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

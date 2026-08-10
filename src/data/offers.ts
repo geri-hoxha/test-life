@@ -77,6 +77,15 @@ export type OfferScheduleDiscountRequest = {
   status: "requested" | "approved" | "rejected";
 };
 
+export type OfferScheduleReviewFlag = {
+  id: string;
+  type: string;
+  reason: string;
+  status: string;
+  raisedOnUtc?: string;
+  resolvedOnUtc?: string | null;
+};
+
 export type OfferSchedule = {
   id: string;
   year: number;
@@ -85,9 +94,11 @@ export type OfferSchedule = {
   insuredAmount: number;
   premium: number;
   internalStatus?: string;
+  policyId?: string | null;
   coverages: OfferScheduleCoverage[];
   documents: OfferScheduleDocument[];
   discountRequests: OfferScheduleDiscountRequest[];
+  reviewFlags: OfferScheduleReviewFlag[];
 };
 
 export type OfferLoanDisbursement = {

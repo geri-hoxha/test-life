@@ -28,5 +28,9 @@ export const mapProductCoverage = (
   isActive: true,
   ratingTableId: entry.ratingTableId,
   ratingTableMultiplier: entry.ratingTableMultiplier ?? 1,
+  isSumInsuredFixed: entry.isSumInsuredFixed ?? true,
+  sumInsuredPercentage: entry.isSumInsuredFixed === false
+    ? entry.sumInsuredPercentage
+    : undefined,
   sortOrder: entry.sortOrder,
 });

@@ -25,15 +25,38 @@ export const setAccessToken = (token: string | null) => {
 
 export const getAccessToken = () => accessToken;
 
+type ProblemDetails = {
+  title?: string;
+  detail?: string;
+  status?: number;
+};
+
+const parseProblemDetails = (body: unknown): ProblemDetails => {
+  if (typeof body === "string" && body.trim()) {
+    return { detail: body.trim() };
+  }
+  if (!body || typeof body !== "object") return {};
+  const o = body as Record<string, unknown>;
+  return {
+    title: typeof o.title === "string" ? o.title : undefined,
+    detail: typeof o.detail === "string" ? o.detail : undefined,
+    status: typeof o.status === "number" ? o.status : undefined,
+  };
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
+  readonly title?: string;
+  readonly detail?: string;
 
-  constructor(status: number, message: string, body: unknown) {
+  constructor(status: number, message: string, body: unknown, problem?: ProblemDetails) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.body = body;
+    this.title = problem?.title;
+    this.detail = problem?.detail;
   }
 }
 
@@ -111,14 +134,12 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
     } catch {
       errorBody = null;
     }
+    const problem = parseProblemDetails(errorBody);
     const message =
-      typeof errorBody === "object" &&
-      errorBody &&
-      "title" in errorBody &&
-      typeof (errorBody as { title: unknown }).title === "string"
-        ? (errorBody as { title: string }).title
-        : `Request failed with status ${response.status}`;
-    throw new ApiError(response.status, message, errorBody);
+      problem.detail?.trim() ||
+      problem.title?.trim() ||
+      `Request failed with status ${response.status}`;
+    throw new ApiError(response.status, message, errorBody, problem);
   }
 
   if (options.binary) {

@@ -2,10 +2,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfProductResponse,
+  ProductsAddProductCoverageCurrencyLimitRequest,
   ProductsAddProductCoverageRequest,
   ProductsAddProductDocumentTypeRequest,
   ProductsAddProductPaymentMethodRequest,
   ProductsCreateProductRequest,
+  ProductsProductCoverageCurrencyLimitResponse,
   ProductsProductCoverageResponse,
   ProductsProductDocumentTypeResponse,
   ProductsProductPaymentMethodResponse,
@@ -242,6 +244,66 @@ export const useRemoveProductCoverage = () => {
   });
 };
 
+/** PUT /api/products/{productId}/coverages/{coverageEntryId}/currency-limits */
+export const addProductCoverageCurrencyLimit = async (
+  productId: string,
+  coverageEntryId: string,
+  body: ProductsAddProductCoverageCurrencyLimitRequest,
+  signal?: AbortSignal,
+): Promise<ProductsProductCoverageCurrencyLimitResponse> =>
+  apiRequest<ProductsProductCoverageCurrencyLimitResponse>({
+    method: "PUT",
+    path: `/api/products/${encodeURIComponent(productId)}/coverages/${encodeURIComponent(coverageEntryId)}/currency-limits`,
+    body,
+    signal,
+  });
+
+export const useAddProductCoverageCurrencyLimit = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      productId: string;
+      coverageEntryId: string;
+      body: ProductsAddProductCoverageCurrencyLimitRequest;
+    }) => addProductCoverageCurrencyLimit(vars.productId, vars.coverageEntryId, vars.body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: productsKeys.all });
+    },
+  });
+};
+
+/** DELETE /api/products/{productId}/coverages/{coverageEntryId}/currency-limits/{currencyLimitEntryId} */
+export const removeProductCoverageCurrencyLimit = async (
+  productId: string,
+  coverageEntryId: string,
+  currencyLimitEntryId: string,
+  signal?: AbortSignal,
+): Promise<void> =>
+  apiRequest<void>({
+    method: "DELETE",
+    path: `/api/products/${encodeURIComponent(productId)}/coverages/${encodeURIComponent(coverageEntryId)}/currency-limits/${encodeURIComponent(currencyLimitEntryId)}`,
+    signal,
+  });
+
+export const useRemoveProductCoverageCurrencyLimit = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      productId: string;
+      coverageEntryId: string;
+      currencyLimitEntryId: string;
+    }) =>
+      removeProductCoverageCurrencyLimit(
+        vars.productId,
+        vars.coverageEntryId,
+        vars.currencyLimitEntryId,
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: productsKeys.all });
+    },
+  });
+};
+
 /** DELETE /api/products/{productId}/document-types/{documentTypeEntryId} */
 export const removeProductDocumentType = async (productId: string, documentTypeEntryId: string, signal?: AbortSignal): Promise<void> =>
   apiRequest<void>({
@@ -292,6 +354,7 @@ export type MappedProduct = {
   sumInsuredBasis?: string | null;
   issuanceMode?: string | null;
   calculationMethod?: string | null;
+  maxCoveredYears?: number | null;
   paymentModel?: string;
   premiumTableId?: string;
   coverages?: ProductsProductCoverageResponse[];
@@ -363,6 +426,7 @@ export const mapApiProduct = (p: ProductsProductResponse): MappedProduct => {
     sumInsuredBasis: p.sumInsuredBasis ?? null,
     issuanceMode: p.issuanceMode ?? null,
     calculationMethod: p.calculationMethod ?? null,
+    maxCoveredYears: p.maxCoveredYears ?? null,
     paymentModel: p.paymentModel ?? undefined,
     premiumTableId: p.premiumTableId ?? undefined,
     coverages: p.coverages,
