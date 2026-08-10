@@ -13,6 +13,7 @@ import type {
   OffersOfferScheduleDocumentResponse,
   OffersOfferScheduleResponse,
   OffersOfferScheduleReviewFlagResponse,
+  OffersCalculatePremiumRequest,
   OffersOfferPremiumPreview,
   OffersRejectOfferScheduleDocumentRequest,
   OffersRequestOfferScheduleDiscountRequest,
@@ -29,6 +30,8 @@ export const offersKeys = {
   details: () => [...offersKeys.all, "detail"] as const,
   detail: (id: string) => [...offersKeys.details(), id] as const,
   premium: (offerId: string) => [...offersKeys.detail(offerId), "premium"] as const,
+  premiumCalc: (params: OffersCalculatePremiumRequest) =>
+    [...offersKeys.all, "premium-calc", params] as const,
   scheduleDocuments: (offerId: string, year: string) =>
     [...offersKeys.detail(offerId), "schedules", year, "documents"] as const,
 };
@@ -72,7 +75,7 @@ export const issueOfferPolicy = async (
   apiRequest<PoliciesPolicyResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/policy`,
-    ...(body !== undefined ? { body } : {}),
+    body: {},
     signal,
   });
 
@@ -250,6 +253,15 @@ export const useApproveOfferScheduleReviewFlag = () => {
   });
 };
 
+const mapPremiumPreviewRows = (
+  rows: OffersOfferScheduleResponse[] | null | undefined,
+): OffersOfferPremiumPreview[] =>
+  (rows ?? []).map((s) => ({
+    year: s.year,
+    insuredAmount: s.insuredAmount ?? 0,
+    premium: s.premium ?? 0,
+  }));
+
 /**
  * POST /api/offers/{offerId}/premium
  * Non-persisting premium preview for a draft offer (per loan-disbursement year).
@@ -265,10 +277,7 @@ export const previewOfferPremium = async (
     signal,
     body: {},
   });
-  return (rows ?? []).map((s) => ({
-    insuredAmount: s.insuredAmount ?? 0,
-    premium: s.premium ?? 0,
-  }));
+  return mapPremiumPreviewRows(rows);
 };
 
 export const usePreviewOfferPremium = (
@@ -280,6 +289,37 @@ export const usePreviewOfferPremium = (
     queryFn: ({ signal }) => previewOfferPremium(offerId, signal),
     enabled: Boolean(offerId) && (options?.enabled ?? true),
     retry: false,
+  });
+
+/**
+ * POST /api/offers/premium
+ * Unbound premium preview from product, insured demographics, and loan disbursements.
+ */
+export const calculateOffersPremium = async (
+  body: OffersCalculatePremiumRequest,
+  signal?: AbortSignal,
+): Promise<OffersOfferPremiumPreview[]> => {
+  const rows = await apiRequest<OffersOfferScheduleResponse[]>({
+    method: "POST",
+    path: "/api/offers/premium",
+    signal,
+    body,
+  });
+  return mapPremiumPreviewRows(rows);
+};
+
+export const useCalculateOffersPremium = (
+  body: OffersCalculatePremiumRequest | null,
+  options?: { enabled?: boolean },
+) =>
+  useQuery({
+    queryKey: body
+      ? offersKeys.premiumCalc(body)
+      : [...offersKeys.all, "premium-calc", "idle"],
+    queryFn: ({ signal }) => calculateOffersPremium(body!, signal),
+    enabled: Boolean(body) && (options?.enabled ?? true),
+    retry: false,
+    placeholderData: keepPreviousData,
   });
 
 /** POST /api/offers/{offerId}/schedules */

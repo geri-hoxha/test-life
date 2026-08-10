@@ -339,7 +339,6 @@ export type PoliciesPolicyInsuredPersonResponse = {
   lastName?: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
-  isPep?: boolean;
 };
 
 export type PoliciesPolicyDocumentResponse = {
@@ -359,12 +358,20 @@ export type PoliciesPolicyCoverageResponse = {
   calculatedPremium?: number;
 };
 
+export type PoliciesPolicyYearResponse = {
+  id?: number;
+  year?: number;
+  period?: OffersDateOnlyRangeResponse;
+  insuredAmount?: number;
+  premium?: number;
+  coverages?: PoliciesPolicyCoverageResponse[];
+};
+
 export type PoliciesPolicyResponse = {
   id?: string;
   productId?: string;
   currency?: string;
   offerId?: string;
-  offerScheduleYear?: number;
   issuedOnUtc?: string;
   effectiveFromUtc?: string;
   effectiveToUtc?: string;
@@ -373,7 +380,7 @@ export type PoliciesPolicyResponse = {
   participants?: PoliciesPolicyParticipantResponse[];
   insuredPersons?: PoliciesPolicyInsuredPersonResponse[];
   documents?: PoliciesPolicyDocumentResponse[];
-  coverages?: PoliciesPolicyCoverageResponse[];
+  policyYears?: PoliciesPolicyYearResponse[];
 };
 
 export type PoliciesGetPolicyRequest = Record<string, unknown>;
@@ -409,7 +416,6 @@ export type PeoplePersonResponse = {
   nationality?: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
-  isPep?: boolean;
 };
 
 export type PeopleCreatePersonRequest = {
@@ -420,7 +426,6 @@ export type PeopleCreatePersonRequest = {
   nationality: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
-  isPep?: boolean;
 };
 
 export type PeopleGetPersonRequest = Record<string, unknown>;
@@ -446,7 +451,6 @@ export type PeopleUpdatePersonRequest = {
   nationality: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
-  isPep?: boolean;
 };
 
 export type CompaniesCompanyAddressResponse = {
@@ -523,7 +527,6 @@ export type OffersOfferInsuredPersonResponse = {
   lastName?: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
-  isPep?: boolean;
 };
 
 export type OffersAddOfferInsuredPersonRequest = {
@@ -624,10 +627,20 @@ export type OffersOfferScheduleResponse = {
   reviewFlags?: OffersOfferScheduleReviewFlagResponse[];
 };
 
-/** Slim shape used by POST /offers/{offerId}/premium preview UI. */
+/** Slim shape used by POST /offers/{offerId}/premium and POST /offers/premium preview UI. */
 export type OffersOfferPremiumPreview = {
+  year?: number;
   insuredAmount: number;
   premium: number;
+};
+
+/** POST /api/offers/premium — unbound premium calc from product + insured + loan rows. */
+export type OffersCalculatePremiumRequest = {
+  productId: string;
+  currency: string;
+  dateOfBirth: string;
+  gender: DomainCommonGender;
+  loanDisbursements: OffersAddOfferLoanDisbursementRequest[];
 };
 
 export type OffersApproveOfferScheduleDiscountRequest = Record<string, unknown>;

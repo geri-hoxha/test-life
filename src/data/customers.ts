@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export type Gender = "Male" | "Female" | "Other";
-export type PEPStatus = "Unknown" | "No" | "Yes";
 export type CustomerType = "Individual" | "Company";
 export type CompanyType =
   | "soleProprietor"
@@ -84,7 +83,6 @@ export type Customer = {
   phone?: string;
   email?: string;
   occupation?: string;
-  pepStatus: PEPStatus;
   notes?: string;
   totalExposure: number;
   createdDate: string;
@@ -123,7 +121,6 @@ export const customerSchema = z.object({
   city: z.string().trim().max(80).optional().or(z.literal("")),
   country: z.string().trim().max(80).optional().or(z.literal("")),
   occupation: z.string().trim().max(100).optional().or(z.literal("")),
-  pepStatus: z.enum(["Unknown", "No", "Yes"]),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
 }).superRefine((c, ctx) => {
   if (c.customerType === "Individual") {
@@ -162,21 +159,21 @@ const seed: Customer[] = [
   { id: "CUS-0001", customerType: "Individual", firstName: "Arben", lastName: "Hoxha", fatherName: "Petrit", personalId: "AL-TR-J70412900A",
     dateOfBirth: "1970-04-12", gender: "Male", nationality: "Albanian", placeOfBirth: "Tirana",
     f5Location: "bb123bb123", address: "Rruga e Kavajës 88", phone: "+355 69 201 4488", email: "arben.hoxha@example.al",
-    occupation: "Civil Engineer", pepStatus: "No", totalExposure: 145000, createdDate: "2025-09-14",
+    occupation: "Civil Engineer", totalExposure: 145000, createdDate: "2025-09-14",
     notes: "Long-standing client of Tirana branch — mortgage protection holder." },
   { id: "CUS-0002", customerType: "Individual", firstName: "Elira", lastName: "Dervishi", fatherName: "Bashkim", personalId: "AL-DR-H85822015B",
     dateOfBirth: "1988-08-22", gender: "Female", nationality: "Albanian", placeOfBirth: "Durrës",
     f5Location: "dd345dd345", address: "Bulevardi Epidamn 14", phone: "+355 68 305 9912", email: "elira.dervishi@example.al",
-    occupation: "Senior Government Advisor", pepStatus: "Yes", totalExposure: 95000, createdDate: "2026-01-30",
-    notes: "Politically exposed person — advisor at Ministry of Finance. Compliance review required on each new policy." },
+    occupation: "Senior Government Advisor", totalExposure: 95000, createdDate: "2026-01-30",
+    notes: "Advisor at Ministry of Finance." },
   { id: "CUS-0003", customerType: "Individual", firstName: "Dritan", lastName: "Kola", fatherName: "Sokol", personalId: "AL-VL-G65003317C",
     dateOfBirth: "1965-03-03", gender: "Male", nationality: "Albanian", placeOfBirth: "Vlorë",
     f5Location: "ee456ee456", address: "Rruga Justin Godart 5", phone: "+355 69 444 7720", email: "dritan.kola@example.al",
-    occupation: "Restaurant Owner", pepStatus: "No", totalExposure: 60000, createdDate: "2024-11-08" },
+    occupation: "Restaurant Owner", totalExposure: 60000, createdDate: "2024-11-08" },
   { id: "CUS-0004", customerType: "Individual", firstName: "Mira", lastName: "Leka", fatherName: "Gjergj", personalId: "AL-SH-K92517822D",
     dateOfBirth: "1992-05-17", gender: "Female", nationality: "Albanian", placeOfBirth: "Shkodër",
     f5Location: "ff567ff567", address: "Rruga 28 Nëntori 22", phone: "+355 67 818 3300", email: "mira.leka@example.al",
-    occupation: "Pharmacist", pepStatus: "No", totalExposure: 0, createdDate: "2026-03-05",
+    occupation: "Pharmacist", totalExposure: 0, createdDate: "2026-03-05",
     notes: "Newly onboarded — referred by Arben Hoxha." },
   { id: "CUS-0005", customerType: "Company", firstName: "", lastName: "", personalId: "",
     companyName: "Alb-Trans Logistics Sh.p.k.", nipt: "L72416502K", companyType: "shpk",
@@ -184,7 +181,7 @@ const seed: Customer[] = [
     dateOfBirth: "", gender: "Other",
     f5Location: "bb123bb123", city: "Tirana", country: "Albania",
     address: "Rruga e Durrësit, Km 5", phone: "+355 4 222 7788", email: "info@albtrans.al",
-    pepStatus: "No", totalExposure: 320000, createdDate: "2025-07-22",
+    totalExposure: 320000, createdDate: "2025-07-22",
     notes: "Group life cover for 42 employees." },
 ];
 

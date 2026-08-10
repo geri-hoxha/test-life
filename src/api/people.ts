@@ -43,7 +43,6 @@ export type ListPeopleQuery = {
   firstName?: string;
   lastName?: string;
   gender?: string;
-  isPep?: boolean;
   pageNumber?: number;
   pageSize?: number;
 };

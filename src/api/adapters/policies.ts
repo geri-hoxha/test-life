@@ -1,7 +1,17 @@
 /** Map Policies API ↔ UI `Policy` shape. Unsupported UI fields stay as placeholders. */
 
-import type { PoliciesPolicyResponse } from "../types";
-import type { Policy, PolicyCoverage, PolicyDocument, PolicyStatus } from "@/data/policies";
+import type {
+  PoliciesPolicyCoverageResponse,
+  PoliciesPolicyResponse,
+  PoliciesPolicyYearResponse,
+} from "../types";
+import type {
+  Policy,
+  PolicyCoverage,
+  PolicyDocument,
+  PolicyStatus,
+  PolicyYear,
+} from "@/data/policies";
 import type { OfferInsuredPerson, OfferParticipant, PaymentMode } from "@/data/offers";
 
 const DEFAULT_PAYMENT: PaymentMode = "Pagesa me prim te rregullt";
@@ -32,27 +42,35 @@ const mapInsuredPersons = (p: PoliciesPolicyResponse): OfferInsuredPerson[] =>
     lastName: x.lastName,
     dateOfBirth: x.dateOfBirth,
     gender: x.gender,
-    isPep: x.isPep,
   }));
 
-const mapCoverages = (p: PoliciesPolicyResponse): PolicyCoverage[] =>
-  (p.coverages ?? []).map((c, i) => ({
-    id: String(c.id ?? i),
-    coverageId: c.coverageId ?? "",
-    coverageName: c.coverageName,
-    coverageDescription: c.coverageDescription,
-    sumInsured: c.sumInsured ?? 0,
-    rateUsed: c.rateUsed
-      ? {
-          isFlat: c.rateUsed.isFlat,
-          flatValue: c.rateUsed.flatValue,
-          flatValueCurrency: c.rateUsed.flatValueCurrency,
-          percentageValue: c.rateUsed.percentageValue,
-        }
-      : undefined,
-    ratingTableMultiplierUsed: c.ratingTableMultiplierUsed,
-    calculatedPremium: c.calculatedPremium ?? 0,
-  }));
+const mapCoverage = (c: PoliciesPolicyCoverageResponse, i: number): PolicyCoverage => ({
+  id: String(c.id ?? i),
+  coverageId: c.coverageId ?? "",
+  coverageName: c.coverageName,
+  coverageDescription: c.coverageDescription,
+  sumInsured: c.sumInsured ?? 0,
+  rateUsed: c.rateUsed
+    ? {
+        isFlat: c.rateUsed.isFlat,
+        flatValue: c.rateUsed.flatValue,
+        flatValueCurrency: c.rateUsed.flatValueCurrency,
+        percentageValue: c.rateUsed.percentageValue,
+      }
+    : undefined,
+  ratingTableMultiplierUsed: c.ratingTableMultiplierUsed,
+  calculatedPremium: c.calculatedPremium ?? 0,
+});
+
+const mapPolicyYear = (y: PoliciesPolicyYearResponse, i: number): PolicyYear => ({
+  id: String(y.id ?? i),
+  year: y.year ?? 0,
+  startDate: y.period?.startDate?.slice(0, 10) ?? "",
+  endDate: y.period?.endDate?.slice(0, 10) ?? "",
+  insuredAmount: y.insuredAmount ?? 0,
+  premium: y.premium ?? 0,
+  coverages: (y.coverages ?? []).map(mapCoverage),
+});
 
 const mapDocuments = (p: PoliciesPolicyResponse): PolicyDocument[] =>
   (p.documents ?? []).map((d, i) => ({
@@ -70,7 +88,10 @@ const deriveStatus = (endDate: string): PolicyStatus => {
 export const mapApiPolicy = (p: PoliciesPolicyResponse): Policy => {
   const participants = mapParticipants(p);
   const insuredPersons = mapInsuredPersons(p);
-  const coverages = mapCoverages(p);
+  const policyYears = [...(p.policyYears ?? []).map(mapPolicyYear)].sort(
+    (a, b) => a.year - b.year,
+  );
+  const coverages = policyYears.flatMap((y) => y.coverages);
   const documents = mapDocuments(p);
   const holder = participants.find((x) => x.role === "policyHolder");
   const payer = participants.find((x) => x.role === "invoiced") ?? holder;
@@ -87,7 +108,13 @@ export const mapApiPolicy = (p: PoliciesPolicyResponse): Policy => {
       uniqueIdentifier: x.uniqueIdentifier,
     }));
 
-  const premium = coverages.reduce((sum, c) => sum + (c.calculatedPremium ?? 0), 0);
+  const premium =
+    policyYears.reduce((sum, y) => sum + (y.premium ?? 0), 0) ||
+    coverages.reduce((sum, c) => sum + (c.calculatedPremium ?? 0), 0);
+
+  const insuredAmount =
+    policyYears[0]?.insuredAmount ??
+    coverages.reduce((max, c) => Math.max(max, c.sumInsured ?? 0), 0);
 
   const start = p.effectiveFromUtc?.slice(0, 10) ?? p.issuedOnUtc?.slice(0, 10) ?? "";
   const end = p.effectiveToUtc?.slice(0, 10) ?? start;
@@ -98,7 +125,6 @@ export const mapApiPolicy = (p: PoliciesPolicyResponse): Policy => {
     id: p.id ?? "",
     number: p.id ?? "",
     offerId: p.offerId ?? "",
-    offerScheduleYear: p.offerScheduleYear,
     productId: p.productId ?? "",
     versionId: "N/A",
     templateId: p.printableTemplateDocumentId ?? "N/A",
@@ -110,13 +136,18 @@ export const mapApiPolicy = (p: PoliciesPolicyResponse): Policy => {
     beneficiaries,
     participants,
     insuredPersons,
+    policyYears,
     coverages,
     documents,
     startDate: start,
     endDate: end,
-    termYears: Math.max(1, endYear - startYear),
+    termYears: Math.max(
+      1,
+      policyYears.length > 0 ? policyYears.length : endYear - startYear,
+    ),
     paymentMode: DEFAULT_PAYMENT,
     premium,
+    insuredAmount,
     status: deriveStatus(end),
     issueDate: p.issuedOnUtc?.slice(0, 10) ?? start,
     issuedBy: "N/A",

@@ -24,7 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { seedProducts } from "@/data/products";
-import { getCustomer, fullName } from "@/data/customers";
+import { getCustomer } from "@/data/customers";
 import { listDocuments } from "@/data/documents";
 import { listCoverages } from "@/data/coverages";
 import { listTemplates } from "@/data/templates";
@@ -219,7 +219,6 @@ export const computeVerification = (
     versionId,
     templateId,
     policyHolderId,
-    insuredId,
     premium,
     loanOutstanding,
   } = args;
@@ -227,7 +226,6 @@ export const computeVerification = (
   const product = seedProducts.find((p) => p.id === productId);
   const template = listTemplates(productId, versionId).find((t) => t.id === templateId);
   const holder = policyHolderId ? getCustomer(policyHolderId) : undefined;
-  const insured = insuredId ? getCustomer(insuredId) : undefined;
 
   // Determine sum insured from mandatory coverages in template
   const coverages = listCoverages(productId, versionId);
@@ -245,38 +243,7 @@ export const computeVerification = (
   const docs = listDocuments(productId, versionId);
   const checks: VerificationCheck[] = [];
 
-  // 1. PEP check
-  if (product?.flags.pep) {
-    const pepHolder = holder?.pepStatus === "Yes";
-    const pepInsured = insured?.pepStatus === "Yes";
-    const pepUnknown = holder?.pepStatus === "Unknown" || insured?.pepStatus === "Unknown";
-    if (pepHolder || pepInsured) {
-      const who = [pepHolder && holder ? fullName(holder) : null, pepInsured && insured ? fullName(insured) : null]
-        .filter(Boolean).join(", ");
-      checks.push({
-        name: "PEP Check",
-        result: "Requires Review",
-        reason: `Politically Exposed Person flagged: ${who}.`,
-        action: "Compliance team must approve before quotation.",
-      });
-    } else if (pepUnknown) {
-      checks.push({
-        name: "PEP Check",
-        result: "Warning",
-        reason: "PEP status is Unknown for one or more parties.",
-        action: "Confirm PEP declaration with the customer.",
-      });
-    } else {
-      checks.push({
-        name: "PEP Check",
-        result: "Passed",
-        reason: "No PEP flags on policy holder or insured.",
-        action: "No action required.",
-      });
-    }
-  }
-
-  // 2. Insured amount threshold
+  // 1. Insured amount threshold
   if (product?.flags.highInsuredAmount) {
     if (sumInsured >= HIGH_INSURED_THRESHOLD) {
       checks.push({
@@ -295,7 +262,7 @@ export const computeVerification = (
     }
   }
 
-  // 3. Total customer exposure
+  // 2. Total customer exposure
   if (product?.flags.totalExposure && holder) {
     const projected = (holder.totalExposure ?? 0) + sumInsured;
     if (projected >= HIGH_EXPOSURE_THRESHOLD) {
@@ -322,7 +289,7 @@ export const computeVerification = (
     }
   }
 
-  // 4. Manual underwriting
+  // 3. Manual underwriting
   if (product?.flags.manualUnderwriting) {
     checks.push({
       name: "Manual Underwriting Required",
@@ -339,7 +306,7 @@ export const computeVerification = (
     });
   }
 
-  // 5. Missing mandatory documents
+  // 4. Missing mandatory documents
   const mandatoryDocs = docs.filter((d) => d.isMandatory);
   if (mandatoryDocs.length > 0) {
     // No collected-docs feature yet → treat all mandatory as missing in the demo
@@ -358,7 +325,7 @@ export const computeVerification = (
     });
   }
 
-  // 6. Premium manually overridden
+  // 5. Premium manually overridden
   if (premium?.manualOverride) {
     checks.push({
       name: "Premium Manually Overridden",
@@ -375,7 +342,7 @@ export const computeVerification = (
     });
   }
 
-  // 7. FX rate manually overridden
+  // 6. FX rate manually overridden
   if (premium?.fxSource === "Manual" || premium?.fxSource === "Override") {
     checks.push({
       name: "FX Rate Manually Overridden",

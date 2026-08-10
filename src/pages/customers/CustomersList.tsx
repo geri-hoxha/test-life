@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -23,16 +22,10 @@ import { useListCompanies } from "@/api/companies";
 import { useCountryEnum } from "@/api/smart-enums";
 import { customerPath, mapCompanyToCustomer, mapPersonToCustomer, newOfferPath } from "@/api/adapters/customers";
 import { Plus, Pencil, FileText } from "lucide-react";
-import { fullName, PEPStatus, COMPANY_TYPE_OPTIONS, companyTypeLabel } from "@/data/customers";
+import { fullName, COMPANY_TYPE_OPTIONS, companyTypeLabel } from "@/data/customers";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-
-const pepClass: Record<PEPStatus, string> = {
-  Yes: "bg-warning/20 text-warning-foreground",
-  No: "bg-success/15 text-success",
-  Unknown: "bg-muted text-muted-foreground",
-};
 
 const initials = (first: string, last: string) =>
   `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
@@ -84,7 +77,6 @@ const CustomersList = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState("ALL");
-  const [isPep, setIsPep] = useState(false);
 
   // Company filters
   const [registrationNumber, setRegistrationNumber] = useState("");
@@ -109,7 +101,6 @@ const CustomersList = () => {
     setFirstName("");
     setLastName("");
     setGender("ALL");
-    setIsPep(false);
   };
 
   const clearCompanyFilters = () => {
@@ -135,9 +126,8 @@ const CustomersList = () => {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         ...(gender !== "ALL" ? { gender } : {}),
-        ...(isPep ? { isPep: true } : {}),
       }),
-    [personalIdentifier, nationality, firstName, lastName, gender, isPep]
+    [personalIdentifier, nationality, firstName, lastName, gender]
   );
   const companiesFilters = useMemo(
     () =>
@@ -199,7 +189,7 @@ const CustomersList = () => {
     (loadPeople && peopleLoading) || (loadCompanies && companiesLoading);
 
   const hasPeopleFilters =
-    personalIdentifier || nationality !== "ALL" || firstName || lastName || gender !== "ALL" || isPep;
+    personalIdentifier || nationality !== "ALL" || firstName || lastName || gender !== "ALL";
   const hasCompanyFilters =
     registrationNumber || countryCode !== "ALL" || legalName || tradeName || companyType !== "ALL";
 
@@ -297,13 +287,6 @@ const CustomersList = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">PEP</Label>
-                  <label className="flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
-                    <Checkbox checked={isPep} onCheckedChange={(v) => setIsPep(v === true)} />
-                    Is PEP
-                  </label>
-                </div>
               </div>
             </div>
           )}
@@ -381,7 +364,6 @@ const CustomersList = () => {
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Gender</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Phone</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Email</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">PEP</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground text-right">Total Exposure</TableHead>
               <TableHead className="text-right text-xs uppercase tracking-wider font-semibold text-muted-foreground">Actions</TableHead>
             </TableRow>
@@ -389,12 +371,12 @@ const CustomersList = () => {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <td colSpan={12} className="p-8 text-center text-muted-foreground text-sm">Loading customers…</td>
+                <td colSpan={11} className="p-8 text-center text-muted-foreground text-sm">Loading customers…</td>
               </TableRow>
             )}
             {!isLoading && customers.length === 0 && (
               <TableRow>
-                <td colSpan={12} className="p-8 text-center text-muted-foreground text-sm">
+                <td colSpan={11} className="p-8 text-center text-muted-foreground text-sm">
                   {!typeFilter
                     ? "Select Individuals or Companies to view and filter customers."
                     : "No customers found."}
@@ -434,9 +416,6 @@ const CustomersList = () => {
                 <TableCell className="text-muted-foreground">{isCompany ? "—" : c.gender}</TableCell>
                 <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground truncate max-w-[200px]">{c.email ?? "—"}</TableCell>
-                <TableCell>
-                  <Badge className={`border-0 ${pepClass[c.pepStatus]}`}>{c.pepStatus}</Badge>
-                </TableCell>
                 <TableCell className="text-right font-medium" onClick={(e) => e.stopPropagation()}>
                   {c.totalExposure > 0 ? (
                     <div className="flex flex-col items-end leading-tight">

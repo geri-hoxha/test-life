@@ -11,37 +11,43 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { MappedProduct } from "@/api/products";
+
+export type ProductComboboxOption = {
+  id: string;
+  name: string;
+  code?: string;
+};
 
 type ProductComboboxProps = {
-  products: MappedProduct[];
+  products: ProductComboboxOption[];
   value: string;
   onValueChange: (id: string) => void;
   placeholder?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
   className?: string;
   triggerClassName?: string;
   disabled?: boolean;
-  /** When true, selecting the same item again (or an explicit clear row) clears the value. */
-  allowClear?: boolean;
-  clearLabel?: string;
 };
 
-const matchesProductSearch = (p: MappedProduct, search: string) => {
+const matchesProductSearch = (p: ProductComboboxOption, search: string) => {
   const q = search.trim().toLowerCase();
   if (!q) return true;
-  return [p.name, p.code, p.id].some((field) => field?.toLowerCase().includes(q));
+  return [p.name, p.code, p.id]
+    .filter(Boolean)
+    .some((field) => String(field).toLowerCase().includes(q));
 };
 
 export const ProductCombobox = ({
   products,
   value,
   onValueChange,
-  placeholder = "Select product…",
+  placeholder = "Select package",
+  searchPlaceholder = "Search packages…",
+  emptyMessage = "No package found.",
   className,
   triggerClassName,
   disabled,
-  allowClear = false,
-  clearLabel = "All products",
 }: ProductComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -77,32 +83,19 @@ export const ProductCombobox = ({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search products…"
+            placeholder={searchPlaceholder}
             value={search}
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>No product found.</CommandEmpty>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
-              {allowClear && (
-                <CommandItem
-                  value="__clear__"
-                  onSelect={() => {
-                    onValueChange("");
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  <Check className={cn("mr-2 h-4 w-4 shrink-0", !value ? "opacity-100" : "opacity-0")} />
-                  <span className="text-muted-foreground">{clearLabel}</span>
-                </CommandItem>
-              )}
               {filtered.map((p) => (
                 <CommandItem
                   key={p.id}
-                  value={`${p.id} ${p.name} ${p.code}`}
+                  value={`${p.name} ${p.code ?? ""} ${p.id}`}
                   onSelect={() => {
-                    onValueChange(allowClear && value === p.id ? "" : p.id);
+                    onValueChange(p.id);
                     setOpen(false);
                     setSearch("");
                   }}

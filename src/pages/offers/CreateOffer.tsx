@@ -60,6 +60,7 @@ import {
   mapPersonToCustomer,
   mergeCustomers,
   parseCustomerPartyType,
+  toApiGender,
 } from "@/api/adapters/customers";
 import {
   useCreateOffer,
@@ -67,12 +68,30 @@ import {
   useAddOfferInsuredPerson,
   useAddOfferLoanDisbursement,
   useCalculateOfferSchedules,
+  useCalculateOffersPremium,
 } from "@/api/offers";
+import type { OffersCalculatePremiumRequest } from "@/api/types";
 import { CustomerCombobox } from "@/components/CustomerCombobox";
+import { ProductCombobox } from "@/components/ProductCombobox";
 import CustomerForm from "@/pages/customers/CustomerForm";
 import PremiumCalculation from "./PremiumCalculation";
 import type { Gender as RuleGender } from "@/data/premiumRules";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { toast } from "sonner";
+
+const fmtMoney = (v: number, ccy: string) => {
+  if (!ccy || !isFinite(v)) return "—";
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: ccy,
+      maximumFractionDigits: 2,
+    }).format(v);
+  } catch {
+    return `${v.toFixed(2)} ${ccy}`;
+  }
+};
 
 const PAYMENT_MODES: PaymentMode[] = [
   "Pagesa me prim te rregullt",
@@ -449,11 +468,79 @@ const CreateOffer = () => {
       : insured?.gender === "Male"
         ? "Male"
         : "Any";
+  const apiGender = insured ? toApiGender(insured.gender) : undefined;
 
   const termYears = useMemo(
     () => offerTermYears(startDate, endDate),
     [startDate, endDate],
   );
+
+  const manualPremiumRequest = useMemo((): OffersCalculatePremiumRequest | null => {
+    if (!manualLoans || !productId || !currency) return null;
+    if (!insured?.dateOfBirth || !apiGender) return null;
+    if (manualLoanRows.length === 0) return null;
+    return {
+      productId,
+      currency,
+      dateOfBirth: insured.dateOfBirth,
+      gender: apiGender,
+      loanDisbursements: manualLoanRows.map((r) => ({
+        year: Number(r.year) || 0,
+        periodStart: r.periodStart,
+        periodEnd: r.periodEnd,
+        remainingLoanAmount: Number(r.remainingLoanAmount) || 0,
+      })),
+    };
+  }, [
+    manualLoans,
+    productId,
+    currency,
+    insured?.dateOfBirth,
+    apiGender,
+    manualLoanRows,
+  ]);
+
+  const debouncedManualPremiumRequest = useDebouncedValue(
+    manualPremiumRequest,
+    500,
+  );
+  const {
+    data: manualPremiumPreview,
+    isFetching: manualPremiumLoading,
+    isError: manualPremiumError,
+    error: manualPremiumErr,
+  } = useCalculateOffersPremium(debouncedManualPremiumRequest);
+
+  const manualPremiumByYear = useMemo(() => {
+    const map = new Map<number, { insuredAmount: number; premium: number }>();
+    for (const row of manualPremiumPreview ?? []) {
+      if (row.year != null) {
+        map.set(row.year, {
+          insuredAmount: row.insuredAmount,
+          premium: row.premium,
+        });
+      }
+    }
+    return map;
+  }, [manualPremiumPreview]);
+
+  const manualPremiumTotals = useMemo(() => {
+    const rows = manualPremiumPreview ?? [];
+    return {
+      insuredAmount: rows.reduce((sum, r) => sum + r.insuredAmount, 0),
+      premium: rows.reduce((sum, r) => sum + r.premium, 0),
+    };
+  }, [manualPremiumPreview]);
+
+  const premiumHint = !manualLoans
+    ? null
+    : !productId || !currency
+      ? "Select product and currency to calculate premium."
+      : !insured?.dateOfBirth || !apiGender
+        ? "Select an insured person with date of birth and gender to calculate premium."
+        : manualLoanRows.length === 0
+          ? "Add at least one loan row to calculate premium."
+          : null;
 
   const beneficiaryTotal = beneficiaries.reduce(
     (s, b) => s + (Number(b.percentage) || 0),
@@ -689,34 +776,22 @@ const CreateOffer = () => {
               </div>
               <div>
                 <Label>Template / Package</Label>
-                <Select
+                <ProductCombobox
+                  products={productsInGroup}
                   value={productId}
                   onValueChange={onProductChange}
                   disabled={!productGroupId}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        productGroupId
-                          ? "Select package"
-                          : "Pick product group first"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {productsInGroup.length === 0 ? (
-                      <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                        No packages for this product group.
-                      </div>
-                    ) : (
-                      productsInGroup.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                  placeholder={
+                    productGroupId
+                      ? "Select package"
+                      : "Pick product group first"
+                  }
+                  emptyMessage={
+                    productsInGroup.length === 0
+                      ? "No packages for this product group."
+                      : "No package found."
+                  }
+                />
               </div>
 
               <div>
@@ -1193,6 +1268,12 @@ const CreateOffer = () => {
                         <TableHead className="h-8 px-2 text-xs">
                           Remaining
                         </TableHead>
+                        <TableHead className="h-8 px-2 text-xs text-right">
+                          Insured Amount
+                        </TableHead>
+                        <TableHead className="h-8 px-2 text-xs text-right">
+                          Premium
+                        </TableHead>
                         <TableHead className="h-8 w-8 px-1" />
                       </TableRow>
                     </TableHeader>
@@ -1200,7 +1281,7 @@ const CreateOffer = () => {
                       {manualLoanRows.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={5}
+                            colSpan={7}
                             className="h-12 text-center text-xs text-muted-foreground"
                           >
                             No rows yet. Set offer dates, then re-open manual
@@ -1208,7 +1289,11 @@ const CreateOffer = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        manualLoanRows.map((row) => (
+                        manualLoanRows.map((row, idx) => {
+                          const preview =
+                            manualPremiumByYear.get(row.year) ??
+                            manualPremiumPreview?.[idx];
+                          return (
                           <TableRow key={row.id}>
                             <TableCell className="p-1.5">
                               <Input
@@ -1258,18 +1343,33 @@ const CreateOffer = () => {
                               />
                             </TableCell>
                             <TableCell className="p-1.5">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                className="h-7 px-2 text-xs"
-                                value={row.remainingLoanAmount}
-                                onChange={(e) =>
-                                  updateManualLoanRow(row.id, {
-                                    remainingLoanAmount:
-                                      Number(e.target.value) || 0,
-                                  })
-                                }
-                              />
+                              <div className="flex">
+                                <span className="inline-flex h-7 shrink-0 items-center rounded-l-md border border-r-0 border-input bg-muted px-2 text-xs text-muted-foreground">
+                                  {currency || "—"}
+                                </span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="h-7 rounded-l-none px-2 text-xs"
+                                  value={row.remainingLoanAmount}
+                                  onChange={(e) =>
+                                    updateManualLoanRow(row.id, {
+                                      remainingLoanAmount:
+                                        Number(e.target.value) || 0,
+                                    })
+                                  }
+                                />
+                              </div>
+                            </TableCell>
+                            <TableCell className="p-1.5 text-right font-mono text-xs tabular-nums">
+                              {preview
+                                ? fmtMoney(preview.insuredAmount, currency || "EUR")
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="p-1.5 text-right font-mono text-xs tabular-nums text-primary">
+                              {preview
+                                ? fmtMoney(preview.premium, currency || "EUR")
+                                : "—"}
                             </TableCell>
                             <TableCell className="p-1">
                               <Button
@@ -1286,10 +1386,56 @@ const CreateOffer = () => {
                               </Button>
                             </TableCell>
                           </TableRow>
-                        ))
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-muted-foreground">
+                    {manualPremiumLoading ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Calculating premium…
+                      </span>
+                    ) : premiumHint ? (
+                      premiumHint
+                    ) : manualPremiumError ? (
+                      getApiErrorMessage(
+                        manualPremiumErr,
+                        "Failed to calculate premium",
+                      )
+                    ) : manualPremiumPreview?.length ? (
+                      "Premium calculated from manual loan rows."
+                    ) : null}
+                  </div>
+                  {manualPremiumPreview && manualPremiumPreview.length > 0 && (
+                    <div className="flex items-center gap-4 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Total insured:{" "}
+                        </span>
+                        <span className="font-mono font-medium">
+                          {fmtMoney(
+                            manualPremiumTotals.insuredAmount,
+                            currency || "EUR",
+                          )}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">
+                          Total premium:{" "}
+                        </span>
+                        <span className="font-mono font-semibold text-primary">
+                          {fmtMoney(
+                            manualPremiumTotals.premium,
+                            currency || "EUR",
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             )}
@@ -1314,6 +1460,15 @@ const CreateOffer = () => {
                     interestRate: Number(interestRate) || 0,
                     loanTermYears: termYears,
                     outstandingBalance: Number(outstandingBalance) || 0,
+                  }
+                : undefined
+            }
+            serverPreview={
+              manualLoans && manualPremiumPreview && manualPremiumPreview.length > 0
+                ? {
+                    insuredAmount: manualPremiumTotals.insuredAmount,
+                    premium: manualPremiumTotals.premium,
+                    loading: manualPremiumLoading,
                   }
                 : undefined
             }

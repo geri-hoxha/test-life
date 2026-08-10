@@ -8,7 +8,7 @@ import type {
   PeoplePersonResponse,
   PeopleUpdatePersonRequest,
 } from "../types";
-import type { Customer, Gender, PEPStatus } from "@/data/customers";
+import type { Customer, Gender } from "@/data/customers";
 
 const NA = "N/A";
 
@@ -63,10 +63,6 @@ export const fromApiGender = (g?: string): Gender => {
   return "Other";
 };
 
-export const toApiPep = (p?: PEPStatus) => p === "Yes";
-export const fromApiPep = (isPep?: boolean): PEPStatus =>
-  isPep === true ? "Yes" : isPep === false ? "No" : "Unknown";
-
 export const mapPersonToCustomer = (p: PeoplePersonResponse): Customer => ({
   id: p.id ?? "",
   customerType: "Individual",
@@ -86,7 +82,6 @@ export const mapPersonToCustomer = (p: PeoplePersonResponse): Customer => ({
   phone: "",
   email: "",
   occupation: "",
-  pepStatus: fromApiPep(p.isPep),
   notes: "",
   totalExposure: 0,
   // People GET does not return a created timestamp.
@@ -118,7 +113,6 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
     phone: "",
     email: "",
     occupation: "",
-    pepStatus: "Unknown",
     notes: "",
     totalExposure: 0,
     // Companies GET does not return a created timestamp.
@@ -134,7 +128,6 @@ export const customerToCreatePerson = (c: Customer): PeopleCreatePersonRequest =
     personalIdentifier: c.personalId.trim(),
     countryCode: toCountryCode(c.ssnIssuingCountry || c.country),
     nationality: (c.nationality ?? "").trim(),
-    isPep: toApiPep(c.pepStatus),
   };
   if (c.dateOfBirth) body.dateOfBirth = c.dateOfBirth;
   const gender = toApiGender(c.gender);

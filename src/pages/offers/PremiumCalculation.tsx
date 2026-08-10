@@ -70,6 +70,12 @@ type Props = {
     remainingYears?: number;
     outstandingBalance: number;
   };
+  /** When set (manual loans API), prefer these totals over the local estimate. */
+  serverPreview?: {
+    insuredAmount: number;
+    premium: number;
+    loading?: boolean;
+  };
   onResultChange?: (r: PremiumResult) => void;
 };
 
@@ -115,6 +121,7 @@ const PremiumCalculation = ({
   termYears,
   paymentMode = "Pagesa me prim te rregullt",
   loan,
+  serverPreview,
   onResultChange,
 }: Props) => {
   // Version is optional for now — treat placeholder / empty as unset.
@@ -205,7 +212,9 @@ const PremiumCalculation = ({
   const calculatedNet = Math.max(0, subtotal + templateAdjustment);
 
   let netPremium = calculatedNet;
-  if (manualOverride && manualAmount !== "") {
+  if (serverPreview) {
+    netPremium = Math.max(0, serverPreview.premium);
+  } else if (manualOverride && manualAmount !== "") {
     netPremium = Math.max(0, Number(manualAmount));
   }
 
@@ -404,8 +413,29 @@ const PremiumCalculation = ({
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        {serverPreview && (
+          <Card>
+            <CardHeader className="pb-1.5">
+              <CardDescription>Insured Amount</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-lg font-semibold">
+                {serverPreview.loading
+                  ? "…"
+                  : fmt(serverPreview.insuredAmount, currency)}
+              </div>
+              <div className="text-[10px] text-muted-foreground">From API</div>
+            </CardContent>
+          </Card>
+        )}
         <Card><CardHeader className="pb-1.5"><CardDescription>Net Premium</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{fmt(netPremium, currency)}</div></CardContent></Card>
+          <CardContent>
+            <div className="text-lg font-semibold">{fmt(netPremium, currency)}</div>
+            {serverPreview && (
+              <div className="text-[10px] text-muted-foreground">From API</div>
+            )}
+          </CardContent>
+        </Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Tax (10%)</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{fmt(tax, currency)}</div></CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
@@ -417,25 +447,6 @@ const PremiumCalculation = ({
           </CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Currency</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{currency}</div></CardContent></Card>
-        <Card>
-          <CardHeader className="pb-1.5"><CardDescription>FX Rate (EUR→{currency})</CardDescription></CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold font-mono">
-              {currency === baseCurrency
-                ? "1.0000"
-                : isFinite(fxConv.rate)
-                  ? fxConv.rate.toFixed(4)
-                  : "—"}
-            </div>
-            <div className="text-[10px] text-muted-foreground">
-              {currency === baseCurrency
-                ? "Same currency"
-                : fxConv.source === "missing"
-                  ? "No rate for this pair"
-                  : fxConv.source}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {currency !== baseCurrency && (

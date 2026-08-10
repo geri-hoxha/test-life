@@ -2020,21 +2020,6 @@ const OfferDetail = () => {
                     />
                     <Field label="Gender" value={titleCase(insuredPerson.gender)} />
                     <Field label="Country" value={insuredPerson.countryCode} />
-                    <Field
-                      label="PEP Status"
-                      value={
-                        <Badge
-                          variant="outline"
-                          className={
-                            insuredPerson.isPep
-                              ? "border-destructive/40 text-destructive"
-                              : "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
-                          }
-                        >
-                          {insuredPerson.isPep ? "Yes" : "No"}
-                        </Badge>
-                      }
-                    />
                   </>
                 ) : (
                   <div className="text-sm text-muted-foreground">Not assigned</div>

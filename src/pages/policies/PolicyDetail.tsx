@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import AppShell from "@/components/layout/AppShell";
@@ -22,6 +22,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
+  Calendar,
+  ChevronDown,
+  ChevronRight,
   Download,
   FileText,
   Files,
@@ -134,6 +137,17 @@ const PolicyDetail = () => {
     return map;
   }, [documentTypesPage?.items]);
 
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(() => new Set());
+
+  const toggleYearExpanded = (year: number) => {
+    setExpandedYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  };
+
   if (isLoading) {
     return (
       <AppShell>
@@ -198,9 +212,7 @@ const PolicyDetail = () => {
             </span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {product?.name ?? policy.productId} · issued {policy.issueDate}
-            {policy.offerScheduleYear != null ? ` · schedule ${policy.offerScheduleYear}` : ""} ·
-            from offer{" "}
+            {product?.name ?? policy.productId} · issued {policy.issueDate} · from offer{" "}
             <Link
               to={`/offers/${policy.offerId}`}
               className="text-primary hover:underline font-mono"
@@ -225,6 +237,16 @@ const PolicyDetail = () => {
         </Card>
         <Card>
           <CardHeader className="pb-1.5">
+            <CardDescription>Insured Amount</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">
+              {fmtMoney(policy.insuredAmount, policy.currency)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1.5">
             <CardDescription>Currency</CardDescription>
           </CardHeader>
           <CardContent>
@@ -233,18 +255,10 @@ const PolicyDetail = () => {
         </Card>
         <Card>
           <CardHeader className="pb-1.5">
-            <CardDescription>Term</CardDescription>
+            <CardDescription>Policy Years</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold">{policy.termYears} yrs</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-1.5">
-            <CardDescription>Schedule Year</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">{policy.offerScheduleYear ?? "—"}</div>
+            <div className="text-lg font-semibold">{policy.policyYears.length || policy.termYears}</div>
           </CardContent>
         </Card>
         <Card>
@@ -261,10 +275,14 @@ const PolicyDetail = () => {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 max-w-3xl">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 max-w-4xl">
           <TabsTrigger value="summary">
             <FileText className="h-3.5 w-3.5 mr-1.5" />
             Summary
+          </TabsTrigger>
+          <TabsTrigger value="years">
+            <Calendar className="h-3.5 w-3.5 mr-1.5" />
+            Policy Years
           </TabsTrigger>
           <TabsTrigger value="people">
             <Users className="h-3.5 w-3.5 mr-1.5" />
@@ -322,10 +340,12 @@ const PolicyDetail = () => {
                   value={<Badge variant="outline">{policy.currency}</Badge>}
                 />
                 <Field
-                  label="Schedule year"
+                  label="Policy years"
                   value={
-                    policy.offerScheduleYear != null ? (
-                      <span className="font-mono text-xs">{policy.offerScheduleYear}</span>
+                    policy.policyYears.length > 0 ? (
+                      <span className="font-mono text-xs">
+                        {policy.policyYears.map((y) => y.year).join(", ")}
+                      </span>
                     ) : undefined
                   }
                 />
@@ -409,9 +429,10 @@ const PolicyDetail = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Coverages</CardTitle>
+              <CardTitle className="text-base">Coverages overview</CardTitle>
               <CardDescription>
-                {policy.coverages.length} coverages · total premium{" "}
+                {policy.coverages.length} coverages across {policy.policyYears.length}{" "}
+                {policy.policyYears.length === 1 ? "year" : "years"} · total premium{" "}
                 {fmtMoney(policy.premium, policy.currency)}
               </CardDescription>
             </CardHeader>
@@ -462,6 +483,155 @@ const PolicyDetail = () => {
                           </TableCell>
                         </TableRow>
                       ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="years" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Policy Years</CardTitle>
+              <CardDescription>
+                Expand a year to view its coverages, rates, and calculated premiums.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {policy.policyYears.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-6 text-center">
+                  No policy years on this policy.
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[44px]" />
+                        <TableHead className="w-[70px]">Year</TableHead>
+                        <TableHead>Start</TableHead>
+                        <TableHead>End</TableHead>
+                        <TableHead className="text-right">Insured Amount</TableHead>
+                        <TableHead className="text-right">Premium</TableHead>
+                        <TableHead className="text-right">Coverages</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {policy.policyYears.map((y) => {
+                        const isExpanded = expandedYears.has(y.year);
+                        return (
+                          <Fragment key={y.id || y.year}>
+                            <TableRow
+                              className={isExpanded ? "border-b-0" : undefined}
+                              data-state={isExpanded ? "open" : undefined}
+                            >
+                              <TableCell className="pr-0">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground"
+                                  aria-label={
+                                    isExpanded
+                                      ? `Collapse policy year ${y.year}`
+                                      : `Expand policy year ${y.year}`
+                                  }
+                                  aria-expanded={isExpanded}
+                                  onClick={() => toggleYearExpanded(y.year)}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-mono">{y.year}</TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {y.startDate || "—"}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {y.endDate || "—"}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {fmtMoney(y.insuredAmount, policy.currency)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm font-semibold">
+                                {fmtMoney(y.premium, policy.currency)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {y.coverages.length}
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && (
+                              <TableRow>
+                                <TableCell colSpan={7} className="bg-muted/30 p-4">
+                                  {y.coverages.length === 0 ? (
+                                    <span className="text-sm text-muted-foreground">
+                                      No coverages for {y.year}.
+                                    </span>
+                                  ) : (
+                                    <div className="rounded-md border bg-background">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Coverage</TableHead>
+                                            <TableHead className="text-right">
+                                              Sum Insured
+                                            </TableHead>
+                                            <TableHead className="text-right">Rate</TableHead>
+                                            <TableHead className="text-right">
+                                              Multiplier
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                              Premium
+                                            </TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {y.coverages.map((c) => (
+                                            <TableRow key={c.id || c.coverageId}>
+                                              <TableCell>
+                                                <div className="text-sm font-medium">
+                                                  {c.coverageName ?? c.coverageId}
+                                                </div>
+                                                <div className="font-mono text-[11px] text-muted-foreground">
+                                                  {c.coverageId}
+                                                </div>
+                                                {c.coverageDescription?.trim() && (
+                                                  <div className="text-xs text-muted-foreground mt-1 max-w-xl whitespace-pre-wrap">
+                                                    {c.coverageDescription}
+                                                  </div>
+                                                )}
+                                              </TableCell>
+                                              <TableCell className="text-right font-mono text-sm">
+                                                {fmtMoney(c.sumInsured, policy.currency)}
+                                              </TableCell>
+                                              <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                                                {formatRate(c.rateUsed, policy.currency)}
+                                              </TableCell>
+                                              <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                                                {c.ratingTableMultiplierUsed != null
+                                                  ? `${c.ratingTableMultiplierUsed}x`
+                                                  : "—"}
+                                              </TableCell>
+                                              <TableCell className="text-right font-mono text-sm font-semibold">
+                                                {fmtMoney(c.calculatedPremium, policy.currency)}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -545,21 +715,6 @@ const PolicyDetail = () => {
                     />
                     <Field label="Gender" value={titleCase(insuredPerson.gender)} />
                     <Field label="Country" value={insuredPerson.countryCode} />
-                    <Field
-                      label="PEP Status"
-                      value={
-                        <Badge
-                          variant="outline"
-                          className={
-                            insuredPerson.isPep
-                              ? "border-destructive/40 text-destructive"
-                              : "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
-                          }
-                        >
-                          {insuredPerson.isPep ? "Yes" : "No"}
-                        </Badge>
-                      }
-                    />
                   </>
                 ) : (
                   <div className="text-sm text-muted-foreground">Not assigned</div>

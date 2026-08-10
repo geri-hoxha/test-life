@@ -37,6 +37,7 @@ import { policyStatusColor, PolicyStatus, type Policy } from "@/data/policies";
 import { CURRENCIES } from "@/data/fxRates";
 import { useListPolicies } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
+import { customerPath } from "@/api/adapters/customers";
 import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListOffers } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
@@ -44,6 +45,15 @@ import { compactQuery, dateToUtcDay, dateToUtcEnd, dateToUtcStart } from "@/lib/
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const STATUSES: PolicyStatus[] = ["Active", "Pending Payment", "Cancelled", "Expired", "Lapsed"];
+
+const COL_COUNT = 11;
+
+const fmtMoney = (v: number, ccy: string) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: ccy,
+    maximumFractionDigits: 2,
+  }).format(v);
 
 const insuredName = (p: Policy) => {
   const person = p.insuredPersons[0];
@@ -53,6 +63,13 @@ const insuredName = (p: Policy) => {
 };
 
 const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
+
+const yearsLabel = (p: Policy) => {
+  if (p.policyYears.length === 0) return null;
+  if (p.policyYears.length === 1) return String(p.policyYears[0].year);
+  const years = p.policyYears.map((y) => y.year);
+  return `${years[0]}–${years[years.length - 1]}`;
+};
 
 const toDate = (isoDay: string) => {
   if (!isoDay) return undefined;
@@ -267,12 +284,13 @@ const PoliciesList = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Policy #</TableHead>
                   <TableHead>Policy Holder</TableHead>
                   <TableHead>Insured</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Currency</TableHead>
+                  <TableHead className="text-right">Insured Amount</TableHead>
                   <TableHead className="text-right">Premium</TableHead>
+                  <TableHead>Years</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Issued</TableHead>
                   <TableHead>Effective</TableHead>
@@ -282,13 +300,13 @@ const PoliciesList = () => {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={COL_COUNT} className="text-center py-10 text-sm text-muted-foreground">
                       Loading policies…
                     </TableCell>
                   </TableRow>
                 ) : policies.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={COL_COUNT} className="text-center py-10 text-sm text-muted-foreground">
                       No policies match the current filters.
                     </TableCell>
                   </TableRow>
@@ -297,23 +315,24 @@ const PoliciesList = () => {
                     const holderParticipant = p.participants.find((x) => x.role === "policyHolder");
                     const holder = holderParticipant?.displayName?.trim() || null;
                     const insured = insuredName(p);
+                    const insuredPerson = p.insuredPersons[0];
                     const product = productMap[p.productId];
+                    const years = yearsLabel(p);
                     return (
                       <TableRow key={p.id}>
                         <TableCell>
-                          <Link
-                            to={`/policies/${p.id}`}
-                            className="font-mono text-xs font-medium text-primary hover:underline"
-                            title={p.id}
-                          >
-                            {shortId(p.id)}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          {holder ? (
+                          {holder && holderParticipant?.partyId ? (
                             <div className="min-w-0">
-                              <div className="text-sm truncate">{holder}</div>
-                              {holderParticipant?.uniqueIdentifier && (
+                              <Link
+                                to={customerPath(
+                                  holderParticipant.partyId,
+                                  holderParticipant.partyType ?? "person",
+                                )}
+                                className="text-sm truncate text-primary hover:underline block"
+                              >
+                                {holder}
+                              </Link>
+                              {holderParticipant.uniqueIdentifier && (
                                 <div className="text-[11px] text-muted-foreground font-mono">
                                   {holderParticipant.uniqueIdentifier}
                                 </div>
@@ -324,15 +343,35 @@ const PoliciesList = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {insured ?? <span className="text-muted-foreground">—</span>}
+                          {insured && insuredPerson?.personId ? (
+                            <Link
+                              to={customerPath(insuredPerson.personId, "person")}
+                              className="text-primary hover:underline"
+                            >
+                              {insured}
+                            </Link>
+                          ) : (
+                            insured ?? <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
-                        <TableCell className="text-sm">{product?.name ?? p.productId}</TableCell>
-                        <TableCell><Badge variant="outline">{p.currency}</Badge></TableCell>
+                        <TableCell className="text-sm" title={p.productId}>
+                          {product?.name ?? shortId(p.productId)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{p.currency}</Badge>
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: p.currency,
-                          }).format(p.premium)}
+                          {p.insuredAmount > 0
+                            ? fmtMoney(p.insuredAmount, p.currency)
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-medium">
+                          {p.premium > 0
+                            ? fmtMoney(p.premium, p.currency)
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {years ?? "—"}
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${policyStatusColor[p.status]}`}>

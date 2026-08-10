@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Pencil, FileText, MapPin, Briefcase, Calendar, BadgeCheck, ShieldCheck, FileSignature, Plus, AlertCircle } from "lucide-react";
-import { ageFromDob, companyTypeLabel, fullName, PEPStatus } from "@/data/customers";
+import { ageFromDob, companyTypeLabel, fullName } from "@/data/customers";
 import { useGetPerson } from "@/api/people";
 import { useGetCompany } from "@/api/companies";
 import {
@@ -22,12 +22,6 @@ import {
   newOfferPath,
   parseCustomerPartyType,
 } from "@/api/adapters/customers";
-
-const pepClass: Record<PEPStatus, string> = {
-  Yes: "bg-warning/20 text-warning-foreground",
-  No: "bg-success/15 text-success",
-  Unknown: "bg-muted text-muted-foreground",
-};
 
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -161,9 +155,6 @@ const CustomerDetail = () => {
               <Badge variant="outline" className={isCompany ? "border-accent/40 text-accent" : "border-border text-muted-foreground"}>
                 {isCompany ? "Company" : "Individual"}
               </Badge>
-              {!isCompany && (
-                <Badge className={`border-0 ${pepClass[customer.pepStatus]}`}>PEP: {customer.pepStatus}</Badge>
-              )}
               {customer.totalExposure > 0 && (
                 <Badge variant="outline" className="font-mono">Exposure {fmtMoney(customer.totalExposure)}</Badge>
               )}
@@ -187,7 +178,6 @@ const CustomerDetail = () => {
                 <div className="flex items-center gap-2 text-muted-foreground"><BadgeCheck className="h-4 w-4" /> <span className="font-mono">{customer.personalId || "—"}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {customer.ssnIssuingCountry || customer.country || "—"}</div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="h-4 w-4" /> {customer.dateOfBirth ? format(parseISO(customer.dateOfBirth), "MMM dd, yyyy") : "—"}</div>
-                <div className="flex items-center gap-2 text-muted-foreground"><ShieldCheck className="h-4 w-4" /> PEP: {customer.pepStatus}</div>
               </>
             )}
           </div>
@@ -266,12 +256,6 @@ const CustomerDetail = () => {
                 <AlertCircle className="h-4 w-4 text-warning" /> Compliance
               </h3>
               <div className="space-y-3">
-                {!isCompany && (
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">PEP Status</div>
-                    <Badge className={`mt-1 border-0 ${pepClass[customer.pepStatus]}`}>{customer.pepStatus}</Badge>
-                  </div>
-                )}
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total Exposure</div>
                   <div className="text-2xl font-semibold mt-1">

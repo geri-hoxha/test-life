@@ -23,6 +23,16 @@ export type PolicyCoverage = {
   calculatedPremium: number;
 };
 
+export type PolicyYear = {
+  id: string;
+  year: number;
+  startDate: string;
+  endDate: string;
+  insuredAmount: number;
+  premium: number;
+  coverages: PolicyCoverage[];
+};
+
 export type PolicyDocument = {
   id: string;
   documentId?: string | null;
@@ -33,7 +43,6 @@ export type Policy = {
   id: string;
   number: string;
   offerId: string;
-  offerScheduleYear?: number;
   productId: string;
   versionId: string;
   templateId: string;
@@ -45,6 +54,8 @@ export type Policy = {
   beneficiaries: Beneficiary[];
   participants: OfferParticipant[];
   insuredPersons: OfferInsuredPerson[];
+  policyYears: PolicyYear[];
+  /** Flattened coverages across all policy years (convenience). */
   coverages: PolicyCoverage[];
   documents: PolicyDocument[];
   startDate: string;
@@ -52,6 +63,7 @@ export type Policy = {
   termYears: number;
   paymentMode: PaymentMode;
   premium: number;
+  insuredAmount: number;
   status: PolicyStatus;
   issueDate: string;
   issuedBy: string;
@@ -65,11 +77,12 @@ const seed: Policy[] = [
     beneficiaries: [{ id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 100 }],
     participants: [],
     insuredPersons: [],
+    policyYears: [],
     coverages: [],
     documents: [],
     startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
     paymentMode: "Pagesa me prim te rregullt",
-    premium: 615, status: "Active",
+    premium: 615, insuredAmount: 0, status: "Active",
     issueDate: "2026-04-01", issuedBy: "Erin Hoxha",
   },
 ];

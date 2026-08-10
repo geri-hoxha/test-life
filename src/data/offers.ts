@@ -45,7 +45,6 @@ export type OfferInsuredPerson = {
   lastName?: string;
   dateOfBirth?: string;
   gender?: string;
-  isPep?: boolean;
 };
 
 export type OfferScheduleCoverage = {

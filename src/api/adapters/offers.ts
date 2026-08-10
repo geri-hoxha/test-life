@@ -65,7 +65,6 @@ const mapInsuredPerson = (p: OffersOfferInsuredPersonResponse): OfferInsuredPers
   lastName: p.lastName,
   dateOfBirth: p.dateOfBirth?.slice(0, 10),
   gender: p.gender,
-  isPep: p.isPep,
 });
 
 const mapSchedule = (s: OffersOfferScheduleResponse): OfferSchedule => ({

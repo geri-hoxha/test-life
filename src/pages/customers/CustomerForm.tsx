@@ -24,7 +24,7 @@ import {
 import { toast } from "sonner";
 import {
   Customer, customerSchema, ageFromDob,
-  Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPE_OPTIONS,
+  Gender, CustomerType, CompanyType, COMPANY_TYPE_OPTIONS,
   SSN_ISSUING_COUNTRIES,
 } from "@/data/customers";
 import { useCreatePerson, useGetPerson, useUpdatePerson } from "@/api/people";
@@ -107,7 +107,7 @@ const blank = (): Customer => ({
   f5Location: NA,
   address: "", city: "", country: "Albania",
   phone: "", email: "", occupation: "",
-  pepStatus: "Unknown", notes: "",
+  notes: "",
   totalExposure: 0,
   createdDate: new Date().toISOString().slice(0, 10),
 });
@@ -714,28 +714,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
         </div>
 
         <div className="space-y-6">
-          {isCompany ? (
-            addressesSection
-          ) : (
-            <Card className="p-6 shadow-card border-border">
-              <h3 className="text-sm font-semibold text-foreground mb-1">Compliance</h3>
-              <p className="text-xs text-muted-foreground mb-4">PEP status drives manual review on offers.</p>
-              <div className="space-y-1.5">
-                <Label>PEP Status</Label>
-                <Select value={c.pepStatus} onValueChange={(v) => set("pepStatus", v as PEPStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Unknown">Unknown</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
-                    <SelectItem value="Yes">Yes</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                  Politically Exposed Persons require enhanced due diligence and trigger compliance review on every new offer.
-                </p>
-              </div>
-            </Card>
-          )}
+          {isCompany ? addressesSection : null}
         </div>
       </div>
   );
