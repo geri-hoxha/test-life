@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfProductGroupResponse,
@@ -34,11 +34,17 @@ export const useCreateProductGroup = () => {
   });
 };
 
-/** GET /api/product-groups */
-export const listProductGroups = async (query?: {
+export type ListProductGroupsQuery = {
+  name?: string;
   pageNumber?: number;
   pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfProductGroupResponse> =>
+};
+
+/** GET /api/product-groups */
+export const listProductGroups = async (
+  query?: ListProductGroupsQuery,
+  signal?: AbortSignal
+): Promise<PaginationPagedListOfProductGroupResponse> =>
   apiRequest<PaginationPagedListOfProductGroupResponse>({
     method: "GET",
     path: `/api/product-groups`,
@@ -46,14 +52,15 @@ export const listProductGroups = async (query?: {
     signal,
   });
 
-export const useListProductGroups = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListProductGroups = (
+  query?: ListProductGroupsQuery,
+  options?: { enabled?: boolean }
+) =>
   useQuery({
     queryKey: productGroupsKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listProductGroups(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** DELETE /api/product-groups/{id} */

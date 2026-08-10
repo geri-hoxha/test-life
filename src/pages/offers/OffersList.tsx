@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
+import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import TablePagination from "@/components/TablePagination";
+import { ProductCombobox } from "@/components/ProductCombobox";
+import { PersonCombobox } from "@/components/PersonCombobox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Card,
   CardContent,
@@ -28,11 +32,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Plus, Search } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
 import { statusColor, OfferStatus, offerStatusToApi, type Offer } from "@/data/offers";
+import { CURRENCIES } from "@/data/fxRates";
 import { listOffers, offersKeys, useListOffers } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useListProducts, mapApiProduct } from "@/api/products";
+import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const STATUSES: OfferStatus[] = [
   "Draft",
@@ -52,22 +59,45 @@ const insuredName = (o: Offer) => {
 
 const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
 
+const toDate = (isoDay: string) => {
+  if (!isoDay) return undefined;
+  try {
+    return parseISO(isoDay);
+  } catch {
+    return undefined;
+  }
+};
+
 const OffersList = () => {
   const navigate = useNavigate();
-  const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [productId, setProductId] = useState("");
+  const [currency, setCurrency] = useState("__all__");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
+  const [personId, setPersonId] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const filters = useMemo(
+    () =>
+      compactQuery({
+        ...(statusFilter !== "ALL" ? { status: offerStatusToApi[statusFilter as OfferStatus] } : {}),
+        productId: productId.trim() || undefined,
+        ...(currency !== "__all__" ? { currency } : {}),
+        createdFromUtc: dateToUtcStart(createdFrom),
+        createdToUtc: dateToUtcEnd(createdTo),
+        personId: personId.trim() || undefined,
+      }),
+    [statusFilter, productId, currency, createdFrom, createdTo, personId]
+  );
+  const debouncedFilters = useDebouncedValue(filters);
+
   useEffect(() => {
     setPage(1);
-  }, [q, statusFilter, pageSize]);
+  }, [debouncedFilters, pageSize]);
 
-  const listQuery = {
-    pageNumber: page,
-    pageSize,
-    ...(statusFilter !== "ALL" ? { status: offerStatusToApi[statusFilter as OfferStatus] } : {}),
-  };
+  const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
 
   const { data: offersPage, isLoading, isFetching } = useListOffers(listQuery);
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
@@ -88,32 +118,15 @@ const OffersList = () => {
     [offersPage?.items]
   );
 
-  const productMap = useMemo(
-    () => Object.fromEntries((productsPage?.items ?? []).map(mapApiProduct).map((p) => [p.id, p])),
+  const products = useMemo(
+    () => (productsPage?.items ?? []).map(mapApiProduct),
     [productsPage?.items]
   );
 
-  // Client search only narrows the current server page (API has no search param).
-  const rows = useMemo(() => {
-    if (!q.trim()) return offers;
-    const needle = q.toLowerCase();
-    return offers.filter((o) => {
-      const holder = o.participants.find((p) => p.role === "policyHolder");
-      const haystack = [
-        o.id,
-        holder?.displayName ?? "",
-        holder?.uniqueIdentifier ?? "",
-        insuredName(o) ?? "",
-        productMap[o.productId]?.name ?? "",
-        o.productId,
-        o.currency,
-        o.status,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(needle);
-    });
-  }, [offers, productMap, q]);
+  const productMap = useMemo(
+    () => Object.fromEntries(products.map((p) => [p.id, p])),
+    [products]
+  );
 
   const totalCount = offersPage?.totalCount ?? 0;
   const totalPages = Math.max(1, offersPage?.totalPages ?? offersPage?.pageCount ?? 1);
@@ -122,6 +135,23 @@ const OffersList = () => {
     acc[s] = statusCountQueries[i]?.data?.totalCount ?? 0;
     return acc;
   }, {} as Record<OfferStatus, number>);
+
+  const clearFilters = () => {
+    setStatusFilter("ALL");
+    setProductId("");
+    setCurrency("__all__");
+    setCreatedFrom("");
+    setCreatedTo("");
+    setPersonId("");
+  };
+
+  const hasFilters =
+    statusFilter !== "ALL" ||
+    productId ||
+    currency !== "__all__" ||
+    createdFrom ||
+    createdTo ||
+    personId;
 
   return (
     <AppShell>
@@ -156,32 +186,82 @@ const OffersList = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">All Offers</CardTitle>
-              <CardDescription>
-                {isLoading
-                  ? "Loading…"
-                  : `${totalCount} total${isFetching && !isLoading ? " · updating…" : ""}`}
-              </CardDescription>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">All Offers</CardTitle>
+                <CardDescription>
+                  {isLoading
+                    ? "Loading…"
+                    : `${totalCount} total${isFetching && !isLoading ? " · updating…" : ""}`}
+                </CardDescription>
+              </div>
+              {hasFilters && (
+                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )}
             </div>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search this page…"
-                  className="pl-8 h-9 w-[260px]"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All statuses</SelectItem>
+                    {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Product</Label>
+                <ProductCombobox
+                  products={products}
+                  value={productId}
+                  onValueChange={setProductId}
+                  placeholder="All products"
+                  allowClear
+                  triggerClassName="h-9"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All statuses</SelectItem>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All currencies</SelectItem>
+                    {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Person</Label>
+                <PersonCombobox
+                  value={personId}
+                  onValueChange={setPersonId}
+                  placeholder="All people"
+                  allowClear
+                  triggerClassName="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Created from</Label>
+                <DatePicker
+                  value={toDate(createdFrom)}
+                  onChange={(d) => setCreatedFrom(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="From date"
+                  buttonClassName="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Created to</Label>
+                <DatePicker
+                  value={toDate(createdTo)}
+                  onChange={(d) => setCreatedTo(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="To date"
+                  buttonClassName="h-9"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -208,14 +288,14 @@ const OffersList = () => {
                       Loading data, please wait…
                     </TableCell>
                   </TableRow>
-                ) : rows.length === 0 ? (
+                ) : offers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
                       No offers match the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((o) => {
+                  offers.map((o) => {
                     const holderParticipant = o.participants.find((p) => p.role === "policyHolder");
                     const holder = holderParticipant?.displayName?.trim() || null;
                     const insured = insuredName(o);

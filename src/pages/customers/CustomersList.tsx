@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -18,13 +20,13 @@ import {
 import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
+import { useCountryEnum } from "@/api/smart-enums";
 import { customerPath, mapCompanyToCustomer, mapPersonToCustomer, newOfferPath } from "@/api/adapters/customers";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreHorizontal, Eye, Pencil, FileText, Filter } from "lucide-react";
-import { fullName, PEPStatus, type Customer } from "@/data/customers";
+import { Plus, Pencil, FileText } from "lucide-react";
+import { fullName, PEPStatus, COMPANY_TYPE_OPTIONS, companyTypeLabel } from "@/data/customers";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { compactQuery } from "@/lib/list-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const pepClass: Record<PEPStatus, string> = {
   Yes: "bg-warning/20 text-warning-foreground",
@@ -68,30 +70,102 @@ const exposureBreakdown = (
   return rows;
 };
 
-type CustomerTypeFilter = "all" | "person" | "company";
+type CustomerTypeFilter = "person" | "company";
 
 const CustomersList = () => {
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<CustomerTypeFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<CustomerTypeFilter | "">("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // People filters
+  const [personalIdentifier, setPersonalIdentifier] = useState("");
+  const [nationality, setNationality] = useState("ALL");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [gender, setGender] = useState("ALL");
+  const [isPep, setIsPep] = useState(false);
+
+  // Company filters
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("ALL");
+  const [legalName, setLegalName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [companyType, setCompanyType] = useState("ALL");
+
+  const { data: nationalityOptions = [] } = useCountryEnum();
+
+  const nationalityLabel = (code?: string) => {
+    if (!code) return "—";
+    return nationalityOptions.find((o) => o.value === code)?.text ?? code;
+  };
+
+  const loadPeople = typeFilter === "person";
+  const loadCompanies = typeFilter === "company";
+
+  const clearPeopleFilters = () => {
+    setPersonalIdentifier("");
+    setNationality("ALL");
+    setFirstName("");
+    setLastName("");
+    setGender("ALL");
+    setIsPep(false);
+  };
+
+  const clearCompanyFilters = () => {
+    setRegistrationNumber("");
+    setCountryCode("ALL");
+    setLegalName("");
+    setTradeName("");
+    setCompanyType("ALL");
+  };
+
+  const handleTypeChange = (value: CustomerTypeFilter) => {
+    setTypeFilter(value);
+    setPage(1);
+    clearPeopleFilters();
+    clearCompanyFilters();
+  };
+
+  const peopleFilters = useMemo(
+    () =>
+      compactQuery({
+        personalIdentifier: personalIdentifier.trim() || undefined,
+        ...(nationality !== "ALL" ? { nationality } : {}),
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        ...(gender !== "ALL" ? { gender } : {}),
+        ...(isPep ? { isPep: true } : {}),
+      }),
+    [personalIdentifier, nationality, firstName, lastName, gender, isPep]
+  );
+  const companiesFilters = useMemo(
+    () =>
+      compactQuery({
+        registrationNumber: registrationNumber.trim() || undefined,
+        ...(countryCode !== "ALL" ? { countryCode } : {}),
+        legalName: legalName.trim() || undefined,
+        tradeName: tradeName.trim() || undefined,
+        ...(companyType !== "ALL" ? { companyType } : {}),
+      }),
+    [registrationNumber, countryCode, legalName, tradeName, companyType]
+  );
+  const debouncedPeopleFilters = useDebouncedValue(peopleFilters);
+  const debouncedCompaniesFilters = useDebouncedValue(companiesFilters);
+
   useEffect(() => {
     setPage(1);
-  }, [query, typeFilter, pageSize]);
+  }, [pageSize, debouncedPeopleFilters, debouncedCompaniesFilters]);
 
-  const loadPeople = typeFilter === "all" || typeFilter === "person";
-  const loadCompanies = typeFilter === "all" || typeFilter === "company";
+  const peopleQuery = { ...debouncedPeopleFilters, pageNumber: page, pageSize };
+  const companiesQuery = { ...debouncedCompaniesFilters, pageNumber: page, pageSize };
 
-  const { data: peoplePage, isLoading: peopleLoading } = useListPeople(
-    { pageNumber: page, pageSize },
-    { enabled: loadPeople }
-  );
-  const { data: companiesPage, isLoading: companiesLoading } = useListCompanies(
-    { pageNumber: page, pageSize },
-    { enabled: loadCompanies }
-  );
+  const { data: peoplePage, isLoading: peopleLoading } = useListPeople(peopleQuery, {
+    enabled: loadPeople,
+  });
+  const { data: companiesPage, isLoading: companiesLoading } = useListCompanies(companiesQuery, {
+    enabled: loadCompanies,
+  });
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 100 });
 
   const products = useMemo(
@@ -100,39 +174,17 @@ const CustomersList = () => {
   );
 
   const customers = useMemo(() => {
-    const people = loadPeople ? (peoplePage?.items ?? []).map(mapPersonToCustomer) : [];
-    const companies = loadCompanies ? (companiesPage?.items ?? []).map(mapCompanyToCustomer) : [];
-    let all: Customer[] = [];
-    if (typeFilter === "person") all = people;
-    else if (typeFilter === "company") all = companies;
-    else all = [...people, ...companies];
+    if (typeFilter === "person") return (peoplePage?.items ?? []).map(mapPersonToCustomer);
+    if (typeFilter === "company") return (companiesPage?.items ?? []).map(mapCompanyToCustomer);
+    return [];
+  }, [companiesPage?.items, peoplePage?.items, typeFilter]);
 
-    const q = query.toLowerCase();
-    if (!q) return all;
-    return all.filter(
-      (c) =>
-        fullName(c).toLowerCase().includes(q) ||
-        c.personalId.toLowerCase().includes(q) ||
-        (c.nipt ?? "").toLowerCase().includes(q) ||
-        (c.email ?? "").toLowerCase().includes(q)
-    );
-  }, [
-    companiesPage?.items,
-    loadCompanies,
-    loadPeople,
-    peoplePage?.items,
-    query,
-    typeFilter,
-  ]);
-
-  const peopleTotal = peoplePage?.totalCount ?? 0;
-  const companiesTotal = companiesPage?.totalCount ?? 0;
   const totalCount =
     typeFilter === "person"
-      ? peopleTotal
+      ? (peoplePage?.totalCount ?? 0)
       : typeFilter === "company"
-        ? companiesTotal
-        : peopleTotal + companiesTotal;
+        ? (companiesPage?.totalCount ?? 0)
+        : 0;
 
   const totalPages = Math.max(
     1,
@@ -140,14 +192,16 @@ const CustomersList = () => {
       ? (peoplePage?.totalPages ?? peoplePage?.pageCount ?? 1)
       : typeFilter === "company"
         ? (companiesPage?.totalPages ?? companiesPage?.pageCount ?? 1)
-        : Math.max(
-            peoplePage?.totalPages ?? peoplePage?.pageCount ?? 1,
-            companiesPage?.totalPages ?? companiesPage?.pageCount ?? 1
-          )
+        : 1
   );
 
   const isLoading =
     (loadPeople && peopleLoading) || (loadCompanies && companiesLoading);
+
+  const hasPeopleFilters =
+    personalIdentifier || nationality !== "ALL" || firstName || lastName || gender !== "ALL" || isPep;
+  const hasCompanyFilters =
+    registrationNumber || countryCode !== "ALL" || legalName || tradeName || companyType !== "ALL";
 
   return (
     <AppShell>
@@ -156,45 +210,163 @@ const CustomersList = () => {
         title="Customers"
         description="Manage individuals and organizations covered by your policies."
         actions={
-          <>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" /> Filters
-            </Button>
-            <Button asChild className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link to="/customers/new">
-                <Plus className="h-4 w-4" /> New Customer
-              </Link>
-            </Button>
-          </>
+          <Button asChild className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Link to="/customers/new">
+              <Plus className="h-4 w-4" /> New Customer
+            </Link>
+          </Button>
         }
       />
 
       <Card className="shadow-card border-border overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-b border-border bg-muted/30">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
-            <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search this page…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="pl-9 h-9"
-              />
+        <div className="flex flex-col gap-4 px-5 py-4 border-b border-border bg-muted/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Customer type</Label>
+              <Select value={typeFilter || undefined} onValueChange={(v) => handleTypeChange(v as CustomerTypeFilter)}>
+                <SelectTrigger className="h-9 w-[200px]">
+                  <SelectValue placeholder="Select type first…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="person">Individuals</SelectItem>
+                  <SelectItem value="company">Companies</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as CustomerTypeFilter)}>
-              <SelectTrigger className="h-9 w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="person">Individuals</SelectItem>
-                <SelectItem value="company">Companies</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="text-xs text-muted-foreground">
+              {!typeFilter
+                ? "Select a type to list and filter customers"
+                : isLoading
+                  ? "Loading…"
+                  : `${totalCount} customer(s)`}
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {isLoading ? "Loading…" : `${totalCount} customer(s)`}
-          </div>
+
+          {typeFilter === "person" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  People filters
+                </div>
+                {hasPeopleFilters && (
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearPeopleFilters}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Personal ID</Label>
+                  <Input
+                    className="h-9 font-mono text-xs"
+                    value={personalIdentifier}
+                    onChange={(e) => setPersonalIdentifier(e.target.value)}
+                    placeholder="personalIdentifier"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">First name</Label>
+                  <Input className="h-9" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Last name</Label>
+                  <Input className="h-9" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Nationality</Label>
+                  <Select value={nationality} onValueChange={setNationality}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All countries</SelectItem>
+                      {nationalityOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.text}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Gender</Label>
+                  <Select value={gender} onValueChange={setGender}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All</SelectItem>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">PEP</Label>
+                  <label className="flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+                    <Checkbox checked={isPep} onCheckedChange={(v) => setIsPep(v === true)} />
+                    Is PEP
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {typeFilter === "company" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Company filters
+                </div>
+                {hasCompanyFilters && (
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearCompanyFilters}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Registration #</Label>
+                  <Input
+                    className="h-9 font-mono text-xs"
+                    value={registrationNumber}
+                    onChange={(e) => setRegistrationNumber(e.target.value)}
+                    placeholder="registrationNumber"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Legal name</Label>
+                  <Input className="h-9" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Trade name</Label>
+                  <Input className="h-9" value={tradeName} onChange={(e) => setTradeName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Country</Label>
+                  <Select value={countryCode} onValueChange={setCountryCode}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All countries</SelectItem>
+                      {nationalityOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.text}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Company type</Label>
+                  <Select value={companyType} onValueChange={setCompanyType}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All types</SelectItem>
+                      {COMPANY_TYPE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.text}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <Table>
@@ -203,6 +375,8 @@ const CustomersList = () => {
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Full Name</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Type</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Personal ID / NIPT</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Nationality</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Company type</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Date of Birth</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Gender</TableHead>
               <TableHead className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Phone</TableHead>
@@ -215,12 +389,16 @@ const CustomersList = () => {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <td colSpan={10} className="p-8 text-center text-muted-foreground text-sm">Loading customers…</td>
+                <td colSpan={12} className="p-8 text-center text-muted-foreground text-sm">Loading customers…</td>
               </TableRow>
             )}
             {!isLoading && customers.length === 0 && (
               <TableRow>
-                <td colSpan={10} className="p-8 text-center text-muted-foreground text-sm">No customers found.</td>
+                <td colSpan={12} className="p-8 text-center text-muted-foreground text-sm">
+                  {!typeFilter
+                    ? "Select Individuals or Companies to view and filter customers."
+                    : "No customers found."}
+                </td>
               </TableRow>
             )}
             {customers.map((c) => {
@@ -231,7 +409,7 @@ const CustomersList = () => {
               return (
               <TableRow key={`${c.customerType}-${c.id}`} className="hover:bg-accent-soft/40 cursor-pointer" onClick={() => navigate(customerPath(c.id, c.customerType))}>
                 <TableCell>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-40">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-accent-soft text-accent text-xs font-semibold">
                         {avatarInitials}
@@ -239,7 +417,6 @@ const CustomersList = () => {
                     </Avatar>
                     <div>
                       <div className="font-medium">{fullName(c)}</div>
-                      <div className="text-[11px] text-muted-foreground">{c.id}</div>
                     </div>
                   </div>
                 </TableCell>
@@ -249,7 +426,11 @@ const CustomersList = () => {
                   </Badge>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{isCompany ? (c.nipt ?? "—") : c.personalId}</TableCell>
-                <TableCell className="text-muted-foreground">{!isCompany && c.dateOfBirth ? format(parseISO(c.dateOfBirth), "MMM dd, yyyy") : "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{nationalityLabel(c.nationality)}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {isCompany ? (companyTypeLabel(c.companyType) || "—") : "—"}
+                </TableCell>
+                <TableCell className="text-muted-foreground min-w-28">{!isCompany && c.dateOfBirth ? format(parseISO(c.dateOfBirth), "MMM dd, yyyy") : "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{isCompany ? "—" : c.gender}</TableCell>
                 <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground truncate max-w-[200px]">{c.email ?? "—"}</TableCell>
@@ -292,27 +473,11 @@ const CustomersList = () => {
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="inline-flex items-center gap-1">
                     <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
-                      <Link to={customerPath(c.id, c.customerType)}><Eye className="h-3.5 w-3.5 mr-1" /> View</Link>
-                    </Button>
-                    <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
                       <Link to={customerPath(c.id, c.customerType, { edit: true })}><Pencil className="h-3.5 w-3.5 mr-1" /> Edit</Link>
                     </Button>
                     <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs text-accent hover:text-accent hover:bg-accent-soft">
                       <Link to={newOfferPath(c.id, c.customerType)}><FileText className="h-3.5 w-3.5 mr-1" /> New Offer</Link>
                     </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Run KYC check</DropdownMenuItem>
-                        <DropdownMenuItem>Send communication</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">Archive</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 </TableCell>
               </TableRow>

@@ -28,11 +28,24 @@ export const useGetPolicy = (id: string, options?: { enabled?: boolean }) =>
     enabled: Boolean(id) && (options?.enabled ?? true),
   });
 
-/** GET /api/policies */
-export const listPolicies = async (query?: {
+export type ListPoliciesQuery = {
+  productId?: string;
+  offerId?: string;
+  currency?: string;
+  issuedFromUtc?: string;
+  issuedToUtc?: string;
+  effectiveOnUtc?: string;
+  partyId?: string;
+  personId?: string;
   pageNumber?: number;
   pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfPolicyResponse> =>
+};
+
+/** GET /api/policies */
+export const listPolicies = async (
+  query?: ListPoliciesQuery,
+  signal?: AbortSignal
+): Promise<PaginationPagedListOfPolicyResponse> =>
   apiRequest<PaginationPagedListOfPolicyResponse>({
     method: "GET",
     path: `/api/policies`,
@@ -40,10 +53,7 @@ export const listPolicies = async (query?: {
     signal,
   });
 
-export const useListPolicies = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListPolicies = (query?: ListPoliciesQuery, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: policiesKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listPolicies(query, signal),

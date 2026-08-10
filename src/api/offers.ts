@@ -253,12 +253,23 @@ export const useCreateOffer = () => {
   });
 };
 
-/** GET /api/offers */
-export const listOffers = async (query?: {
+export type ListOffersQuery = {
   status?: string;
+  productId?: string;
+  currency?: string;
+  createdFromUtc?: string;
+  createdToUtc?: string;
+  partyId?: string;
+  personId?: string;
   pageNumber?: number;
   pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfOfferResponse> =>
+};
+
+/** GET /api/offers */
+export const listOffers = async (
+  query?: ListOffersQuery,
+  signal?: AbortSignal
+): Promise<PaginationPagedListOfOfferResponse> =>
   apiRequest<PaginationPagedListOfOfferResponse>({
     method: "GET",
     path: `/api/offers`,
@@ -266,11 +277,7 @@ export const listOffers = async (query?: {
     signal,
   });
 
-export const useListOffers = (query?: {
-  status?: string;
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListOffers = (query?: ListOffersQuery, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: offersKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listOffers(query, signal),

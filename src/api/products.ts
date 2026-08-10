@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfProductResponse,
@@ -137,11 +137,18 @@ export const useCreateProduct = () => {
   });
 };
 
-/** GET /api/products */
-export const listProducts = async (query?: {
+export type ListProductsQuery = {
+  name?: string;
+  productGroupId?: string;
   pageNumber?: number;
   pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfProductResponse> =>
+};
+
+/** GET /api/products */
+export const listProducts = async (
+  query?: ListProductsQuery,
+  signal?: AbortSignal
+): Promise<PaginationPagedListOfProductResponse> =>
   apiRequest<PaginationPagedListOfProductResponse>({
     method: "GET",
     path: `/api/products`,
@@ -149,14 +156,12 @@ export const listProducts = async (query?: {
     signal,
   });
 
-export const useListProducts = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListProducts = (query?: ListProductsQuery, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: productsKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listProducts(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** DELETE /api/products/{id} */
@@ -284,6 +289,9 @@ export type MappedProduct = {
   productGroupId?: string;
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
+  sumInsuredBasis?: string | null;
+  issuanceMode?: string | null;
+  calculationMethod?: string | null;
   paymentModel?: string;
   premiumTableId?: string;
   coverages?: ProductsProductCoverageResponse[];
@@ -352,6 +360,9 @@ export const mapApiProduct = (p: ProductsProductResponse): MappedProduct => {
     productGroupId: p.productGroupId,
     coverageText: p.coverageText,
     defaultPrintableTemplateDocumentId: p.defaultPrintableTemplateDocumentId ?? null,
+    sumInsuredBasis: p.sumInsuredBasis ?? null,
+    issuanceMode: p.issuanceMode ?? null,
+    calculationMethod: p.calculationMethod ?? null,
     paymentModel: p.paymentModel ?? undefined,
     premiumTableId: p.premiumTableId ?? undefined,
     coverages: p.coverages,

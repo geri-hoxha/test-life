@@ -19,11 +19,13 @@ import {
   addProductDocumentType,
   addProductPaymentMethod,
 } from "@/api/products";
+import type { ProductsCalculationMethod, ProductsIssuanceMode } from "@/api/types";
 import { useListCoverages } from "@/api/coverages";
 import { useListRatingTables } from "@/api/rating-tables";
 import { useListDocumentTypes } from "@/api/document-types";
 import { useListDocuments } from "@/api/documents";
 import { useListBankAccounts } from "@/api/bank-accounts";
+import { useSumInsuredBasisEnum } from "@/api/smart-enums";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
 import CreateCoverageModal from "@/pages/products/CreateCoverageModal";
 import CreateDocumentTypeModal from "@/pages/products/CreateDocumentTypeModal";
@@ -31,6 +33,16 @@ import { toast } from "sonner";
 import { Plus } from "lucide-react";
 
 const ALL_CURRENCIES = ["EUR", "ALL", "USD"] as const;
+
+const ISSUANCE_MODE_OPTIONS = [
+  { value: "annualRenewable", label: "Annual renewable" },
+  { value: "wholeOfTerm", label: "Whole of term" },
+] as const;
+
+const CALCULATION_METHOD_OPTIONS = [
+  { value: "declining", label: "Declining" },
+  { value: "leveled", label: "Leveled" },
+] as const;
 
 const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
   <div className="mb-5">
@@ -90,6 +102,7 @@ const CreateProduct = () => {
   const { data: documentTypesPage, isLoading: documentTypesLoading } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
   const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
   const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
+  const { data: sumInsuredBasisOptions = [] } = useSumInsuredBasisEnum();
   const createProduct = useCreateProduct();
 
   const apiGroups = groupsPage?.items ?? [];
@@ -106,8 +119,11 @@ const CreateProduct = () => {
   const [currencies, setCurrencies] = useState<string[]>(["EUR"]);
   const [coverageText, setCoverageText] = useState("");
   const [defaultPrintableTemplateDocumentId, setDefaultPrintableTemplateDocumentId] = useState("");
-  // Payment method — POST /api/products/{id}/payment-methods (single)
-  const [bankAccountId, setBankAccountId] = useState("");
+  const [sumInsuredBasis, setSumInsuredBasis] = useState("");
+  const [issuanceMode, setIssuanceMode] = useState<ProductsIssuanceMode | "">("");
+  const [calculationMethod, setCalculationMethod] = useState<ProductsCalculationMethod | "">("");
+  // Payment methods — POST /api/products/{id}/payment-methods (one per account)
+  const [bankAccountIds, setBankAccountIds] = useState<string[]>([]);
   const [coverageModalOpen, setCoverageModalOpen] = useState(false);
   const [documentTypeModalOpen, setDocumentTypeModalOpen] = useState(false);
 
@@ -195,6 +211,9 @@ const CreateProduct = () => {
         supportedCurrencies: currencies,
         coverageText: coverageText.trim() || undefined,
         defaultPrintableTemplateDocumentId: defaultPrintableTemplateDocumentId || null,
+        sumInsuredBasis: sumInsuredBasis || null,
+        issuanceMode: issuanceMode || null,
+        calculationMethod: calculationMethod || null,
       });
       if (!created.id) throw new Error("Product created without id");
 
@@ -218,7 +237,7 @@ const CreateProduct = () => {
         });
       }
 
-      if (bankAccountId) {
+      for (const bankAccountId of bankAccountIds) {
         await addProductPaymentMethod(created.id, { bankAccountId });
       }
 
@@ -304,11 +323,74 @@ const CreateProduct = () => {
                 </Select>
               </div>
               <div className="space-y-1.5 md:col-span-2">
+                <Label>Sum insured basis</Label>
+                <Select
+                  value={sumInsuredBasis || "none"}
+                  onValueChange={(v) => setSumInsuredBasis(v === "none" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sum insured basis…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {sumInsuredBasisOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.text}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Issuance mode</Label>
+                <Select
+                  value={issuanceMode || "none"}
+                  onValueChange={(v) =>
+                    setIssuanceMode(v === "none" ? "" : (v as ProductsIssuanceMode))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select issuance mode…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {ISSUANCE_MODE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Calculation method</Label>
+                <Select
+                  value={calculationMethod || "none"}
+                  onValueChange={(v) =>
+                    setCalculationMethod(v === "none" ? "" : (v as ProductsCalculationMethod))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select calculation method…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {CALCULATION_METHOD_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Payment method</Label>
                 <BankAccountCombobox
+                  multiple
                   accounts={bankAccounts}
-                  value={bankAccountId}
-                  onValueChange={setBankAccountId}
+                  value={bankAccountIds}
+                  onValueChange={setBankAccountIds}
+                  placeholder="Select bank accounts…"
                 />
               </div>
             </div>

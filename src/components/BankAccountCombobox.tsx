@@ -13,14 +13,28 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { BankAccountsBankAccountResponse } from "@/api/types";
 
-type BankAccountComboboxProps = {
+type BankAccountComboboxBaseProps = {
   accounts: BankAccountsBankAccountResponse[];
-  value: string;
-  onValueChange: (id: string) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
 };
+
+type BankAccountComboboxSingleProps = BankAccountComboboxBaseProps & {
+  multiple?: false;
+  value: string;
+  onValueChange: (id: string) => void;
+};
+
+type BankAccountComboboxMultipleProps = BankAccountComboboxBaseProps & {
+  multiple: true;
+  value: string[];
+  onValueChange: (ids: string[]) => void;
+};
+
+export type BankAccountComboboxProps =
+  | BankAccountComboboxSingleProps
+  | BankAccountComboboxMultipleProps;
 
 const accountLabel = (a: BankAccountsBankAccountResponse) =>
   [a.bankName, a.currency, a.iban || a.accountNumber].filter(Boolean).join(" · ") || a.id || "—";
@@ -33,18 +47,54 @@ const matchesAccountSearch = (a: BankAccountsBankAccountResponse, search: string
     .some((field) => String(field).toLowerCase().includes(q));
 };
 
-export const BankAccountCombobox = ({
-  accounts,
-  value,
-  onValueChange,
-  placeholder = "Select bank account…",
-  className,
-  disabled,
-}: BankAccountComboboxProps) => {
+export const BankAccountCombobox = (props: BankAccountComboboxProps) => {
+  const {
+    accounts,
+    placeholder = "Select bank account…",
+    className,
+    disabled,
+  } = props;
+  const multiple = props.multiple === true;
+  const selectedIds = multiple
+    ? props.value
+    : props.value
+      ? [props.value]
+      : [];
+
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const selected = accounts.find((a) => a.id === value);
+  const selectedAccounts = accounts.filter((a) => a.id && selectedIds.includes(a.id));
   const filtered = accounts.filter((a) => matchesAccountSearch(a, search));
+
+  const triggerLabel = () => {
+    if (selectedAccounts.length === 0) return placeholder;
+    if (!multiple) return accountLabel(selectedAccounts[0]);
+    if (selectedAccounts.length === 1) return accountLabel(selectedAccounts[0]);
+    return `${selectedAccounts.length} accounts selected`;
+  };
+
+  const toggleId = (id: string) => {
+    if (multiple) {
+      const next = selectedIds.includes(id)
+        ? selectedIds.filter((x) => x !== id)
+        : [...selectedIds, id];
+      props.onValueChange(next);
+      return;
+    }
+    props.onValueChange(id);
+    setOpen(false);
+    setSearch("");
+  };
+
+  const clearSelection = () => {
+    if (multiple) {
+      props.onValueChange([]);
+      return;
+    }
+    props.onValueChange("");
+    setOpen(false);
+    setSearch("");
+  };
 
   return (
     <Popover
@@ -63,11 +113,13 @@ export const BankAccountCombobox = ({
           disabled={disabled}
           className={cn(
             "w-full justify-between font-normal",
-            !selected && "text-muted-foreground",
+            selectedAccounts.length === 0 && "text-muted-foreground",
             className,
           )}
         >
-          <span className="truncate">{selected ? accountLabel(selected) : placeholder}</span>
+          <span className="truncate" title={selectedAccounts.map(accountLabel).join(", ")}>
+            {triggerLabel()}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -83,19 +135,19 @@ export const BankAccountCombobox = ({
             <CommandGroup>
               <CommandItem
                 value="__none__"
-                onSelect={() => {
-                  onValueChange("");
-                  setOpen(false);
-                  setSearch("");
-                }}
+                onSelect={clearSelection}
               >
                 <Check
-                  className={cn("mr-2 h-4 w-4 shrink-0", !value ? "opacity-100" : "opacity-0")}
+                  className={cn(
+                    "mr-2 h-4 w-4 shrink-0",
+                    selectedIds.length === 0 ? "opacity-100" : "opacity-0",
+                  )}
                 />
-                <span className="text-muted-foreground">None</span>
+                <span className="text-muted-foreground">{multiple ? "Clear all" : "None"}</span>
               </CommandItem>
               {filtered.map((a) => {
                 const id = a.id ?? "";
+                const selected = Boolean(id && selectedIds.includes(id));
                 return (
                   <CommandItem
                     key={id}
@@ -104,15 +156,14 @@ export const BankAccountCombobox = ({
                       .join(" ")}
                     disabled={!id}
                     onSelect={() => {
-                      onValueChange(id);
-                      setOpen(false);
-                      setSearch("");
+                      if (!id) return;
+                      toggleId(id);
                     }}
                   >
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4 shrink-0",
-                        value === id ? "opacity-100" : "opacity-0",
+                        selected ? "opacity-100" : "opacity-0",
                       )}
                     />
                     <span className="truncate">{accountLabel(a)}</span>

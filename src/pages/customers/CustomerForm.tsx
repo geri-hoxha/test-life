@@ -24,10 +24,11 @@ import {
 import { toast } from "sonner";
 import {
   Customer, customerSchema, ageFromDob,
-  Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPES,
+  Gender, PEPStatus, CustomerType, CompanyType, COMPANY_TYPE_OPTIONS,
   SSN_ISSUING_COUNTRIES,
 } from "@/data/customers";
 import { useCreatePerson, useGetPerson, useUpdatePerson } from "@/api/people";
+import { useCountryEnum } from "@/api/smart-enums";
 import {
   useAddCompanyAddress,
   useCreateCompany,
@@ -100,7 +101,7 @@ const blank = (): Customer => ({
   firstName: "", lastName: "", fatherName: "", personalId: "",
   ssnIssuingCountry: NA,
   dateOfBirth: "", gender: "Other",
-  nationality: NA, placeOfBirth: "",
+  nationality: "", placeOfBirth: "",
   companyName: "", tradeName: "", nipt: "", companyType: undefined,
   registrationDate: "", legalRepresentative: "",
   f5Location: NA,
@@ -148,6 +149,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
   const updateCompany = useUpdateCompany();
   const addCompanyAddress = useAddCompanyAddress();
   const removeCompanyAddress = useRemoveCompanyAddress();
+  const { data: nationalityOptions = [] } = useCountryEnum();
 
   const [c, setC] = useState<Customer>(blank());
   const set = <K extends keyof Customer>(k: K, v: Customer[K]) => setC((s) => ({ ...s, [k]: v }));
@@ -601,7 +603,9 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                     <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NA}>N/A</SelectItem>
-                      {COMPANY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      {COMPANY_TYPE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.text}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -612,6 +616,24 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                     <SelectContent>
                       {countryOptions.map((country) => (
                         <SelectItem key={country} value={country}>{country}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nationality *</Label>
+                  <Select
+                    value={c.nationality || undefined}
+                    onValueChange={(v) => set("nationality", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select nationality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {nationalityOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.text}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -665,6 +687,24 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                       <SelectItem value="Other">N/A</SelectItem>
                       <SelectItem value="Male">Male</SelectItem>
                       <SelectItem value="Female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nationality *</Label>
+                  <Select
+                    value={c.nationality || undefined}
+                    onValueChange={(v) => set("nationality", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select nationality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {nationalityOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.text}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

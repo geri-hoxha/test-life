@@ -4,21 +4,36 @@ export type Gender = "Male" | "Female" | "Other";
 export type PEPStatus = "Unknown" | "No" | "Yes";
 export type CustomerType = "Individual" | "Company";
 export type CompanyType =
-  | "Person Fizik"
-  | "Sh.p.k."
-  | "Sh.a."
-  | "Person Juridik"
-  | "Ortakeri"
-  | "Dega e shoqërisë së huaj";
+  | "soleProprietor"
+  | "shpk"
+  | "sha"
+  | "publicInstitution"
+  | "municipality"
+  | "association"
+  | "foundation"
+  | "branchOfForeignCompany"
+  | "other";
 
-export const COMPANY_TYPES: CompanyType[] = [
-  "Person Fizik",
-  "Sh.p.k.",
-  "Sh.a.",
-  "Person Juridik",
-  "Ortakeri",
-  "Dega e shoqërisë së huaj",
+export type CompanyTypeOption = {
+  value: CompanyType;
+  text: string;
+};
+
+export const COMPANY_TYPE_OPTIONS: CompanyTypeOption[] = [
+  { value: "soleProprietor", text: "Sole proprietor" },
+  { value: "shpk", text: "Sh.p.k." },
+  { value: "sha", text: "Sh.a." },
+  { value: "publicInstitution", text: "Public institution" },
+  { value: "municipality", text: "Municipality" },
+  { value: "association", text: "Association" },
+  { value: "foundation", text: "Foundation" },
+  { value: "branchOfForeignCompany", text: "Branch of foreign company" },
+  { value: "other", text: "Other" },
 ];
+
+export const companyTypeLabel = (value?: string | null) =>
+  COMPANY_TYPE_OPTIONS.find((o) => o.value === value)?.text ?? value ?? "";
+
 
 export type F5LocationCode = {
   code: string;
@@ -116,9 +131,15 @@ export const customerSchema = z.object({
     if (!c.lastName?.trim()) ctx.addIssue({ code: "custom", message: "Last name is required", path: ["lastName"] });
     if (!c.personalId?.trim()) ctx.addIssue({ code: "custom", message: "SSN / Personal ID is required", path: ["personalId"] });
     if (!c.dateOfBirth) ctx.addIssue({ code: "custom", message: "Date of birth is required", path: ["dateOfBirth"] });
+    if (!c.nationality?.trim() || c.nationality === "N/A") {
+      ctx.addIssue({ code: "custom", message: "Nationality is required", path: ["nationality"] });
+    }
   } else {
     if (!c.companyName?.trim()) ctx.addIssue({ code: "custom", message: "Company name is required", path: ["companyName"] });
     if (!c.nipt?.trim()) ctx.addIssue({ code: "custom", message: "NIPT is required", path: ["nipt"] });
+    if (!c.nationality?.trim() || c.nationality === "N/A") {
+      ctx.addIssue({ code: "custom", message: "Nationality is required", path: ["nationality"] });
+    }
   }
 });
 
@@ -158,7 +179,7 @@ const seed: Customer[] = [
     occupation: "Pharmacist", pepStatus: "No", totalExposure: 0, createdDate: "2026-03-05",
     notes: "Newly onboarded — referred by Arben Hoxha." },
   { id: "CUS-0005", customerType: "Company", firstName: "", lastName: "", personalId: "",
-    companyName: "Alb-Trans Logistics Sh.p.k.", nipt: "L72416502K", companyType: "Sh.p.k.",
+    companyName: "Alb-Trans Logistics Sh.p.k.", nipt: "L72416502K", companyType: "shpk",
     registrationDate: "2012-06-15", legalRepresentative: "Genc Beqiri",
     dateOfBirth: "", gender: "Other",
     f5Location: "bb123bb123", city: "Tirana", country: "Albania",

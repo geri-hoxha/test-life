@@ -63,11 +63,21 @@ export const useCreateCompany = () => {
   });
 };
 
-/** GET /api/companies */
-export const listCompanies = async (query?: {
+export type ListCompaniesQuery = {
+  registrationNumber?: string;
+  countryCode?: string;
+  legalName?: string;
+  tradeName?: string;
+  companyType?: string;
   pageNumber?: number;
   pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfCompanyResponse> =>
+};
+
+/** GET /api/companies */
+export const listCompanies = async (
+  query?: ListCompaniesQuery,
+  signal?: AbortSignal
+): Promise<PaginationPagedListOfCompanyResponse> =>
   apiRequest<PaginationPagedListOfCompanyResponse>({
     method: "GET",
     path: `/api/companies`,
@@ -75,10 +85,7 @@ export const listCompanies = async (query?: {
     signal,
   });
 
-export const useListCompanies = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListCompanies = (query?: ListCompaniesQuery, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: companiesKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listCompanies(query, signal),

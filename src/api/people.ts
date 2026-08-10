@@ -37,11 +37,22 @@ export const useCreatePerson = () => {
   });
 };
 
-/** GET /api/people */
-export const listPeople = async (query?: {
+export type ListPeopleQuery = {
+  personalIdentifier?: string;
+  nationality?: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: string;
+  isPep?: boolean;
   pageNumber?: number;
   pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfPersonResponse> =>
+};
+
+/** GET /api/people */
+export const listPeople = async (
+  query?: ListPeopleQuery,
+  signal?: AbortSignal
+): Promise<PaginationPagedListOfPersonResponse> =>
   apiRequest<PaginationPagedListOfPersonResponse>({
     method: "GET",
     path: `/api/people`,
@@ -49,10 +60,7 @@ export const listPeople = async (query?: {
     signal,
   });
 
-export const useListPeople = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListPeople = (query?: ListPeopleQuery, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: peopleKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listPeople(query, signal),

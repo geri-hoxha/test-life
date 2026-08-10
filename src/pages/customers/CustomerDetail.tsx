@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Pencil, FileText, MapPin, Briefcase, Calendar, BadgeCheck, ShieldCheck, FileSignature, Plus, AlertCircle } from "lucide-react";
-import { ageFromDob, fullName, PEPStatus } from "@/data/customers";
+import { ageFromDob, companyTypeLabel, fullName, PEPStatus } from "@/data/customers";
 import { useGetPerson } from "@/api/people";
 import { useGetCompany } from "@/api/companies";
 import {
@@ -170,7 +170,7 @@ const CustomerDetail = () => {
             </div>
             <div className="text-sm text-muted-foreground mt-1">
               {isCompany
-                ? [customer.companyType, customer.nipt].filter(Boolean).join(" · ") || "Company"
+                ? [companyTypeLabel(customer.companyType), customer.nipt].filter(Boolean).join(" · ") || "Company"
                 : [customer.gender, age != null ? `${age} years old` : null].filter(Boolean).join(" · ")}
             </div>
           </div>
@@ -178,7 +178,7 @@ const CustomerDetail = () => {
             {isCompany ? (
               <>
                 <div className="flex items-center gap-2 text-muted-foreground"><BadgeCheck className="h-4 w-4" /> <span className="font-mono">{customer.nipt || "—"}</span></div>
-                <div className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> {customer.companyType || "—"}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> {companyTypeLabel(customer.companyType) || "—"}</div>
                 <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {customer.country || "—"}</div>
                 <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {[customer.address, customer.city, customer.postalCode].filter(Boolean).join(", ") || "—"}</div>
               </>
@@ -211,7 +211,7 @@ const CustomerDetail = () => {
                 {isCompany ? (
                   <>
                     <Field icon={BadgeCheck} label="Registration no. / NIPT" value={<span className="font-mono">{customer.nipt}</span>} />
-                    <Field icon={Briefcase} label="Company type" value={customer.companyType} />
+                    <Field icon={Briefcase} label="Company type" value={companyTypeLabel(customer.companyType)} />
                     {customer.tradeName ? (
                       <Field icon={Briefcase} label="Trade name" value={customer.tradeName} />
                     ) : null}

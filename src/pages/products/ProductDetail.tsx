@@ -19,23 +19,39 @@ import {
   useAddProductPaymentMethod,
   useRemoveProductPaymentMethod,
 } from "@/api/products";
+import type { ProductsCalculationMethod, ProductsIssuanceMode } from "@/api/types";
 import { useListProductGroups } from "@/api/product-groups";
 import { useListDocuments } from "@/api/documents";
 import { useListBankAccounts } from "@/api/bank-accounts";
+import { useSumInsuredBasisEnum } from "@/api/smart-enums";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import CoveragesTab from "./CoveragesTab";
 import DocumentsTab from "./DocumentsTab";
+import CurrenciesTab from "./CurrenciesTab";
 
 const ALL_CURRENCIES = ["EUR", "ALL", "USD", "GBP", "CHF"];
+
+const ISSUANCE_MODE_OPTIONS = [
+  { value: "annualRenewable", label: "Annual renewable" },
+  { value: "wholeOfTerm", label: "Whole of term" },
+] as const;
+
+const CALCULATION_METHOD_OPTIONS = [
+  { value: "declining", label: "Declining" },
+  { value: "leveled", label: "Leveled" },
+] as const;
 
 type EditableFields = {
   name: string;
   coverageText: string;
   currencies: string[];
   defaultPrintableTemplateDocumentId: string;
-  bankAccountId: string;
+  sumInsuredBasis: string;
+  issuanceMode: ProductsIssuanceMode | "";
+  calculationMethod: ProductsCalculationMethod | "";
+  bankAccountIds: string[];
 };
 
 const ProductDetail = () => {
@@ -47,6 +63,7 @@ const ProductDetail = () => {
   const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
   const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
   const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
+  const { data: sumInsuredBasisOptions = [] } = useSumInsuredBasisEnum();
 
   const product = useMemo(
     () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
@@ -55,6 +72,19 @@ const ProductDetail = () => {
 
   const templateDocuments = documentsPage?.items ?? [];
   const bankAccounts = bankAccountsPage?.items ?? [];
+  const paymentMethods = apiProduct?.paymentMethods ?? [];
+
+  const currentBankAccountIds = useMemo(
+    () =>
+      paymentMethods
+        .map((pm) => pm.bankAccountId)
+        .filter((id): id is string => Boolean(id)),
+    [paymentMethods]
+  );
+  const currentBankAccountIdsKey = useMemo(
+    () => [...currentBankAccountIds].sort().join("|"),
+    [currentBankAccountIds]
+  );
 
   const productGroupName = useMemo(() => {
     const gid = product?.productGroupId;
@@ -63,11 +93,9 @@ const ProductDetail = () => {
     return match?.english?.trim() || match?.name?.trim() || gid;
   }, [product?.productGroupId, groupsPage?.items]);
 
-  const currentPayment = apiProduct?.paymentMethods?.[0];
-  const currentBankAccountId = currentPayment?.bankAccountId ?? "";
-
   const [fields, setFields] = useState<EditableFields | null>(null);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (!product) {
@@ -79,9 +107,13 @@ const ProductDetail = () => {
       coverageText: product.coverageText ?? "",
       currencies: [...product.currencies],
       defaultPrintableTemplateDocumentId: product.defaultPrintableTemplateDocumentId ?? "",
-      bankAccountId: currentBankAccountId,
+      sumInsuredBasis: product.sumInsuredBasis ?? "",
+      issuanceMode: (product.issuanceMode as ProductsIssuanceMode | null) ?? "",
+      calculationMethod: (product.calculationMethod as ProductsCalculationMethod | null) ?? "",
+      bankAccountIds: [...currentBankAccountIds],
     });
-  }, [product, currentBankAccountId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when product or payment method ids change by value
+  }, [product, currentBankAccountIdsKey]);
 
   if (isLoading) {
     return (
@@ -110,12 +142,19 @@ const ProductDetail = () => {
     );
   }
 
+  const paymentDirty =
+    JSON.stringify([...fields.bankAccountIds].sort()) !==
+    JSON.stringify([...currentBankAccountIds].sort());
+
   const fieldsDirty =
     fields.name !== product.name ||
     fields.coverageText !== (product.coverageText ?? "") ||
     JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
     fields.defaultPrintableTemplateDocumentId !== (product.defaultPrintableTemplateDocumentId ?? "") ||
-    fields.bankAccountId !== currentBankAccountId;
+    fields.sumInsuredBasis !== (product.sumInsuredBasis ?? "") ||
+    fields.issuanceMode !== (product.issuanceMode ?? "") ||
+    fields.calculationMethod !== (product.calculationMethod ?? "") ||
+    paymentDirty;
 
   const toggleCurrency = (c: string) =>
     setFields((f) =>
@@ -143,20 +182,30 @@ const ProductDetail = () => {
           supportedCurrencies: fields.currencies,
           coverageText: fields.coverageText.trim() || undefined,
           defaultPrintableTemplateDocumentId: fields.defaultPrintableTemplateDocumentId || null,
+          sumInsuredBasis: fields.sumInsuredBasis || null,
+          issuanceMode: fields.issuanceMode || null,
+          calculationMethod: fields.calculationMethod || null,
         },
       });
 
-      if (fields.bankAccountId !== currentBankAccountId) {
-        if (currentPayment?.id != null) {
+      if (paymentDirty) {
+        const currentSet = new Set(currentBankAccountIds);
+        const nextSet = new Set(fields.bankAccountIds);
+        const toAdd = fields.bankAccountIds.filter((id) => !currentSet.has(id));
+        const toRemove = paymentMethods.filter(
+          (pm) => pm.bankAccountId && !nextSet.has(pm.bankAccountId) && pm.id != null
+        );
+
+        for (const pm of toRemove) {
           await removePaymentMethod.mutateAsync({
             productId: product.id,
-            paymentMethodEntryId: String(currentPayment.id),
+            paymentMethodEntryId: String(pm.id),
           });
         }
-        if (fields.bankAccountId) {
+        for (const bankAccountId of toAdd) {
           await addPaymentMethod.mutateAsync({
             productId: product.id,
-            body: { bankAccountId: fields.bankAccountId },
+            body: { bankAccountId },
           });
         }
       }
@@ -176,14 +225,18 @@ const ProductDetail = () => {
   };
 
   const paymentLabel = () => {
-    if (!currentBankAccountId) return "—";
-    const account = bankAccounts.find((a) => a.id === currentBankAccountId);
-    if (!account) {
-      return [currentPayment?.currency, currentBankAccountId].filter(Boolean).join(" · ") || "—";
-    }
-    return [account.bankName, account.currency ?? currentPayment?.currency, account.iban || account.accountNumber]
-      .filter(Boolean)
-      .join(" · ");
+    if (paymentMethods.length === 0) return "—";
+    const labels = paymentMethods.map((pm) => {
+      const account = bankAccounts.find((a) => a.id === pm.bankAccountId);
+      if (!account) {
+        return [pm.currency, pm.bankAccountId].filter(Boolean).join(" · ") || "—";
+      }
+      return [account.bankName, account.currency ?? pm.currency, account.iban || account.accountNumber]
+        .filter(Boolean)
+        .join(" · ");
+    });
+    if (labels.length === 1) return labels[0];
+    return `${labels.length} accounts`;
   };
 
   return (
@@ -233,11 +286,12 @@ const ProductDetail = () => {
         </div>
       </Card>
 
-      <Tabs defaultValue="overview" className="space-y-5">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="coverages">Coverages</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="currencies">Currencies</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -246,7 +300,7 @@ const ProductDetail = () => {
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Product details</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Fields from GET/PUT product, plus payment method.
+                  Fields from GET/PUT product, plus payment methods.
                 </p>
               </div>
               <Button
@@ -304,12 +358,90 @@ const ProductDetail = () => {
                 </Select>
               </div>
               <div className="space-y-2 md:col-span-2">
+                <Label>Sum insured basis</Label>
+                <Select
+                  value={fields.sumInsuredBasis || "none"}
+                  onValueChange={(v) =>
+                    setFields({ ...fields, sumInsuredBasis: v === "none" ? "" : v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sum insured basis…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {sumInsuredBasisOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.text}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Issuance mode</Label>
+                <Select
+                  value={fields.issuanceMode || "none"}
+                  onValueChange={(v) =>
+                    setFields({
+                      ...fields,
+                      issuanceMode: v === "none" ? "" : (v as ProductsIssuanceMode),
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select issuance mode…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {ISSUANCE_MODE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Calculation method</Label>
+                <Select
+                  value={fields.calculationMethod || "none"}
+                  onValueChange={(v) =>
+                    setFields({
+                      ...fields,
+                      calculationMethod: v === "none" ? "" : (v as ProductsCalculationMethod),
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select calculation method…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {CALCULATION_METHOD_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
                 <Label>Payment method</Label>
                 <BankAccountCombobox
+                  multiple
                   accounts={bankAccounts}
-                  value={fields.bankAccountId}
-                  onValueChange={(bankAccountId) => setFields({ ...fields, bankAccountId })}
+                  value={fields.bankAccountIds}
+                  onValueChange={(bankAccountIds) => setFields({ ...fields, bankAccountIds })}
+                  placeholder="Select bank accounts…"
                 />
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("currencies")}
+                  className="text-xs text-accent hover:underline mt-1.5"
+                >
+                  View currency bank configurations →
+                </button>
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Currencies</Label>
@@ -343,6 +475,10 @@ const ProductDetail = () => {
 
         <TabsContent value="documents">
           <DocumentsTab productId={product.id} />
+        </TabsContent>
+
+        <TabsContent value="currencies">
+          <CurrenciesTab productId={product.id} currencies={product.currencies} />
         </TabsContent>
       </Tabs>
     </AppShell>

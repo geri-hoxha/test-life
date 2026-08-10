@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import TablePagination from "@/components/TablePagination";
+import { ProductCombobox } from "@/components/ProductCombobox";
+import { PersonCombobox } from "@/components/PersonCombobox";
+import { OfferCombobox } from "@/components/OfferCombobox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Card,
   CardContent,
@@ -27,11 +32,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Search, ShieldCheck } from "lucide-react";
+import { Eye, ShieldCheck } from "lucide-react";
 import { policyStatusColor, PolicyStatus, type Policy } from "@/data/policies";
+import { CURRENCIES } from "@/data/fxRates";
 import { useListPolicies } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
 import { useListProducts, mapApiProduct } from "@/api/products";
+import { useListOffers } from "@/api/offers";
+import { mapApiOffer } from "@/api/adapters/offers";
+import { compactQuery, dateToUtcDay, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const STATUSES: PolicyStatus[] = ["Active", "Pending Payment", "Cancelled", "Expired", "Lapsed"];
 
@@ -44,55 +54,71 @@ const insuredName = (p: Policy) => {
 
 const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
 
+const toDate = (isoDay: string) => {
+  if (!isoDay) return undefined;
+  try {
+    return parseISO(isoDay);
+  } catch {
+    return undefined;
+  }
+};
+
 const PoliciesList = () => {
   const navigate = useNavigate();
-  const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [productId, setProductId] = useState("");
+  const [offerId, setOfferId] = useState("");
+  const [currency, setCurrency] = useState("__all__");
+  const [issuedFrom, setIssuedFrom] = useState("");
+  const [issuedTo, setIssuedTo] = useState("");
+  const [effectiveOn, setEffectiveOn] = useState("");
+  const [personId, setPersonId] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const filters = useMemo(
+    () =>
+      compactQuery({
+        productId: productId.trim() || undefined,
+        offerId: offerId.trim() || undefined,
+        ...(currency !== "__all__" ? { currency } : {}),
+        issuedFromUtc: dateToUtcStart(issuedFrom),
+        issuedToUtc: dateToUtcEnd(issuedTo),
+        effectiveOnUtc: dateToUtcDay(effectiveOn),
+        personId: personId.trim() || undefined,
+      }),
+    [productId, offerId, currency, issuedFrom, issuedTo, effectiveOn, personId]
+  );
+  const debouncedFilters = useDebouncedValue(filters);
+
   useEffect(() => {
     setPage(1);
-  }, [q, statusFilter, pageSize]);
+  }, [debouncedFilters, pageSize]);
 
-  const { data: policiesPage, isLoading, isFetching } = useListPolicies({
-    pageNumber: page,
-    pageSize,
-  });
+  const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
+
+  const { data: policiesPage, isLoading, isFetching } = useListPolicies(listQuery);
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const { data: offersPage } = useListOffers({ pageNumber: 1, pageSize: 200 });
 
   const policies = useMemo(
     () => (policiesPage?.items ?? []).map(mapApiPolicy),
     [policiesPage?.items]
   );
 
-  const productMap = useMemo(
-    () => Object.fromEntries((productsPage?.items ?? []).map(mapApiProduct).map((p) => [p.id, p])),
+  const products = useMemo(
+    () => (productsPage?.items ?? []).map(mapApiProduct),
     [productsPage?.items]
   );
 
-  // Status + search filter the current server page only (API has no those params).
-  const rows = useMemo(() => {
-    return policies.filter((p) => {
-      if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
-      if (!q.trim()) return true;
-      const holder = p.participants.find((x) => x.role === "policyHolder");
-      const haystack = [
-        p.id,
-        holder?.displayName ?? "",
-        holder?.uniqueIdentifier ?? "",
-        insuredName(p) ?? "",
-        productMap[p.productId]?.name ?? "",
-        p.productId,
-        p.currency,
-        p.status,
-        p.offerId,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q.toLowerCase());
-    });
-  }, [policies, productMap, q, statusFilter]);
+  const offers = useMemo(
+    () => (offersPage?.items ?? []).map(mapApiOffer),
+    [offersPage?.items]
+  );
+
+  const productMap = useMemo(
+    () => Object.fromEntries(products.map((p) => [p.id, p])),
+    [products]
+  );
 
   const totalCount = policiesPage?.totalCount ?? 0;
   const totalPages = Math.max(1, policiesPage?.totalPages ?? policiesPage?.pageCount ?? 1);
@@ -101,6 +127,25 @@ const PoliciesList = () => {
     acc[s] = policies.filter((p) => p.status === s).length;
     return acc;
   }, {} as Record<PolicyStatus, number>);
+
+  const clearFilters = () => {
+    setProductId("");
+    setOfferId("");
+    setCurrency("__all__");
+    setIssuedFrom("");
+    setIssuedTo("");
+    setEffectiveOn("");
+    setPersonId("");
+  };
+
+  const hasFilters =
+    productId ||
+    offerId ||
+    currency !== "__all__" ||
+    issuedFrom ||
+    issuedTo ||
+    effectiveOn ||
+    personId;
 
   return (
     <AppShell>
@@ -128,32 +173,92 @@ const PoliciesList = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> All Policies</CardTitle>
-              <CardDescription>
-                {isLoading
-                  ? "Loading…"
-                  : `${totalCount} total${isFetching && !isLoading ? " · updating…" : ""}`}
-              </CardDescription>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> All Policies</CardTitle>
+                <CardDescription>
+                  {isLoading
+                    ? "Loading…"
+                    : `${totalCount} total${isFetching && !isLoading ? " · updating…" : ""}`}
+                </CardDescription>
+              </div>
+              {hasFilters && (
+                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )}
             </div>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search this page…"
-                  className="pl-8 h-9 w-[260px]"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Product</Label>
+                <ProductCombobox
+                  products={products}
+                  value={productId}
+                  onValueChange={setProductId}
+                  placeholder="All products"
+                  allowClear
+                  triggerClassName="h-9"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All statuses</SelectItem>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Offer</Label>
+                <OfferCombobox
+                  offers={offers}
+                  value={offerId}
+                  onValueChange={setOfferId}
+                  placeholder="All offers"
+                  allowClear
+                  triggerClassName="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All currencies</SelectItem>
+                    {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Person</Label>
+                <PersonCombobox
+                  value={personId}
+                  onValueChange={setPersonId}
+                  placeholder="All people"
+                  allowClear
+                  triggerClassName="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Issued from</Label>
+                <DatePicker
+                  value={toDate(issuedFrom)}
+                  onChange={(d) => setIssuedFrom(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="From date"
+                  buttonClassName="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Issued to</Label>
+                <DatePicker
+                  value={toDate(issuedTo)}
+                  onChange={(d) => setIssuedTo(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="To date"
+                  buttonClassName="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Effective on</Label>
+                <DatePicker
+                  value={toDate(effectiveOn)}
+                  onChange={(d) => setEffectiveOn(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="Effective date"
+                  buttonClassName="h-9"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -181,14 +286,14 @@ const PoliciesList = () => {
                       Loading policies…
                     </TableCell>
                   </TableRow>
-                ) : rows.length === 0 ? (
+                ) : policies.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-10 text-sm text-muted-foreground">
                       No policies match the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((p) => {
+                  policies.map((p) => {
                     const holderParticipant = p.participants.find((x) => x.role === "policyHolder");
                     const holder = holderParticipant?.displayName?.trim() || null;
                     const insured = insuredName(p);

@@ -4,35 +4,13 @@ import type {
   CompaniesCompanyResponse,
   CompaniesCreateCompanyRequest,
   CompaniesUpdateCompanyRequest,
-  DomainPartiesEnumsCompanyType,
   PeopleCreatePersonRequest,
   PeoplePersonResponse,
   PeopleUpdatePersonRequest,
 } from "../types";
-import type { CompanyType, Customer, Gender, PEPStatus } from "@/data/customers";
+import type { Customer, Gender, PEPStatus } from "@/data/customers";
 
 const NA = "N/A";
-
-const companyTypeToApi: Record<string, DomainPartiesEnumsCompanyType> = {
-  "Person Fizik": "soleProprietor",
-  "Sh.p.k.": "shpk",
-  "Sh.a.": "sha",
-  "Person Juridik": "other",
-  Ortakeri: "association",
-  "Dega e shoqërisë së huaj": "branchOfForeignCompany",
-};
-
-const companyTypeFromApi: Record<DomainPartiesEnumsCompanyType, CompanyType> = {
-  soleProprietor: "Person Fizik",
-  shpk: "Sh.p.k.",
-  sha: "Sh.a.",
-  publicInstitution: "Person Juridik",
-  municipality: "Person Juridik",
-  association: "Ortakeri",
-  foundation: "Ortakeri",
-  branchOfForeignCompany: "Dega e shoqërisë së huaj",
-  other: "Person Juridik",
-};
 
 const countryToCode: Record<string, string> = {
   Albania: "AL",
@@ -99,7 +77,7 @@ export const mapPersonToCustomer = (p: PeoplePersonResponse): Customer => ({
   ssnIssuingCountry: fromCountryCode(p.countryCode),
   dateOfBirth: p.dateOfBirth?.slice(0, 10) ?? "",
   gender: fromApiGender(p.gender),
-  nationality: NA,
+  nationality: p.nationality ?? "",
   placeOfBirth: "",
   f5Location: NA,
   address: "",
@@ -125,10 +103,11 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
     personalId: "",
     dateOfBirth: "",
     gender: "Other",
+    nationality: c.nationality ?? "",
     companyName: c.legalName ?? c.tradeName ?? "",
     tradeName: c.tradeName ?? "",
     nipt: c.registrationNumber ?? "",
-    companyType: c.companyType ? companyTypeFromApi[c.companyType] : undefined,
+    companyType: c.companyType,
     registrationDate: "",
     legalRepresentative: "",
     f5Location: NA,
@@ -154,6 +133,7 @@ export const customerToCreatePerson = (c: Customer): PeopleCreatePersonRequest =
     lastName: c.lastName.trim(),
     personalIdentifier: c.personalId.trim(),
     countryCode: toCountryCode(c.ssnIssuingCountry || c.country),
+    nationality: (c.nationality ?? "").trim(),
     isPep: toApiPep(c.pepStatus),
   };
   if (c.dateOfBirth) body.dateOfBirth = c.dateOfBirth;
@@ -170,10 +150,8 @@ export const customerToCreateCompany = (c: Customer): CompaniesCreateCompanyRequ
   tradeName: (c.tradeName ?? "").trim() || null,
   registrationNumber: (c.nipt ?? "").trim(),
   countryCode: toCountryCode(c.country),
-  companyType:
-    c.companyType && c.companyType !== (NA as CompanyType)
-      ? companyTypeToApi[c.companyType]
-      : undefined,
+  nationality: (c.nationality ?? "").trim(),
+  companyType: c.companyType,
 });
 
 export const customerToUpdateCompany = (c: Customer): CompaniesUpdateCompanyRequest =>

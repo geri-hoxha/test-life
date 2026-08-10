@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
+import TablePagination from "@/components/TablePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -32,8 +34,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { compactQuery } from "@/lib/list-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const statusClass: Record<ProductStatus, string> = {
   Active: "bg-success/15 text-success",
@@ -44,49 +47,118 @@ const statusClass: Record<ProductStatus, string> = {
 const ProductsList = () => {
   const navigate = useNavigate();
   const { code: activeCode } = useParams<{ code: string }>();
-  const [query, setQuery] = useState("");
-  const [bankFilter, setBankFilter] = useState<string>("ALL");
+
+  const [groupNameFilter, setGroupNameFilter] = useState("");
+
+  const [productName, setProductName] = useState("");
+  const [productGroupIdFilter, setProductGroupIdFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
   const [newGroupOpen, setNewGroupOpen] = useState(false);
-  useEffect(() => { setPage(1); }, [query, pageSize, activeCode, bankFilter]);
   const [ngEnglish, setNgEnglish] = useState("");
   const [ngLabel, setNgLabel] = useState("");
   const [ngCode, setNgCode] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const { data: groupsPage, isLoading: groupsLoading } = useListProductGroups({ pageNumber: 1, pageSize: 100 });
-  const { data: productsPage, isLoading: productsLoading } = useListProducts({ pageNumber: 1, pageSize: 500 });
+  const groupFilters = useMemo(
+    () => compactQuery({ name: groupNameFilter.trim() || undefined }),
+    [groupNameFilter]
+  );
+  const debouncedGroupFilters = useDebouncedValue(groupFilters);
+
+  const productFilters = useMemo(
+    () =>
+      compactQuery({
+        name: productName.trim() || undefined,
+      }),
+    [productName]
+  );
+  const debouncedProductFilters = useDebouncedValue(productFilters);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedProductFilters, productGroupIdFilter, pageSize, activeCode]);
+
+  const groupsQuery = compactQuery({
+    pageNumber: 1,
+    pageSize: 100,
+    ...debouncedGroupFilters,
+  });
+
+  const { data: groupsPage, isLoading: groupsLoading } = useListProductGroups(groupsQuery);
+
+  // Resolve active group from the full groups list when a group route is open.
+  const { data: allGroupsPage } = useListProductGroups(
+    { pageNumber: 1, pageSize: 200 },
+    { enabled: Boolean(activeCode) }
+  );
+
+  const groupsForLookup = activeCode ? (allGroupsPage?.items ?? []) : (groupsPage?.items ?? []);
+
+  const activeGroupMeta = useMemo(() => {
+    if (!activeCode) return null;
+    const g = groupsForLookup.find((x) => (x.code?.trim() || x.id) === activeCode || x.id === activeCode);
+    if (!g) return null;
+    const id = g.id ?? "";
+    const name = g.name ?? "—";
+    return {
+      id,
+      code: g.code?.trim() || id,
+      label: g.label?.trim() || name,
+      english: g.english?.trim() || name,
+    };
+  }, [activeCode, groupsForLookup]);
+
+  // When inside a group, productGroupId comes from the route; otherwise optional filter.
+  const effectiveProductGroupId = activeGroupMeta?.id || productGroupIdFilter || undefined;
+
+  const productsQuery = compactQuery({
+    pageNumber: page,
+    pageSize,
+    ...debouncedProductFilters,
+    productGroupId: effectiveProductGroupId,
+  });
+
+  const { data: productsPage, isLoading: productsLoading } = useListProducts(productsQuery, {
+    enabled: Boolean(activeCode) ? Boolean(activeGroupMeta?.id) : false,
+  });
+
   const createGroup = useCreateProductGroup();
   const deleteGroup = useDeleteProductGroup();
   const deleteProduct = useDeleteProduct();
-
-  const allProducts = useMemo(
-    () => (productsPage?.items ?? []).map(mapApiProduct),
-    [productsPage?.items]
-  );
 
   const groups = useMemo(() => {
     const defs = groupsPage?.items ?? [];
     return defs.map((g) => {
       const id = g.id ?? "";
       const name = g.name ?? "—";
-      // Prefer API fields when available; fall back until backend adds them.
       const english = g.english?.trim() || name;
       const label = g.label?.trim() || name;
       const code = g.code?.trim() || id;
-      const items = allProducts.filter((p) => p.productGroupId === id);
-      return { id, value: id, code, label, english, items };
+      return { id, value: id, code, label, english };
     });
-  }, [allProducts, groupsPage?.items]);
+  }, [groupsPage?.items]);
 
-  const activeGroup = activeCode
-    ? groups.find((g) => g.code === activeCode || g.id === activeCode)
-    : null;
+  const groupTotalCount = groupsPage?.totalCount ?? groups.length;
 
-  // While a group route is open and data is still fetching, avoid falling through to the grid.
-  if (activeCode && groupsLoading) {
+  const products = useMemo(
+    () => (productsPage?.items ?? []).map(mapApiProduct),
+    [productsPage?.items]
+  );
+
+  const productTotalCount = productsPage?.totalCount ?? 0;
+  const productTotalPages = Math.max(1, productsPage?.totalPages ?? productsPage?.pageCount ?? 1);
+
+  // All groups for the productGroupId filter select (when viewing products — already have allGroupsPage).
+  const groupOptions = useMemo(() => {
+    return (allGroupsPage?.items ?? groupsPage?.items ?? []).map((g) => ({
+      id: g.id ?? "",
+      label: g.english?.trim() || g.label?.trim() || g.name || g.id || "—",
+    })).filter((g) => g.id);
+  }, [allGroupsPage?.items, groupsPage?.items]);
+
+  if (activeCode && (groupsLoading || (!activeGroupMeta && allGroupsPage === undefined))) {
     return (
       <AppShell>
         <PageHeader
@@ -98,7 +170,7 @@ const ProductsList = () => {
     );
   }
 
-  if (activeCode && !groupsLoading && !activeGroup) {
+  if (activeCode && !activeGroupMeta) {
     return (
       <AppShell>
         <PageHeader
@@ -120,7 +192,6 @@ const ProductsList = () => {
       toast.error("English name is required.");
       return;
     }
-    // API currently accepts only `name`. Extra fields are typed for when the API adds them.
     createGroup.mutate(
       { name: ngEnglish.trim() },
       {
@@ -141,7 +212,7 @@ const ProductsList = () => {
   };
 
   // ---- Group grid view ----
-  if (!activeGroup) {
+  if (!activeGroupMeta) {
     return (
       <AppShell>
         <PageHeader
@@ -158,13 +229,40 @@ const ProductsList = () => {
           }
         />
 
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-5">
+          <div className="space-y-1.5 flex-1 max-w-sm">
+            <Label className="text-xs text-muted-foreground">Name</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filter by name…"
+                value={groupNameFilter}
+                onChange={(e) => setGroupNameFilter(e.target.value)}
+                className="pl-9 h-9 bg-white"
+              />
+            </div>
+          </div>
+          {groupNameFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-muted-foreground"
+              onClick={() => setGroupNameFilter("")}
+            >
+              Clear
+            </Button>
+          )}
+          <div className="text-xs text-muted-foreground sm:ml-auto pb-2">
+            {groupsLoading ? "Loading…" : `${groupTotalCount} group(s)`}
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {groupsLoading && (
             <p className="text-sm text-muted-foreground col-span-full">Loading product groups…</p>
           )}
           {!groupsLoading && groups.length === 0 && (
-            <p className="text-sm text-muted-foreground col-span-full">No product groups yet.</p>
+            <p className="text-sm text-muted-foreground col-span-full">No product groups match the current filters.</p>
           )}
           {groups.map((g) => (
             <Card
@@ -195,10 +293,6 @@ const ProductsList = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!g.id) return;
-                        if (g.items.length > 0) {
-                          toast.error(`${g.english} has ${g.items.length} product(s).`);
-                          return;
-                        }
                         deleteGroup.mutate(g.id, {
                           onSuccess: () => toast.success(`Product group deleted: ${g.english}`),
                           onError: (err) =>
@@ -213,10 +307,7 @@ const ProductsList = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    <span className="font-semibold text-foreground">{g.items.length}</span> product{g.items.length !== 1 ? "s" : ""}
-                  </span>
+                <div className="flex items-center justify-end text-sm">
                   <span className="text-accent inline-flex items-center gap-1 text-xs font-medium">
                     View <ChevronRight className="h-3.5 w-3.5" />
                   </span>
@@ -264,40 +355,23 @@ const ProductsList = () => {
     );
   }
 
-
   // ---- Products within a group ----
-  const filtered = activeGroup.items.filter(
-    (p) => {
-      const matchesQuery =
-        p.name.toLowerCase().includes(query.toLowerCase()) ||
-        p.code.toLowerCase().includes(query.toLowerCase());
-      const matchesBank = bankFilter === "ALL" || p.bankPartnerCode === bankFilter;
-      return matchesQuery && matchesBank;
-    }
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-
-
   return (
     <AppShell>
       <PageHeader
         breadcrumbs={[
           { label: "Products", to: "/products" },
-          { label: activeGroup.english },
+          { label: activeGroupMeta.english },
         ]}
-        title={activeGroup.english}
-        description={`${activeGroup.label} · Code ${activeGroup.code}`}
+        title={activeGroupMeta.english}
+        description={`${activeGroupMeta.label} · Code ${activeGroupMeta.code}`}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/products")}>
               <ArrowLeft className="h-4 w-4" /> All groups
             </Button>
             <Button asChild size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link to={`/products/new?groupId=${encodeURIComponent(activeGroup.id)}`}>
+              <Link to={`/products/new?groupId=${encodeURIComponent(activeGroupMeta.id)}`}>
                 <Plus className="h-4 w-4" /> Create Product
               </Link>
             </Button>
@@ -305,46 +379,56 @@ const ProductsList = () => {
         }
       />
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or code…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-9 h-9 bg-white"
-            />
+      <div className="flex flex-col gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Name</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filter by name…"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                className="pl-9 h-9 bg-white"
+              />
+            </div>
           </div>
-          <Select value={bankFilter} onValueChange={setBankFilter}>
-            <SelectTrigger className="w-[260px] h-9 text-xs bg-white">
-              <SelectValue placeholder="Bank partner" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL" className="text-xs">
-                <span className="text-muted-foreground">All bank partners</span>
-              </SelectItem>
-              {BANK_PARTNERS.map((b) => (
-                <SelectItem key={b.value} value={b.value} className="text-xs">
-                  <strong className="font-semibold text-foreground mr-2">{b.value}</strong>
-                  {b.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {(query || bankFilter !== "ALL") && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 px-2 text-muted-foreground"
-              onClick={() => { setQuery(""); setBankFilter("ALL"); }}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Product group</Label>
+            <Select
+              value={productGroupIdFilter || activeGroupMeta.id}
+              onValueChange={(v) => {
+                setProductGroupIdFilter(v);
+                const opt = groupOptions.find((g) => g.id === v);
+                const match = (allGroupsPage?.items ?? []).find((g) => g.id === v);
+                const code = match?.code?.trim() || v;
+                if (code) navigate(`/products/groups/${encodeURIComponent(code)}`);
+                void opt;
+              }}
             >
-              Clear
-            </Button>
-          )}
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {productsLoading ? "Loading products…" : `${filtered.length} product(s)`}
+              <SelectTrigger className="h-9 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {groupOptions.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end gap-2">
+            {productName && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2 text-muted-foreground"
+                onClick={() => setProductName("")}
+              >
+                Clear
+              </Button>
+            )}
+            <div className="text-xs text-muted-foreground pb-2 sm:ml-auto">
+              {productsLoading ? "Loading products…" : `${productTotalCount} product(s)`}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -358,14 +442,13 @@ const ProductsList = () => {
                 <th className="h-9 px-2 text-left font-medium w-[22%]">Payment & Loan</th>
                 <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
                 <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
-                <th className="h-9 px-0 text-center font-medium w-[4%] sticky    right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
+                <th className="h-9 px-0 text-center font-medium w-[4%] sticky right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paged.map((p) => {
+              {products.map((p) => {
                 const pm = PAYMENT_MODELS.find((m) => m.value === p.paymentModel);
                 const s = p.setupDetails;
-
                 const pay = p.paymentDetails;
                 const loan = p.loanDetails;
                 const ext = p.externalDetails;
@@ -392,7 +475,6 @@ const ProductsList = () => {
                     className="border-b hover:bg-muted/40 cursor-pointer align-top"
                     onClick={() => navigate(`/products/${p.id}`)}
                   >
-                    {/* Product identity */}
                     <td className="px-2 py-2">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
@@ -415,8 +497,6 @@ const ProductsList = () => {
                         </div>
                       </div>
                     </td>
-
-                    {/* Setup & Commercial */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
                         <MiniField label="Policy" value={dash(s?.policyType)} />
@@ -434,9 +514,6 @@ const ProductsList = () => {
                         </div>
                       </div>
                     </td>
-
-
-                    {/* Payment & Loan */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
                         <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
@@ -447,8 +524,6 @@ const ProductsList = () => {
                         <MiniField label="Loan Product" value={dash(loan?.loanProductType)} />
                       </div>
                     </td>
-
-                    {/* Compliance & flags */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
                         <div>
@@ -471,8 +546,6 @@ const ProductsList = () => {
                         </div>
                       </div>
                     </td>
-
-                    {/* External codes */}
                     <td className="px-2 py-2">
                       <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
                         <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
@@ -482,7 +555,6 @@ const ProductsList = () => {
                         <MiniField label="Legacy Pkt" value={<span className="font-mono">{dash(s?.legacyPacketId)}</span>} />
                       </div>
                     </td>
-
                     <td className="px-0 py-2 text-center w-4 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -507,40 +579,32 @@ const ProductsList = () => {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {!productsLoading && products.length === 0 && (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                    No products match your search.
+                    No products match your filters.
+                  </td>
+                </tr>
+              )}
+              {productsLoading && (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                    Loading products…
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-2.5 text-xs">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <span>Rows per page</span>
-            <select
-              className="h-7 rounded border border-border bg-background px-2 text-xs"
-              value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
-            >
-              {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <span className="ml-2">
-              {filtered.length === 0
-                ? "0 of 0"
-                : `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length}`}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === 1} onClick={() => setPage(1)}>« First</Button>
-            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹ Prev</Button>
-            <span className="px-2 text-muted-foreground">Page {currentPage} of {totalPages}</span>
-            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next ›</Button>
-            <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === totalPages} onClick={() => setPage(totalPages)}>Last »</Button>
-          </div>
-        </div>
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalCount={productTotalCount}
+          totalPages={productTotalPages}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          disabled={productsLoading}
+        />
       </Card>
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>

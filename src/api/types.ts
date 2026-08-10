@@ -127,6 +127,9 @@ export type ProductsProductResponse = {
   coverageText?: string;
   productGroupId?: string;
   supportedCurrencies?: string[];
+  sumInsuredBasis?: string | null;
+  issuanceMode?: string | null;
+  calculationMethod?: string | null;
   coverages?: ProductsProductCoverageResponse[];
   productDocumentTypes?: ProductsProductDocumentTypeResponse[];
   paymentMethods?: ProductsProductPaymentMethodResponse[];
@@ -153,12 +156,18 @@ export type ProductsProductResponse = {
   } | null;
 };
 
+export type ProductsIssuanceMode = "annualRenewable" | "wholeOfTerm";
+export type ProductsCalculationMethod = "declining" | "leveled";
+
 export type ProductsCreateProductRequest = {
   name: string;
   productGroupId?: string;
   supportedCurrencies: string[];
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
+  sumInsuredBasis?: string | null;
+  issuanceMode?: ProductsIssuanceMode | null;
+  calculationMethod?: ProductsCalculationMethod | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;
   status?: string;
@@ -194,6 +203,9 @@ export type ProductsUpdateProductRequest = {
   supportedCurrencies: string[];
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
+  sumInsuredBasis?: string | null;
+  issuanceMode?: ProductsIssuanceMode | null;
+  calculationMethod?: ProductsCalculationMethod | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;
   status?: string;
@@ -360,12 +372,18 @@ export type PaginationPagedListOfPolicyResponse = {
 
 export type PoliciesListPoliciesRequest = PaginationPagedRequest & Record<string, unknown>;
 
+export type SmartEnumsEnumItem = {
+  value: string;
+  text: string;
+};
+
 export type PeoplePersonResponse = {
   id?: string;
   firstName?: string;
   lastName?: string;
   personalIdentifier?: string;
   countryCode?: string;
+  nationality?: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
   isPep?: boolean;
@@ -376,6 +394,7 @@ export type PeopleCreatePersonRequest = {
   lastName: string;
   personalIdentifier: string;
   countryCode: string;
+  nationality: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
   isPep?: boolean;
@@ -401,6 +420,7 @@ export type PeopleUpdatePersonRequest = {
   lastName: string;
   personalIdentifier: string;
   countryCode: string;
+  nationality: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
   isPep?: boolean;
@@ -431,6 +451,7 @@ export type CompaniesCompanyResponse = {
   tradeName?: string | null;
   registrationNumber?: string;
   countryCode?: string;
+  nationality?: string;
   companyType?: DomainPartiesEnumsCompanyType;
   addresses?: CompaniesCompanyAddressResponse[];
 };
@@ -440,6 +461,7 @@ export type CompaniesCreateCompanyRequest = {
   tradeName?: string | null;
   registrationNumber: string;
   countryCode: string;
+  nationality: string;
   companyType?: DomainPartiesEnumsCompanyType;
 };
 
@@ -465,6 +487,7 @@ export type CompaniesUpdateCompanyRequest = {
   tradeName?: string | null;
   registrationNumber: string;
   countryCode: string;
+  nationality: string;
   companyType?: DomainPartiesEnumsCompanyType;
 };
 
