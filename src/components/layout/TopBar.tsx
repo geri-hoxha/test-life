@@ -20,6 +20,7 @@ const navItems = [
   { label: "Customers", to: "/customers" },
   { label: "Offers", to: "/offers" },
   { label: "Policies", to: "/policies" },
+  { label: "Risk list", to: "/risk-list" },
   // API not ready — hide until backend is available
   // { label: "Payments", to: "/payments" },
   // { label: "Permissions", to: "/administration/permission-matrix" },

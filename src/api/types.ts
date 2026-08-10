@@ -835,3 +835,34 @@ export type BankAccountsUpdateBankAccountRequest = {
   iban: string;
   swiftCode: string;
 };
+
+export type DomainComplianceRiskListType = "pep" | "blackList";
+
+export type RiskListsRiskListEntryResponse = {
+  id?: string;
+  personalIdentifier?: string;
+  listType?: DomainComplianceRiskListType;
+  reason?: string;
+  createdOnUtc?: string;
+};
+
+export type RiskListsAddRiskListEntryRequest = {
+  personalIdentifier: string;
+  listType: DomainComplianceRiskListType;
+  reason: string;
+};
+
+export type RiskListsDeleteRiskListEntryRequest = Record<string, unknown>;
+
+export type PaginationPagedListOfRiskListEntryResponse = {
+  items?: RiskListsRiskListEntryResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type RiskListsListRiskListEntriesRequest = PaginationPagedRequest & Record<string, unknown>;

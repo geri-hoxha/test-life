@@ -21,6 +21,7 @@ import PaymentsList from "./pages/payments/PaymentsList.tsx";
 import RecordPayment from "./pages/payments/RecordPayment.tsx";
 import Reports from "./pages/reports/Reports.tsx";
 import PermissionMatrix from "./pages/administration/PermissionMatrix.tsx";
+import RiskList from "./pages/risk-list/RiskList.tsx";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/offers/:offerId/issue" element={<IssuePolicy />} />
           <Route path="/policies" element={<PoliciesList />} />
           <Route path="/policies/:id" element={<PolicyDetail />} />
+          <Route path="/risk-list" element={<RiskList />} />
           <Route path="/payments" element={<PaymentsList />} />
           <Route path="/payments/new" element={<RecordPayment />} />
           <Route path="/reports" element={<Reports />} />
