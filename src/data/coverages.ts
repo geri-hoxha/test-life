@@ -2,6 +2,13 @@ export type CoverageType = "Mandatory" | "Optional Rider";
 export type SumInsuredType = "Fixed" | "User entered" | "Based on loan amount";
 export type BasePremiumType = "Fixed amount" | "Percentage of insured amount" | "Rate table by age/gender";
 
+export type CoverageCurrencyLimit = {
+  id?: string | number;
+  currency?: string;
+  type?: string;
+  value?: number;
+};
+
 export type Coverage = {
   id: string;
   productId: string;
@@ -25,6 +32,8 @@ export type Coverage = {
   sumInsuredPercentage?: number;
   /** Product-coverage link sort order from API. */
   sortOrder?: number;
+  /** Product-coverage link currency limits from API. */
+  currencyLimits?: CoverageCurrencyLimit[];
 };
 
 const seed: Coverage[] = [

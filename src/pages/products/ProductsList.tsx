@@ -12,21 +12,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
-  Plus, Search, MoreHorizontal, Settings2,
-  FolderOpen, ArrowLeft, ChevronRight, Trash2,
+  Plus, Search, FolderOpen, ArrowLeft, ChevronRight, Trash2, Download, Eye,
 } from "lucide-react";
-import {
-  ProductStatus, PAYMENT_MODELS, BANK_PARTNERS,
-} from "@/data/products";
 import {
   useListProductGroups, useCreateProductGroup, useDeleteProductGroup,
 } from "@/api/product-groups";
 import {
   useListProducts, mapApiProduct, useDeleteProduct,
 } from "@/api/products";
+import { downloadDocumentFile } from "@/api/documents";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -38,10 +32,14 @@ import { toast } from "sonner";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
-const statusClass: Record<ProductStatus, string> = {
-  Active: "bg-success/15 text-success",
-  Draft: "bg-muted text-muted-foreground",
-  Inactive: "bg-destructive/10 text-destructive",
+const ISSUANCE_MODE_LABELS: Record<string, string> = {
+  wholeOfTerm: "Whole of term",
+  annualRenewable: "Annual renewable",
+};
+
+const formatMaxCoveredYears = (years?: number | null): string => {
+  if (years == null) return "—";
+  return years === 1 ? "1 year" : `${years} years`;
 };
 
 const ProductsList = () => {
@@ -434,161 +432,131 @@ const ProductsList = () => {
 
       <Card className="shadow-card border-border overflow-hidden">
         <div className="w-full overflow-x-auto">
-          <table className="min-w-[1600px] w-full text-xs table-fixed">
+          <table className="min-w-[1200px] w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
-                <th className="h-9 px-2 text-left font-medium w-[20%]">Product</th>
-                <th className="h-9 px-2 text-left font-medium w-[17%]">Setup & Commercial</th>
-                <th className="h-9 px-2 text-left font-medium w-[22%]">Payment & Loan</th>
-                <th className="h-9 px-2 text-left font-medium w-[17%]">Compliance</th>
-                <th className="h-9 px-2 text-left font-medium w-[10%]">External</th>
-                <th className="h-9 px-0 text-center font-medium w-[4%] sticky right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
+                <th className="h-11 px-4 text-left font-medium w-[250px] min-w-[250px]">Name</th>
+                <th className="h-11 px-4 text-left font-medium">Coverage text</th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Other informations</th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Template</th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Issuance</th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Max years</th>
+                <th className="h-11 px-4 text-left font-medium">Currencies</th>
+                <th className="h-11 px-2 text-center font-medium w-14 sticky right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {products.map((p) => {
-                const pm = PAYMENT_MODELS.find((m) => m.value === p.paymentModel);
-                const s = p.setupDetails;
-                const pay = p.paymentDetails;
-                const loan = p.loanDetails;
-                const ext = p.externalDetails;
-                const dash = (v?: string | number | null) =>
-                  v === undefined || v === null || v === "" ? "—" : String(v);
-                const flagChips = [
-                  p.flags.pep && "PEP",
-                  p.flags.highInsuredAmount && "High Amt",
-                  p.flags.totalExposure && "Exposure",
-                  p.flags.manualUnderwriting && "Manual UW",
-                  p.flags.compliance && "Compliance",
-                ].filter(Boolean) as string[];
-
-                const MiniField = ({ label, value }: { label: string; value: React.ReactNode }) => (
-                  <div className="flex items-baseline justify-between gap-2 min-w-0">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">{label}</span>
-                    <span className="text-xs font-medium text-foreground truncate text-right">{value}</span>
-                  </div>
-                );
-
+                const templateId = p.defaultPrintableTemplateDocumentId?.trim() || "";
                 return (
                   <tr
                     key={p.id}
-                    className="border-b hover:bg-muted/40 cursor-pointer align-top"
+                    className="border-b hover:bg-muted/40 cursor-pointer"
                     onClick={() => navigate(`/products/${p.id}`)}
                   >
-                    <td className="px-2 py-2">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] text-accent">{p.id}</span>
-                          <Badge className={`font-medium border-0 ${statusClass[p.status]}`}>{p.status}</Badge>
-                          <Badge variant="outline" className="text-[10px]">v{p.activeVersion}</Badge>
-                        </div>
-                        <div className="font-semibold text-sm text-foreground leading-tight">{p.name}</div>
-                        {(() => {
-                          const bank = BANK_PARTNERS.find((b) => b.value === p.bankPartnerCode);
-                          return (
-                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                              <span className="font-mono text-[11px] font-semibold text-foreground">{bank?.value ?? dash(p.bankPartnerCode)}</span>
-                              <span className="text-[10px]" title={bank?.label}>{bank?.label ?? dash(p.bankPartnerCode)}</span>
-                            </div>
-                          );
-                        })()}
-                        <div className="text-[11px] text-muted-foreground line-clamp-2" title={p.description}>
-                          {p.description}
-                        </div>
+                    <td className="px-4 py-3.5 w-[250px] min-w-[250px] max-w-[250px]">
+                      <div className="font-semibold text-base text-foreground leading-snug">{p.name}</div>
+                    </td>
+                    <td className="px-4 py-3.5 max-w-[280px]">
+                      <div className="text-xs text-muted-foreground line-clamp-2 leading-snug" title={p.coverageText}>
+                        {p.coverageText?.trim() || "—"}
                       </div>
                     </td>
-                    <td className="px-2 py-2">
-                      <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Policy" value={dash(s?.policyType)} />
-                        <MiniField label="Insured Amt" value={dash(s?.insuranceAmountType)} />
-                        <MiniField label="Agent Comm." value={`${(p.agentCommission * 100).toFixed(1)}%`} />
-                        <MiniField label="Bank Comm." value={`${(p.bankCommission * 100).toFixed(1)}%`} />
-                        <MiniField label="Premium Tbl" value={<span className="font-mono">{dash(p.premiumTableId)}</span>} />
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Currencies</span>
-                          <div className="flex gap-1 flex-wrap justify-end">
-                            {p.currencies.map((c) => (
-                              <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
-                            ))}
-                          </div>
+                    <td className="px-4 py-3.5">
+                      <div className="rounded-md bg-muted/50 border border-border/60 px-3 py-2 flex items-center gap-4 whitespace-nowrap">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Coverages</span>
+                          <span className="text-sm font-semibold tabular-nums">{p.coverages?.length ?? 0}</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Payments</span>
+                          <span className="text-sm font-semibold tabular-nums">{p.paymentMethods?.length ?? 0}</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Documents</span>
+                          <span className="text-sm font-semibold tabular-nums">{p.productDocumentTypes?.length ?? 0}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="px-2 py-2">
-                      <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="Model" value={pm?.label ?? dash(p.paymentModel)} />
-                        <MiniField label="Premium Pay" value={dash(pay?.premiumPaymentType)} />
-                        <MiniField label="Packet Pay" value={dash(pay?.packetPaymentType)} />
-                        <MiniField label="Renewal" value={dash(pay?.renewalType)} />
-                        <MiniField label="Packet Loan" value={dash(loan?.packetLoanType)} />
-                        <MiniField label="Loan Product" value={dash(loan?.loanProductType)} />
+                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      {templateId ? (
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-8 w-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                          title="Download printable template"
+                          onClick={() => {
+                            void downloadDocumentFile(templateId).catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Failed to download template"),
+                            );
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      {p.issuanceMode
+                        ? (ISSUANCE_MODE_LABELS[p.issuanceMode] ?? p.issuanceMode)
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      {formatMaxCoveredYears(p.maxCoveredYears)}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex gap-1.5 flex-wrap">
+                        {p.currencies.length ? (
+                          p.currencies.map((c) => (
+                            <Badge
+                              key={c}
+                              variant="outline"
+                              className="text-xs font-mono px-2 py-0.5 !rounded-sm border-sky-200 bg-sky-100 text-sky-800"
+                            >
+                              {c}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </div>
                     </td>
-                    <td className="px-2 py-2">
-                      <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Flags</div>
-                          {flagChips.length ? (
-                            <div className="flex flex-wrap gap-1">
-                              {flagChips.map((f) => (
-                                <Badge key={f} variant="secondary" className="text-[10px] px-1.5 py-0">{f}</Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground">None</span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Required Docs</div>
-                          <div className="text-[11px] text-foreground line-clamp-3" title={p.requiredDocuments.join(", ")}>
-                            {p.requiredDocuments.length ? p.requiredDocuments.join(", ") : "—"}
-                          </div>
-                        </div>
+                    <td className="px-2 py-3.5 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          title="Open"
+                          onClick={() => navigate(`/products/${p.id}`)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          title="Delete"
+                          onClick={() => setDeleteTarget({ id: p.id, name: p.name })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="rounded-md bg-muted/40 p-1.5 space-y-1">
-                        <MiniField label="SAP Prod" value={<span className="font-mono">{dash(ext?.sapProductCode)}</span>} />
-                        <MiniField label="SAP Ch" value={<span className="font-mono">{dash(ext?.sapChannelCode)}</span>} />
-                        <MiniField label="F5" value={<span className="font-mono">{dash(ext?.f5ProductCode)}</span>} />
-                        <MiniField label="Actuarial" value={<span className="font-mono">{dash(ext?.actuarialProductCode)}</span>} />
-                        <MiniField label="Legacy Pkt" value={<span className="font-mono">{dash(s?.legacyPacketId)}</span>} />
-                      </div>
-                    </td>
-                    <td className="px-0 py-2 text-center w-4 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-4 w-4 p-0">
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/products/${p.id}`)}>
-                            <Settings2 className="h-4 w-4 mr-2" />Open
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteTarget({ id: p.id, name: p.name })}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </td>
                   </tr>
                 );
               })}
               {!productsLoading && products.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={8} className="p-10 text-center text-muted-foreground text-sm">
                     No products match your filters.
                   </td>
                 </tr>
               )}
               {productsLoading && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={8} className="p-10 text-center text-muted-foreground text-sm">
                     Loading products…
                   </td>
                 </tr>

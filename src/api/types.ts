@@ -100,13 +100,19 @@ export type ProductsAddProductCoverageRequest = {
   sumInsuredPercentage?: number;
 };
 
+export type ProductsUpdateProductCoverageRequest = ProductsAddProductCoverageRequest;
+
 export type ProductsAddProductCoverageCurrencyLimitRequest = {
   currency: string;
   type: string;
   value: number;
 };
 
-export type ProductsCurrencyLimitType = "fixedSumInsuredAmount";
+export type ProductsCurrencyLimitType =
+  | "fixedSumInsuredAmount"
+  | "minimumPremium"
+  | "yearlyLimit"
+  | "aggregateLimit";
 
 export type ProductsProductDocumentTypeRequiredForResponse = {
   insuredAmountOver?: number | null;

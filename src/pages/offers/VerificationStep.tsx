@@ -127,10 +127,10 @@ export const VerificationChecksTable = ({
     <Table className="text-xs">
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className="h-8 w-1/3 px-2 py-1.5 text-[11px]">Check</TableHead>
+          <TableHead className="h-8 w-[140px] px-2 py-1.5 text-[11px]">Check</TableHead>
           <TableHead className="h-8 w-[120px] px-2 py-1.5 text-[11px]">Status</TableHead>
           <TableHead className="h-8 px-2 py-1.5 text-[11px]">Reason</TableHead>
-          <TableHead className="h-8 px-2 py-1.5 text-[11px]">Action</TableHead>
+          <TableHead className="h-8 w-[220px] px-2 py-1.5 text-[11px]">Action</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -153,7 +153,7 @@ export const VerificationChecksTable = ({
               c.flagStatus !== "rejected";
             return (
               <TableRow key={`${c.id ?? c.name}-${i}`} className={s.row}>
-                <TableCell className="w-1/3 px-2 py-1.5">
+                <TableCell className="w-[140px] px-2 py-1.5">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="[&>svg]:h-3.5 [&>svg]:w-3.5 shrink-0">{s.icon}</span>
                     <span className="font-medium text-xs leading-snug">{c.name}</span>
@@ -170,7 +170,7 @@ export const VerificationChecksTable = ({
                 <TableCell className="px-2 py-1.5 text-xs leading-snug text-muted-foreground">
                   {c.reason}
                 </TableCell>
-                <TableCell className="px-2 py-1.5 text-xs leading-snug">
+                <TableCell className="w-[220px] px-2 py-1.5 text-xs leading-snug">
                   {canResolve ? (
                     <div className="flex flex-wrap items-center gap-1.5">
                       {onApprove ? (
@@ -187,7 +187,7 @@ export const VerificationChecksTable = ({
                       {onReject ? (
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           className="gap-1 h-7 px-2 text-[11px] text-destructive hover:text-destructive"
                           disabled={actionPending}
                           onClick={() => onReject(c.id!)}

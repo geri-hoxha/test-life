@@ -114,7 +114,7 @@ type ManualLoanRow = {
   year: number;
   periodStart: string;
   periodEnd: string;
-  remainingLoanAmount: number;
+  remainingLoanAmount: number | "";
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -126,7 +126,7 @@ const newManualLoanRow = (overrides?: Partial<ManualLoanRow>): ManualLoanRow => 
     year: 1,
     periodStart: today,
     periodEnd: today,
-    remainingLoanAmount: 0,
+    remainingLoanAmount: "",
     ...overrides,
   };
 };
@@ -141,14 +141,27 @@ const offerTermYears = (startDate: string, endDate: string) => {
   return Math.max(1, diffYears);
 };
 
+/** Cap loan years by product maxCoveredYears when set. */
+const cappedLoanYears = (
+  requestedYears: number,
+  maxCoveredYears?: number | null,
+) => {
+  if (maxCoveredYears == null || maxCoveredYears <= 0) return requestedYears;
+  return Math.min(requestedYears, Math.floor(maxCoveredYears));
+};
+
 /** One manual row per offer year: periodStart/End advance by 1 year from offer start. */
 const buildManualLoanRowsFromOfferTerm = (
   startDate: string,
   endDate: string,
+  maxCoveredYears?: number | null,
 ): ManualLoanRow[] => {
   if (!startDate) return [newManualLoanRow()];
   const start = parseISO(startDate);
-  const term = offerTermYears(startDate, endDate);
+  const term = cappedLoanYears(
+    offerTermYears(startDate, endDate),
+    maxCoveredYears,
+  );
   const rows: ManualLoanRow[] = [];
   for (let i = 0; i < term; i++) {
     const periodStartDate = new Date(start);
@@ -160,7 +173,7 @@ const buildManualLoanRowsFromOfferTerm = (
       year: periodStartDate.getFullYear(),
       periodStart: format(periodStartDate, "yyyy-MM-dd"),
       periodEnd: format(periodEndDate, "yyyy-MM-dd"),
-      remainingLoanAmount: 0,
+      remainingLoanAmount: "",
     });
   }
   return rows;
@@ -333,7 +346,7 @@ const CreateOffer = () => {
       id: `b-${Date.now()}`,
       customerId: "",
       relationship: "",
-      percentage: "",
+      percentage: 100,
     },
   ]);
   type CreateCustomerTarget =
@@ -394,7 +407,18 @@ const CreateOffer = () => {
         return false;
       }
       setHasLoan(false);
-      setManualLoanRows(buildManualLoanRowsFromOfferTerm(startDate, endDate));
+      const selectedProduct = products.find((p) => p.id === productId);
+      const maxYears = selectedProduct?.maxCoveredYears;
+      const requested = offerTermYears(startDate, endDate);
+      const capped = cappedLoanYears(requested, maxYears);
+      setManualLoanRows(
+        buildManualLoanRowsFromOfferTerm(startDate, endDate, maxYears),
+      );
+      if (maxYears != null && maxYears > 0 && requested > capped) {
+        toast.warning(
+          `Product max covered years is ${maxYears}. Only ${capped} loan row${capped === 1 ? "" : "s"} generated.`,
+        );
+      }
       return true;
     });
   };
@@ -561,24 +585,10 @@ const CreateOffer = () => {
     setCurrency(p?.currencies[0] ?? "");
   };
 
-  const addBeneficiary = () => {
-    setBeneficiaries((prev) => [
-      ...prev,
-      {
-        id: `b-${Date.now()}`,
-        customerId: "",
-        relationship: "",
-        percentage: "",
-      },
-    ]);
-  };
   const updateBeneficiary = (id: string, patch: Partial<BeneficiaryDraft>) => {
     setBeneficiaries((prev) =>
       prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
     );
-  };
-  const removeBeneficiary = (id: string) => {
-    setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
   };
 
   // Validation — version not yet on API; product group + product + currency are required.
@@ -586,9 +596,8 @@ const CreateOffer = () => {
   const peopleOk =
     !!(policyHolderId && payerId && insuredId) &&
     peopleOnly.some((p) => p.id === insuredId) &&
-    (beneficiaries.length === 0 ||
-      (beneficiariesValid &&
-        beneficiaries.every((b) => b.customerId && b.percentage > 0)));
+    beneficiariesValid &&
+    beneficiaries.every((b) => b.customerId && Number(b.percentage) > 0);
   const canSave = productOk && peopleOk;
   const saving =
     createOffer.isPending ||
@@ -943,23 +952,10 @@ const CreateOffer = () => {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Beneficiaries</CardTitle>
-                  <CardDescription>
-                    Total percentage must equal 100% when one or more
-                    beneficiaries are added.
-                  </CardDescription>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-2"
-                  onClick={addBeneficiary}
-                >
-                  <Plus className="h-4 w-4" /> Add Beneficiary
-                </Button>
-              </div>
+              <CardTitle className="text-base">Beneficiary</CardTitle>
+              <CardDescription>
+                Each policy has one beneficiary with 100% ownership by default.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -968,97 +964,75 @@ const CreateOffer = () => {
                     <TableRow>
                       <TableHead>Customer</TableHead>
                       <TableHead className="w-[140px]">Percentage</TableHead>
-                      <TableHead className="w-[60px]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {beneficiaries.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={3}
-                          className="text-center text-sm text-muted-foreground py-6"
-                        >
-                          No beneficiaries added yet.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      beneficiaries.map((b) => (
-                        <TableRow key={b.id}>
-                          <TableCell className="h-24">
-                            <div className="relative">
-                              <CustomerCombobox
-                                customers={customers}
-                                value={b.customerId}
-                                onValueChange={(v) =>
-                                  updateBeneficiary(b.id, { customerId: v })
+                    {beneficiaries.map((b) => (
+                      <TableRow key={b.id}>
+                        <TableCell className="h-24">
+                          <div className="relative">
+                            <CustomerCombobox
+                              customers={customers}
+                              value={b.customerId}
+                              onValueChange={(v) =>
+                                updateBeneficiary(b.id, { customerId: v })
+                              }
+                              placeholder="Select customer"
+                              triggerClassName="h-9"
+                            />
+                            <div className="absolute left-0 top-full flex flex-wrap items-center gap-x-3">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                                onClick={() =>
+                                  setCreateCustomerTarget({
+                                    beneficiaryId: b.id,
+                                  })
                                 }
-                                placeholder="Select customer"
-                                triggerClassName="h-9"
-                              />
-                              <div className="absolute left-0 top-full flex flex-wrap items-center gap-x-3">
+                              >
+                                Create a new customer
+                              </Button>
+                              {policyHolderId && (
                                 <Button
                                   variant="link"
                                   size="sm"
-                                  className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                                  className="px-0 h-7 text-xs"
                                   onClick={() =>
-                                    setCreateCustomerTarget({
-                                      beneficiaryId: b.id,
+                                    updateBeneficiary(b.id, {
+                                      customerId: policyHolderId,
                                     })
                                   }
                                 >
-                                  Create a new customer
+                                  Same as policy holder
                                 </Button>
-                                {policyHolderId && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="px-0 h-7 text-xs"
-                                    onClick={() =>
-                                      updateBeneficiary(b.id, {
-                                        customerId: policyHolderId,
-                                      })
-                                    }
-                                  >
-                                    Same as policy holder
-                                  </Button>
-                                )}
-                              </div>
+                              )}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="relative">
-                              <Input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={b.percentage}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  updateBeneficiary(b.id, {
-                                    percentage:
-                                      raw === "" ? "" : Number(raw),
-                                  });
-                                }}
-                                className="h-9 pr-7"
-                              />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                %
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={() => removeBeneficiary(b.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={b.percentage}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                updateBeneficiary(b.id, {
+                                  percentage:
+                                    raw === "" ? "" : Number(raw),
+                                });
+                              }}
+                              className="h-9 pr-7"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                              %
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
@@ -1072,8 +1046,8 @@ const CreateOffer = () => {
                 >
                   <span>
                     {beneficiariesValid
-                      ? "Beneficiary split is valid."
-                      : "Beneficiaries must total exactly 100%."}
+                      ? "Beneficiary ownership is valid."
+                      : "Ownership percentage must equal 100%."}
                   </span>
                   <span className="font-mono font-semibold">
                     {beneficiaryTotal}%
@@ -1221,13 +1195,32 @@ const CreateOffer = () => {
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="text-xs text-muted-foreground">
-                    {termYears} yr · one row/year · edit amounts as needed
+                    {cappedLoanYears(termYears, product?.maxCoveredYears)} yr ·
+                    one row/year · edit amounts as needed
+                    {product?.maxCoveredYears != null &&
+                      product.maxCoveredYears > 0 &&
+                      termYears > product.maxCoveredYears && (
+                        <span className="ml-1 text-amber-600 dark:text-amber-400">
+                          (capped at product max {product.maxCoveredYears} yrs)
+                        </span>
+                      )}
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 gap-1 px-2 text-xs"
-                    onClick={() =>
+                    onClick={() => {
+                      const maxYears = product?.maxCoveredYears;
+                      if (
+                        maxYears != null &&
+                        maxYears > 0 &&
+                        manualLoanRows.length >= maxYears
+                      ) {
+                        toast.warning(
+                          `This product allows a maximum of ${maxYears} covered year${maxYears === 1 ? "" : "s"}.`,
+                        );
+                        return;
+                      }
                       setManualLoanRows((rows) => {
                         const last = rows[rows.length - 1];
                         if (!last?.periodEnd) {
@@ -1247,13 +1240,22 @@ const CreateOffer = () => {
                             periodEnd: format(nextEnd, "yyyy-MM-dd"),
                           }),
                         ];
-                      })
-                    }
+                      });
+                    }}
                   >
                     <Plus className="h-3 w-3" />
                     Add row
                   </Button>
                 </div>
+                {product?.maxCoveredYears != null &&
+                  product.maxCoveredYears > 0 &&
+                  termYears > product.maxCoveredYears && (
+                    <div className="mb-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      Offer term is {termYears} years, but this product’s max
+                      covered years is {product.maxCoveredYears}. Loan rows
+                      are limited to {product.maxCoveredYears}.
+                    </div>
+                  )}
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -1350,14 +1352,16 @@ const CreateOffer = () => {
                                 <Input
                                   type="number"
                                   step="0.01"
+                                  placeholder="0"
                                   className="h-7 rounded-l-none px-2 text-xs"
                                   value={row.remainingLoanAmount}
-                                  onChange={(e) =>
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
                                     updateManualLoanRow(row.id, {
                                       remainingLoanAmount:
-                                        Number(e.target.value) || 0,
-                                    })
-                                  }
+                                        raw === "" ? "" : Number(raw),
+                                    });
+                                  }}
                                 />
                               </div>
                             </TableCell>

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   BankAccountsBankAccountResponse,
@@ -37,12 +37,18 @@ export const useCreateBankAccount = () => {
   });
 };
 
+export type ListBankAccountsQuery = {
+  currency?: string;
+  bankName?: string;
+  iban?: string;
+  swiftCode?: string;
+  pageNumber?: number;
+  pageSize?: number;
+};
+
 /** GET /api/bank-accounts */
 export const listBankAccounts = async (
-  query?: {
-    pageNumber?: number;
-    pageSize?: number;
-  },
+  query?: ListBankAccountsQuery,
   signal?: AbortSignal,
 ): Promise<PaginationPagedListOfBankAccountResponse> =>
   apiRequest<PaginationPagedListOfBankAccountResponse>({
@@ -53,16 +59,14 @@ export const listBankAccounts = async (
   });
 
 export const useListBankAccounts = (
-  query?: {
-    pageNumber?: number;
-    pageSize?: number;
-  },
+  query?: ListBankAccountsQuery,
   options?: { enabled?: boolean },
 ) =>
   useQuery({
     queryKey: bankAccountsKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listBankAccounts(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** DELETE /api/bank-accounts/{id} */

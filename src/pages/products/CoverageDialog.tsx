@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Coverage, newCoverageId } from "@/data/coverages";
 import { useListCoverages } from "@/api/coverages";
@@ -22,6 +27,8 @@ type Props = {
   versionId: string;
   /** Coverage catalog ids already linked to this product. */
   linkedCoverageIds?: string[];
+  /** When set, the dialog edits this coverage link instead of adding a new one. */
+  editing?: Coverage | null;
   onSave: (c: Coverage) => void;
 };
 
@@ -34,7 +41,8 @@ type FormState = {
   ratingTableMultiplier: number;
   isMandatory: boolean;
   isSumInsuredFixed: boolean;
-  sumInsuredPercentage: number;
+  /** Kept as raw input text so the field can start empty. */
+  sumInsuredPercentage: string;
 };
 
 const blankForm = (): FormState => ({
@@ -46,7 +54,7 @@ const blankForm = (): FormState => ({
   ratingTableMultiplier: 1,
   isMandatory: true,
   isSumInsuredFixed: true,
-  sumInsuredPercentage: 1,
+  sumInsuredPercentage: "",
 });
 
 const CoverageDialog = ({
@@ -55,9 +63,11 @@ const CoverageDialog = ({
   productId,
   versionId,
   linkedCoverageIds = [],
+  editing = null,
   onSave,
 }: Props) => {
   const [form, setForm] = useState<FormState>(blankForm());
+  const [comboOpen, setComboOpen] = useState(false);
   const { data: catalogPage, isLoading: catalogLoading } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: tablesPage } = useListRatingTables({ pageNumber: 1, pageSize: 200 });
   const ratingTables = tablesPage?.items ?? [];
@@ -71,8 +81,24 @@ const CoverageDialog = ({
   }, [catalogPage?.items, linkedCoverageIds]);
 
   useEffect(() => {
-    if (open) setForm(blankForm());
-  }, [open]);
+    if (!open) return;
+    if (editing) {
+      setForm({
+        source: "existing",
+        coverageId: editing.code !== "N/A" ? editing.code : "",
+        name: editing.name,
+        description: editing.description ?? "",
+        ratingTableId: editing.ratingTableId ?? "",
+        ratingTableMultiplier: editing.ratingTableMultiplier ?? 1,
+        isMandatory: editing.coverageType === "Mandatory",
+        isSumInsuredFixed: editing.isSumInsuredFixed ?? true,
+        sumInsuredPercentage:
+          editing.sumInsuredPercentage !== undefined ? String(editing.sumInsuredPercentage) : "",
+      });
+    } else {
+      setForm(blankForm());
+    }
+  }, [open, editing]);
 
   const pickCoverage = (coverageId: string) => {
     const found = availableCoverages.find((x) => x.id === coverageId);
@@ -86,11 +112,11 @@ const CoverageDialog = ({
   };
 
   const handleSave = () => {
-    if (form.source === "existing" && !form.coverageId) {
+    if (!editing && form.source === "existing" && !form.coverageId) {
       toast.error("Select a coverage");
       return;
     }
-    if (form.source === "new" && !form.name.trim()) {
+    if (!editing && form.source === "new" && !form.name.trim()) {
       toast.error("Coverage name is required");
       return;
     }
@@ -99,7 +125,7 @@ const CoverageDialog = ({
       return;
     }
     onSave({
-      id: newCoverageId(),
+      id: editing ? editing.id : newCoverageId(),
       productId,
       versionId,
       name: form.source === "new" ? form.name.trim() : (form.name || form.coverageId),
@@ -119,7 +145,10 @@ const CoverageDialog = ({
       isSumInsuredFixed: form.isSumInsuredFixed,
       sumInsuredPercentage: form.isSumInsuredFixed
         ? undefined
-        : form.sumInsuredPercentage || 1,
+        : (() => {
+            const parsed = parseFloat(form.sumInsuredPercentage);
+            return Number.isFinite(parsed) ? parsed : undefined;
+          })(),
     });
     onOpenChange(false);
   };
@@ -128,13 +157,25 @@ const CoverageDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add coverage</DialogTitle>
+          <DialogTitle>{editing ? "Edit coverage" : "Add coverage"}</DialogTitle>
           <DialogDescription>
-            Select an existing coverage, or create a new one with name and description.
+            {editing
+              ? "Update the link settings of this coverage."
+              : "Select an existing coverage, or create a new one with name and description."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {editing && (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5">
+              <div className="text-sm font-medium">{editing.name}</div>
+              {editing.description && (
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{editing.description}</p>
+              )}
+            </div>
+          )}
+
+          {!editing && (
           <div className="space-y-1.5">
             <Label>Source</Label>
             <Select
@@ -158,56 +199,66 @@ const CoverageDialog = ({
               </SelectContent>
             </Select>
           </div>
+          )}
 
-          {form.source === "existing" ? (
+          {!editing && (form.source === "existing" ? (
             <div className="space-y-1.5">
               <Label>Coverage *</Label>
-              <div className="rounded-md border border-border">
-                <div className="max-h-48 overflow-y-auto divide-y divide-border">
-                  {catalogLoading && (
-                    <p className="text-xs text-muted-foreground p-3">Loading coverages…</p>
-                  )}
-                  {!catalogLoading && availableCoverages.length === 0 && (
-                    <p className="text-xs text-muted-foreground p-3">
-                      No coverages available. Switch to Create new coverage.
-                    </p>
-                  )}
-                  {availableCoverages.map((cov) => {
-                    const id = cov.id ?? "";
-                    const selected = form.coverageId === id;
-                    return (
-                      <label
-                        key={id}
-                        className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-accent-soft/40 ${
-                          selected ? "bg-accent-soft/50" : ""
-                        }`}
-                      >
-                        <Checkbox
-                          className="mt-0.5"
-                          checked={selected}
-                          onCheckedChange={(v) => {
-                            if (v) pickCoverage(id);
-                            else {
-                              setForm((s) => ({
-                                ...s,
-                                coverageId: "",
-                                name: "",
-                                description: "",
-                              }));
-                            }
-                          }}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">{cov.name ?? id}</div>
-                          {cov.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{cov.description}</p>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              <Popover open={comboOpen} onOpenChange={setComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={comboOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    <span className="truncate">
+                      {form.coverageId
+                        ? availableCoverages.find((x) => x.id === form.coverageId)?.name ?? form.coverageId
+                        : "Select coverage…"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search coverages…" />
+                    <CommandList>
+                      <CommandEmpty>
+                        {catalogLoading ? "Loading coverages…" : "No coverage found."}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {availableCoverages.map((cov) => {
+                          const id = cov.id ?? "";
+                          return (
+                            <CommandItem
+                              key={id}
+                              value={`${cov.name ?? ""} ${id}`}
+                              onSelect={() => {
+                                pickCoverage(id);
+                                setComboOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 shrink-0",
+                                  form.coverageId === id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm truncate">{cov.name ?? id}</div>
+                                {cov.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-1">{cov.description}</p>
+                                )}
+                              </div>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           ) : (
             <div className="space-y-3">
@@ -230,7 +281,7 @@ const CoverageDialog = ({
                 />
               </div>
             </div>
-          )}
+          ))}
 
           <div className="space-y-1.5">
             <Label>Rating table *</Label>
@@ -297,8 +348,9 @@ const CoverageDialog = ({
                 min={0}
                 step="0.01"
                 value={form.sumInsuredPercentage}
+                placeholder="0%"
                 onChange={(e) =>
-                  setForm((s) => ({ ...s, sumInsuredPercentage: +e.target.value }))
+                  setForm((s) => ({ ...s, sumInsuredPercentage: e.target.value }))
                 }
                 className="font-mono"
               />
@@ -309,7 +361,7 @@ const CoverageDialog = ({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            Add coverage
+            {editing ? "Save changes" : "Add coverage"}
           </Button>
         </DialogFooter>
       </DialogContent>

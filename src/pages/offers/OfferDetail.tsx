@@ -60,7 +60,6 @@ import {
   // StickyNote,
   Package,
   AlertTriangle,
-  Trash2,
   Percent,
   Upload,
   ChevronRight,
@@ -84,8 +83,6 @@ import {
   useCancelOffer,
   useCalculateOfferSchedules,
   usePreviewOfferPremium,
-  useRemoveOfferInsuredPerson,
-  useRemoveOfferParticipant,
   useCancelOfferSchedule,
   useRequestOfferScheduleDiscount,
   useApproveOfferScheduleDiscount,
@@ -376,8 +373,6 @@ const OfferDetail = () => {
   } = usePreviewOfferPremium(id ?? "", { enabled: Boolean(id) });
   const cancelOffer = useCancelOffer();
   const calculateSchedules = useCalculateOfferSchedules();
-  const removeInsuredPerson = useRemoveOfferInsuredPerson();
-  const removeParticipant = useRemoveOfferParticipant();
   const cancelSchedule = useCancelOfferSchedule();
   const requestDiscount = useRequestOfferScheduleDiscount();
   const approveDiscount = useApproveOfferScheduleDiscount();
@@ -401,11 +396,6 @@ const OfferDetail = () => {
     [premiumPreview],
   );
 
-  const [pendingRemove, setPendingRemove] = useState<
-    | { kind: "insured"; id: string; label: string }
-    | { kind: "participant"; id: string; label: string }
-    | null
-  >(null);
   const [cancelScheduleYear, setCancelScheduleYear] = useState<number | null>(null);
   const [discountDialog, setDiscountDialog] = useState<{ year: number } | null>(null);
   const [discountPct, setDiscountPct] = useState("50");
@@ -640,28 +630,6 @@ const OfferDetail = () => {
     }
   };
 
-  const handleConfirmRemove = async () => {
-    if (!pendingRemove) return;
-    try {
-      if (pendingRemove.kind === "insured") {
-        await removeInsuredPerson.mutateAsync({
-          offerId: offer.id,
-          insuredPersonId: pendingRemove.id,
-        });
-        toast.success("Insured person removed");
-      } else {
-        await removeParticipant.mutateAsync({
-          offerId: offer.id,
-          participantId: pendingRemove.id,
-        });
-        toast.success("Participant removed");
-      }
-      setPendingRemove(null);
-    } catch (err) {
-      toastApiError(err, "Failed to remove");
-    }
-  };
-
   const handleCancelSchedule = async () => {
     if (cancelScheduleYear == null) return;
     try {
@@ -825,9 +793,6 @@ const OfferDetail = () => {
   };
 
   const flagActionPending = approveReviewFlag.isPending || rejectReviewFlag.isPending;
-
-  const removing =
-    removeInsuredPerson.isPending || removeParticipant.isPending;
 
   const canReject =
     offer.status !== "Bound" &&
@@ -1922,27 +1887,9 @@ const OfferDetail = () => {
         <TabsContent value="people" className="mt-4 space-y-4">
           <div className="grid gap-4 lg:grid-cols-3">
             <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <div>
-                  <CardTitle className="text-base">Policy Holder</CardTitle>
-                  <CardDescription>Owner of the policy</CardDescription>
-                </div>
-                {holder?.id && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5 text-destructive hover:text-destructive"
-                    onClick={() =>
-                      setPendingRemove({
-                        kind: "participant",
-                        id: holder.id,
-                        label: holder.displayName || "policy holder",
-                      })
-                    }
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Remove
-                  </Button>
-                )}
+              <CardHeader>
+                <CardTitle className="text-base">Policy Holder</CardTitle>
+                <CardDescription>Owner of the policy</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {holder ? (
@@ -1968,30 +1915,9 @@ const OfferDetail = () => {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <div>
-                  <CardTitle className="text-base">Insured Person</CardTitle>
-                  <CardDescription>Life being insured</CardDescription>
-                </div>
-                {insuredPerson?.id && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5 text-destructive hover:text-destructive"
-                    onClick={() =>
-                      setPendingRemove({
-                        kind: "insured",
-                        id: insuredPerson.id,
-                        label:
-                          [insuredPerson.firstName, insuredPerson.lastName].filter(Boolean).join(" ") ||
-                          insuredPerson.personalIdentifier ||
-                          "insured person",
-                      })
-                    }
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Remove
-                  </Button>
-                )}
+              <CardHeader>
+                <CardTitle className="text-base">Insured Person</CardTitle>
+                <CardDescription>Life being insured</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {insuredPerson ? (
@@ -2028,27 +1954,9 @@ const OfferDetail = () => {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <div>
-                  <CardTitle className="text-base">Payer / Invoice Recipient</CardTitle>
-                  <CardDescription>Receives invoices, pays premiums</CardDescription>
-                </div>
-                {payer?.id && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5 text-destructive hover:text-destructive"
-                    onClick={() =>
-                      setPendingRemove({
-                        kind: "participant",
-                        id: payer.id,
-                        label: payer.displayName || "payer",
-                      })
-                    }
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Remove
-                  </Button>
-                )}
+              <CardHeader>
+                <CardTitle className="text-base">Payer / Invoice Recipient</CardTitle>
+                <CardDescription>Receives invoices, pays premiums</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {payer ? (
@@ -2088,7 +1996,6 @@ const OfferDetail = () => {
                         <TableHead>Name</TableHead>
                         <TableHead>Identifier</TableHead>
                         <TableHead>DOB</TableHead>
-                        <TableHead className="w-[100px]" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2101,22 +2008,6 @@ const OfferDetail = () => {
                             </TableCell>
                             <TableCell className="font-mono text-xs">{ip.personalIdentifier ?? "—"}</TableCell>
                             <TableCell className="font-mono text-xs">{ip.dateOfBirth ?? "—"}</TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                className="gap-1.5 text-destructive hover:text-destructive"
-                                onClick={() =>
-                                  setPendingRemove({
-                                    kind: "insured",
-                                    id: ip.id,
-                                    label: name || ip.personalIdentifier || "insured person",
-                                  })
-                                }
-                              >
-                                <Trash2 className="h-3.5 w-3.5" /> Remove
-                              </Button>
-                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -2146,13 +2037,12 @@ const OfferDetail = () => {
                       <TableHead>Identifier</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead className="text-right">Share</TableHead>
-                      <TableHead className="w-[100px]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {offer.beneficiaries.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
                           No beneficiaries assigned to this offer.
                         </TableCell>
                       </TableRow>
@@ -2170,22 +2060,6 @@ const OfferDetail = () => {
                             <TableCell className="font-mono text-xs">{b.uniqueIdentifier ?? "—"}</TableCell>
                             <TableCell>{titleCase(b.partyType) ?? "—"}</TableCell>
                             <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                className="gap-1.5 text-destructive hover:text-destructive"
-                                onClick={() =>
-                                  setPendingRemove({
-                                    kind: "participant",
-                                    id: b.id,
-                                    label: b.displayName || "beneficiary",
-                                  })
-                                }
-                              >
-                                <Trash2 className="h-3.5 w-3.5" /> Remove
-                              </Button>
-                            </TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="bg-muted/40">
@@ -2193,7 +2067,6 @@ const OfferDetail = () => {
                           <TableCell className="text-right font-mono font-semibold">
                             {offer.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%
                           </TableCell>
-                          <TableCell />
                         </TableRow>
                       </>
                     )}
@@ -2202,33 +2075,6 @@ const OfferDetail = () => {
               </div>
             </CardContent>
           </Card>
-
-          <AlertDialog open={!!pendingRemove} onOpenChange={(open) => !open && setPendingRemove(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {pendingRemove?.kind === "insured" ? "Remove insured person?" : "Remove participant?"}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will permanently remove{" "}
-                  <span className="font-medium text-foreground">{pendingRemove?.label}</span> from this offer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void handleConfirmRemove();
-                  }}
-                  disabled={removing}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  {removing ? "Removing…" : "Remove"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </TabsContent>
 
         {/* <TabsContent value="notes" className="mt-4">

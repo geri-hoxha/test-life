@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -17,11 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Calculator,
-  AlertTriangle,
-  ShieldAlert,
-} from "lucide-react";
+import { Calculator } from "lucide-react";
 import { listCoverages, Coverage } from "@/data/coverages";
 import { getPremiumRule, calculatePremium, Gender } from "@/data/premiumRules";
 import { listTemplates, Template } from "@/data/templates";
@@ -146,9 +139,6 @@ const PremiumCalculation = ({
   );
 
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
-  const [manualOverride, setManualOverride] = useState(false);
-  const [manualAmount, setManualAmount] = useState("");
-  const [manualReason, setManualReason] = useState("");
 
   // FX
   const baseCurrency = "EUR";
@@ -214,8 +204,6 @@ const PremiumCalculation = ({
   let netPremium = calculatedNet;
   if (serverPreview) {
     netPremium = Math.max(0, serverPreview.premium);
-  } else if (manualOverride && manualAmount !== "") {
-    netPremium = Math.max(0, Number(manualAmount));
   }
 
   const TAX_RATE = 0.10;
@@ -318,7 +306,6 @@ const PremiumCalculation = ({
       grossPremium,
       fxRate: fxConv.rate,
       fxSource: String(fxConv.source),
-      manualOverride: manualOverride && manualAmount !== "" ? { amount: Number(manualAmount), reason: manualReason } : undefined,
       schedule,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,9 +315,6 @@ const PremiumCalculation = ({
     commission,
     grossPremium,
     fxConv.rate,
-    manualOverride,
-    manualAmount,
-    manualReason,
     termN,
     loan?.loanTermYears,
     loan?.outstandingBalance,
@@ -359,7 +343,7 @@ const PremiumCalculation = ({
           <CardTitle className="text-base flex items-center gap-2">
             <Calculator className="h-4 w-4" /> Calculation Inputs
           </CardTitle>
-          <CardDescription>Values driving the calculation. Adjust riders, manual override, and FX below.</CardDescription>
+          <CardDescription>Values driving the calculation. Adjust riders and FX below.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div><div className="text-[11px] uppercase text-muted-foreground">Insured Age</div><div className="font-medium">{insuredAge}</div></div>
@@ -468,55 +452,6 @@ const PremiumCalculation = ({
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4" /> Edit Premium Manually
-              </CardTitle>
-              <CardDescription>Manual overrides require management approval before issuance.</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="manual-toggle" className="text-xs text-muted-foreground">Enable</Label>
-              <Switch id="manual-toggle" checked={manualOverride} onCheckedChange={setManualOverride} />
-            </div>
-          </div>
-        </CardHeader>
-        {manualOverride && (
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            <div>
-              <Label>Manual Premium Amount ({currency})</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder={netPremium.toFixed(2)}
-                value={manualAmount}
-                onChange={(e) => setManualAmount(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Reason for Override</Label>
-              <Input
-                placeholder="e.g. Strategic corporate client, retention adjustment"
-                value={manualReason}
-                onChange={(e) => setManualReason(e.target.value)}
-                maxLength={200}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 text-xs rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 px-3 py-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 " />
-                <div className="mt-0.5">
-                  <strong>Requires approval: Yes.</strong> This offer will be routed to management for sign-off
-                  before it can be issued.
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        )}
-      </Card>
     </div>
   );
 };

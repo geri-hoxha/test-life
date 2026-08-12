@@ -12,6 +12,7 @@ import type {
   ProductsProductDocumentTypeResponse,
   ProductsProductPaymentMethodResponse,
   ProductsProductResponse,
+  ProductsUpdateProductCoverageRequest,
   ProductsUpdateProductRequest,
 } from "./types";
 
@@ -238,6 +239,34 @@ export const useRemoveProductCoverage = () => {
       coverageEntryId: string;
     }) =>
       removeProductCoverage(vars.productId, vars.coverageEntryId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: productsKeys.all });
+    },
+  });
+};
+
+/** PUT /api/products/{productId}/coverages/{coverageEntryId} */
+export const updateProductCoverage = async (
+  productId: string,
+  coverageEntryId: string,
+  body: ProductsUpdateProductCoverageRequest,
+  signal?: AbortSignal,
+): Promise<ProductsProductCoverageResponse> =>
+  apiRequest<ProductsProductCoverageResponse>({
+    method: "PUT",
+    path: `/api/products/${encodeURIComponent(productId)}/coverages/${encodeURIComponent(coverageEntryId)}`,
+    body,
+    signal,
+  });
+
+export const useUpdateProductCoverage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      productId: string;
+      coverageEntryId: string;
+      body: ProductsUpdateProductCoverageRequest;
+    }) => updateProductCoverage(vars.productId, vars.coverageEntryId, vars.body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: productsKeys.all });
     },

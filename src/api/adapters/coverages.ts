@@ -33,4 +33,5 @@ export const mapProductCoverage = (
     ? entry.sumInsuredPercentage
     : undefined,
   sortOrder: entry.sortOrder,
+  currencyLimits: entry.currencyLimits ?? [],
 });

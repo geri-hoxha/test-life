@@ -22,6 +22,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       closeButton
       expand
       visibleToasts={5}
+      pauseWhenPageIsHidden
       gap={10}
       duration={5_000}
       offset={16}
@@ -48,7 +49,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           info: "group-[.toaster]:border-l-sky-500",
           loading: "group-[.toaster]:border-l-muted-foreground",
           closeButton:
-            "group-[.toast]:absolute group-[.toast]:right-2 group-[.toast]:top-2 group-[.toast]:left-auto group-[.toast]:size-6 group-[.toast]:rounded-sm group-[.toast]:border group-[.toast]:border-border group-[.toast]:bg-background group-[.toast]:text-muted-foreground group-[.toast]:opacity-80 group-[.toast]:transition-opacity hover:group-[.toast]:opacity-100 hover:group-[.toast]:bg-muted hover:group-[.toast]:text-foreground",
+            "group-[.toast]:absolute group-[.toast]:right-2 group-[.toast]:top-2 mt-1 group-[.toast]:left-auto group-[.toast]:size-6 group-[.toast]:rounded-sm group-[.toast]:border group-[.toast]:border-border group-[.toast]:bg-background group-[.toast]:text-muted-foreground group-[.toast]:opacity-80 group-[.toast]:transition-opacity hover:group-[.toast]:opacity-100 hover:group-[.toast]:bg-muted hover:group-[.toast]:text-foreground",
           actionButton:
             "group-[.toast]:h-7 group-[.toast]:rounded-sm group-[.toast]:bg-primary group-[.toast]:px-2.5 group-[.toast]:text-xs group-[.toast]:font-medium group-[.toast]:text-primary-foreground",
           cancelButton:
