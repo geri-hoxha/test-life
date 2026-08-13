@@ -21,6 +21,8 @@ import PaymentsList from "./pages/payments/PaymentsList.tsx";
 import RecordPayment from "./pages/payments/RecordPayment.tsx";
 import Reports from "./pages/reports/Reports.tsx";
 import PermissionMatrix from "./pages/administration/PermissionMatrix.tsx";
+import RatingTablesList from "./pages/administration/RatingTablesList.tsx";
+import RatingTableDetail from "./pages/administration/RatingTableDetail.tsx";
 import RiskList from "./pages/risk-list/RiskList.tsx";
 import BankAccountsList from "./pages/bank-accounts/BankAccountsList.tsx";
 
@@ -55,6 +57,8 @@ const App = () => (
           <Route path="/administration" element={<CurrencyExchange />} />
           <Route path="/administration/currency-exchange" element={<CurrencyExchange />} />
           <Route path="/administration/permission-matrix" element={<PermissionMatrix />} />
+          <Route path="/administration/rating-tables" element={<RatingTablesList />} />
+          <Route path="/administration/rating-tables/:id" element={<RatingTableDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

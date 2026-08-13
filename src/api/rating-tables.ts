@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfRatingTableResponse,
@@ -8,6 +8,12 @@ import type {
   RatingTablesRatingTableRuleResponse,
   RatingTablesUpdateRatingTableRequest,
 } from "./types";
+
+export type ListRatingTablesQuery = {
+  pageNumber?: number;
+  pageSize?: number;
+  name?: string;
+};
 
 export const ratingTablesKeys = {
   all: [...apiKeys.all, "rating-tables"] as const,
@@ -60,10 +66,10 @@ export const useCreateRatingTable = () => {
 };
 
 /** GET /api/rating-tables */
-export const listRatingTables = async (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfRatingTableResponse> =>
+export const listRatingTables = async (
+  query?: ListRatingTablesQuery,
+  signal?: AbortSignal,
+): Promise<PaginationPagedListOfRatingTableResponse> =>
   apiRequest<PaginationPagedListOfRatingTableResponse>({
     method: "GET",
     path: `/api/rating-tables`,
@@ -71,14 +77,15 @@ export const listRatingTables = async (query?: {
     signal,
   });
 
-export const useListRatingTables = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListRatingTables = (
+  query?: ListRatingTablesQuery,
+  options?: { enabled?: boolean },
+) =>
   useQuery({
     queryKey: ratingTablesKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listRatingTables(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** DELETE /api/rating-tables/{id} */

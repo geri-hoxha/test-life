@@ -56,8 +56,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toastApiError } from "@/lib/api-error";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-
-const CURRENCIES = ["EUR", "ALL", "USD"] as const;
+import { getCurrencies } from "@/config/currencies";
 
 type FormState = {
   currency: string;
@@ -302,7 +301,7 @@ const BankAccountsList = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__any__">All currencies</SelectItem>
-                    {CURRENCIES.map((c) => (
+                    {getCurrencies().map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
                       </SelectItem>
@@ -448,7 +447,7 @@ const BankAccountsList = () => {
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CURRENCIES.map((c) => (
+                  {getCurrencies().map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>

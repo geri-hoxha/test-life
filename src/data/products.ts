@@ -1,3 +1,5 @@
+import { getCurrencies } from "@/config/currencies";
+
 export type ProductStatus = "Draft" | "Active" | "Inactive";
 
 // === Enums mirroring the C# domain ===
@@ -643,7 +645,7 @@ const premiumTableIdFromLegacy = (row: LegacyProductRow) => {
 };
 
 const currenciesFromLegacy = (row: LegacyProductRow) => {
-  if (["05", "09", "10", "SJ"].includes(row.insuranceProductCode)) return ["EUR", "ALL", "USD"];
+  if (["05", "09", "10", "SJ"].includes(row.insuranceProductCode)) return [...getCurrencies()];
   return ["EUR", "ALL"];
 };
 

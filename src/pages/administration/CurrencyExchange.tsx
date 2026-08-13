@@ -38,12 +38,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Trash2, RefreshCw, Calculator, Info } from "lucide-react";
 import {
-  CURRENCIES,
   convert,
   deleteFxRate,
   getRatesForPair,
   listFxRates,
 } from "@/data/fxRates";
+import { getCurrencies } from "@/config/currencies";
 import FxRateDialog from "./FxRateDialog";
 import { toast } from "sonner";
 
@@ -150,7 +150,7 @@ const CurrencyExchange = () => {
             <Select value={calcFrom} onValueChange={(v) => { setCalcFrom(v); setOverrideId("auto"); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -159,7 +159,7 @@ const CurrencyExchange = () => {
             <Select value={calcTo} onValueChange={(v) => { setCalcTo(v); setOverrideId("auto"); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -208,14 +208,14 @@ const CurrencyExchange = () => {
                 <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="From" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All from</SelectItem>
-                  {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={filterTo} onValueChange={setFilterTo}>
                 <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="To" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All to</SelectItem>
-                  {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={filterSource} onValueChange={setFilterSource}>

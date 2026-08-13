@@ -31,8 +31,7 @@ import CreateCoverageModal from "@/pages/products/CreateCoverageModal";
 import CreateDocumentTypeModal from "@/pages/products/CreateDocumentTypeModal";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
-
-const ALL_CURRENCIES = ["EUR", "ALL", "USD"] as const;
+import { getCurrencies } from "@/config/currencies";
 
 const ISSUANCE_MODE_OPTIONS = [
   { value: "annualRenewable", label: "Annual renewable" },
@@ -666,7 +665,7 @@ const CreateProduct = () => {
           <Card className="p-6 shadow-card border-border">
             <SectionTitle title="Available currencies" desc="supportedCurrencies on create." />
             <div className="flex flex-wrap gap-2">
-              {ALL_CURRENCIES.map((c) => {
+              {getCurrencies().map((c) => {
                 const active = currencies.includes(c);
                 return (
                   <button type="button" key={c} onClick={() => toggleCurrency(c)}

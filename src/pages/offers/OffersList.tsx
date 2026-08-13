@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Eye, Plus } from "lucide-react";
 import { statusColor, OfferStatus, offerStatusToApi, type Offer } from "@/data/offers";
-import { CURRENCIES } from "@/data/fxRates";
+import { getCurrencies } from "@/config/currencies";
 import { listOffers, offersKeys, useListOffers } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useListProducts, mapApiProduct } from "@/api/products";
@@ -230,7 +230,7 @@ const OffersList = () => {
                   <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">All currencies</SelectItem>
-                    {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

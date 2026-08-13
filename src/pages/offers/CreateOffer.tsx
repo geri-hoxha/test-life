@@ -78,6 +78,7 @@ import PremiumCalculation from "./PremiumCalculation";
 import type { Gender as RuleGender } from "@/data/premiumRules";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { getCurrencies } from "@/config/currencies";
 import { toast } from "sonner";
 
 const fmtMoney = (v: number, ccy: string) => {
@@ -820,7 +821,7 @@ const CreateOffer = () => {
                   <SelectContent>
                     {(product?.currencies?.length
                       ? product.currencies
-                      : ["EUR", "ALL", "USD"]
+                      : getCurrencies()
                     ).map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}

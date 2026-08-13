@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Eye, ShieldCheck } from "lucide-react";
 import { policyStatusColor, PolicyStatus, type Policy } from "@/data/policies";
-import { CURRENCIES } from "@/data/fxRates";
+import { getCurrencies } from "@/config/currencies";
 import { useListPolicies } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
 import { customerPath } from "@/api/adapters/customers";
@@ -235,7 +235,7 @@ const PoliciesList = () => {
                   <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">All currencies</SelectItem>
-                    {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

@@ -30,8 +30,7 @@ import { toast } from "sonner";
 import CoveragesTab from "./CoveragesTab";
 import DocumentsTab from "./DocumentsTab";
 import CurrenciesTab from "./CurrenciesTab";
-
-const ALL_CURRENCIES = ["EUR", "ALL", "USD", "GBP", "CHF"];
+import { getCurrencies } from "@/config/currencies";
 
 const ISSUANCE_MODE_OPTIONS = [
   { value: "annualRenewable", label: "Annual renewable" },
@@ -469,7 +468,7 @@ const ProductDetail = () => {
               <div className="space-y-2 md:col-span-2">
                 <Label>Currencies</Label>
                 <div className="flex flex-wrap gap-2">
-                  {ALL_CURRENCIES.map((c) => {
+                  {getCurrencies().map((c) => {
                     const on = fields.currencies.includes(c);
                     return (
                       <button

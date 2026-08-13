@@ -12,8 +12,6 @@ export type FxRate = {
   notes?: string;
 };
 
-export const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "ALL", "RSD", "BAM", "HRK"] as const;
-
 const today = new Date();
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const daysAgo = (n: number) => {

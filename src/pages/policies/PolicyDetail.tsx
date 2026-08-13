@@ -28,12 +28,13 @@ import {
   Download,
   FileText,
   Files,
+  Printer,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { getPolicy, policyStatusColor } from "@/data/policies";
 import { ageFromDob } from "@/data/customers";
-import { useGetPolicy } from "@/api/policies";
+import { openPolicyPrint, useGetPolicy } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
 import { useGetProduct, mapApiProduct } from "@/api/products";
 import { customerPath } from "@/api/adapters/customers";
@@ -106,6 +107,7 @@ const formatRate = (
 const PolicyDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [printing, setPrinting] = useState(false);
 
   const { data: apiPolicy, isLoading } = useGetPolicy(id ?? "", { enabled: Boolean(id) });
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
@@ -188,6 +190,21 @@ const PolicyDetail = () => {
     );
   };
 
+  const handlePrint = async () => {
+    if (!policy.id) {
+      toast.error("Policy id is missing");
+      return;
+    }
+    try {
+      setPrinting(true);
+      await openPolicyPrint(policy.id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to print policy");
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   return (
     <AppShell>
       <div className="flex items-center justify-between mb-4">
@@ -221,6 +238,18 @@ const PolicyDetail = () => {
               {shortId(policy.offerId)}
             </Link>
           </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={() => void handlePrint()}
+            disabled={printing}
+          >
+            <Printer className="h-4 w-4" />
+            {printing ? "Printing…" : "Print Policy"}
+          </Button>
         </div>
       </div>
 

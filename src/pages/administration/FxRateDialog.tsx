@@ -20,7 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { addFxRate, CURRENCIES, getLatestRate } from "@/data/fxRates";
+import { addFxRate, getLatestRate } from "@/data/fxRates";
+import { getCurrencies } from "@/config/currencies";
 import { toast } from "sonner";
 
 type Props = {
@@ -115,7 +116,7 @@ const FxRateDialog = ({ open, onOpenChange, onSaved }: Props) => {
               <Select value={fromCurrency} onValueChange={setFrom}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -124,7 +125,7 @@ const FxRateDialog = ({ open, onOpenChange, onSaved }: Props) => {
               <Select value={toCurrency} onValueChange={setTo}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

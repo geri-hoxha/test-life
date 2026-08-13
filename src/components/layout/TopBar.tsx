@@ -22,6 +22,7 @@ const navItems = [
   { label: "Policies", to: "/policies" },
   { label: "Risk list", to: "/risk-list" },
   { label: "Bank accounts", to: "/bank-accounts" },
+  { label: "Rating tables", to: "/administration/rating-tables" },
   // API not ready — hide until backend is available
   // { label: "Payments", to: "/payments" },
   // { label: "Permissions", to: "/administration/permission-matrix" },

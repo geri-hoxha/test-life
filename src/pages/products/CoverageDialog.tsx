@@ -248,7 +248,7 @@ const CoverageDialog = ({
                               <div className="min-w-0 flex-1">
                                 <div className="text-sm truncate">{cov.name ?? id}</div>
                                 {cov.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-1">{cov.description}</p>
+                                  <p className="text-xs  line-clamp-1">{cov.description}</p>
                                 )}
                               </div>
                             </CommandItem>
