@@ -23,6 +23,8 @@ import Reports from "./pages/reports/Reports.tsx";
 import PermissionMatrix from "./pages/administration/PermissionMatrix.tsx";
 import RatingTablesList from "./pages/administration/RatingTablesList.tsx";
 import RatingTableDetail from "./pages/administration/RatingTableDetail.tsx";
+import DocumentTypesList from "./pages/administration/DocumentTypesList.tsx";
+import DocumentsList from "./pages/administration/DocumentsList.tsx";
 import RiskList from "./pages/risk-list/RiskList.tsx";
 import BankAccountsList from "./pages/bank-accounts/BankAccountsList.tsx";
 
@@ -59,6 +61,8 @@ const App = () => (
           <Route path="/administration/permission-matrix" element={<PermissionMatrix />} />
           <Route path="/administration/rating-tables" element={<RatingTablesList />} />
           <Route path="/administration/rating-tables/:id" element={<RatingTableDetail />} />
+          <Route path="/administration/document-types" element={<DocumentTypesList />} />
+          <Route path="/administration/documents" element={<DocumentsList />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

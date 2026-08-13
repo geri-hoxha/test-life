@@ -1,11 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
-  DocumentsCreateDocumentRequest,
   DocumentsDocumentResponse,
+  DocumentsListDocumentsRequest,
   DocumentsUpdateDocumentRequest,
   PaginationPagedListOfDocumentResponse,
 } from "./types";
+
+export type ListDocumentsQuery = DocumentsListDocumentsRequest;
 
 export const documentsKeys = {
   all: [...apiKeys.all, "documents"] as const,
@@ -37,10 +39,10 @@ export const useCreateDocument = () => {
 };
 
 /** GET /api/documents */
-export const listDocuments = async (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfDocumentResponse> =>
+export const listDocuments = async (
+  query?: ListDocumentsQuery,
+  signal?: AbortSignal,
+): Promise<PaginationPagedListOfDocumentResponse> =>
   apiRequest<PaginationPagedListOfDocumentResponse>({
     method: "GET",
     path: `/api/documents`,
@@ -48,14 +50,15 @@ export const listDocuments = async (query?: {
     signal,
   });
 
-export const useListDocuments = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListDocuments = (
+  query?: ListDocumentsQuery,
+  options?: { enabled?: boolean },
+) =>
   useQuery({
     queryKey: documentsKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listDocuments(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** DELETE /api/documents/{id} */
@@ -92,7 +95,11 @@ export const useGetDocument = (id: string, options?: { enabled?: boolean }) =>
   });
 
 /** PUT /api/documents/{id} */
-export const updateDocument = async (id: string, body: DocumentsUpdateDocumentRequest, signal?: AbortSignal): Promise<DocumentsDocumentResponse> =>
+export const updateDocument = async (
+  id: string,
+  body: DocumentsUpdateDocumentRequest,
+  signal?: AbortSignal,
+): Promise<DocumentsDocumentResponse> =>
   apiRequest<DocumentsDocumentResponse>({
     method: "PUT",
     path: `/api/documents/${encodeURIComponent(id)}`,
@@ -106,8 +113,7 @@ export const useUpdateDocument = () => {
     mutationFn: (vars: {
       id: string;
       body: DocumentsUpdateDocumentRequest;
-    }) =>
-      updateDocument(vars.id, vars.body),
+    }) => updateDocument(vars.id, vars.body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: documentsKeys.all });
     },
@@ -144,7 +150,7 @@ export const downloadDocumentFile = async (id: string, fileName?: string) => {
   URL.revokeObjectURL(url);
 };
 
-/** Helper to build multipart body for \`createDocument\`. */
+/** Helper to build multipart body for `createDocument`. */
 export const buildCreateDocumentFormData = (file: Blob, fileName?: string) => {
   const form = new FormData();
   form.append("file", file, fileName);

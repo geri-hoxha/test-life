@@ -7,6 +7,13 @@ import type {
   PaginationPagedListOfDocumentTypeResponse,
 } from "./types";
 
+export type ListDocumentTypesQuery = {
+  pageNumber?: number;
+  pageSize?: number;
+  name?: string;
+  hasTemplate?: boolean;
+};
+
 export const documentTypesKeys = {
   all: [...apiKeys.all, "document-types"] as const,
   lists: () => [...documentTypesKeys.all, "list"] as const,
@@ -35,10 +42,10 @@ export const useCreateDocumentType = () => {
 };
 
 /** GET /api/document-types */
-export const listDocumentTypes = async (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfDocumentTypeResponse> =>
+export const listDocumentTypes = async (
+  query?: ListDocumentTypesQuery,
+  signal?: AbortSignal,
+): Promise<PaginationPagedListOfDocumentTypeResponse> =>
   apiRequest<PaginationPagedListOfDocumentTypeResponse>({
     method: "GET",
     path: `/api/document-types`,
@@ -46,10 +53,10 @@ export const listDocumentTypes = async (query?: {
     signal,
   });
 
-export const useListDocumentTypes = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListDocumentTypes = (
+  query?: ListDocumentTypesQuery,
+  options?: { enabled?: boolean },
+) =>
   useQuery({
     queryKey: documentTypesKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listDocumentTypes(query, signal),

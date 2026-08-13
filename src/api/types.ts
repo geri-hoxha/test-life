@@ -748,7 +748,10 @@ export type PaginationPagedListOfDocumentTypeResponse = {
   hasNextPage?: boolean;
 };
 
-export type DocumentsDocumentTypesListDocumentTypesRequest = PaginationPagedRequest & Record<string, unknown>;
+export type DocumentsDocumentTypesListDocumentTypesRequest = PaginationPagedRequest & {
+  name?: string;
+  hasTemplate?: boolean;
+};
 
 export type DocumentsDocumentTypesUpdateDocumentTypeRequest = {
   name: string;
@@ -792,7 +795,12 @@ export type PaginationPagedListOfDocumentResponse = {
   hasNextPage?: boolean;
 };
 
-export type DocumentsListDocumentsRequest = PaginationPagedRequest & Record<string, unknown>;
+export type DocumentsListDocumentsRequest = PaginationPagedRequest & {
+  createdFromUtc?: string;
+  createdToUtc?: string;
+  isDeleted?: boolean;
+  originalFileName?: string;
+};
 
 export type DocumentsUpdateDocumentRequest = {
   originalFileName: string;

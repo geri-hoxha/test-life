@@ -7,18 +7,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Calculator } from "lucide-react";
 import { listCoverages, Coverage } from "@/data/coverages";
 import { getPremiumRule, calculatePremium, Gender } from "@/data/premiumRules";
 import { listTemplates, Template } from "@/data/templates";
-import { getRatesForPair, convert } from "@/data/fxRates";
 import type { PaymentMode } from "@/data/offers";
 
 export type PremiumResult = {
@@ -27,8 +19,6 @@ export type PremiumResult = {
   tax: number;
   commission: number;
   grossPremium: number;
-  fxRate: number;
-  fxSource: string;
   manualOverride?: { amount: number; reason: string };
   schedule: ScheduleRow[];
 };
@@ -139,20 +129,6 @@ const PremiumCalculation = ({
   );
 
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
-
-  // FX
-  const baseCurrency = "EUR";
-  const fxCandidates = currency === baseCurrency ? [] : getRatesForPair(baseCurrency, currency);
-  const [fxOverrideId, setFxOverrideId] = useState<string>("auto");
-
-  // Reset override when offer currency changes so we don't keep a stale pair id.
-  useEffect(() => {
-    setFxOverrideId("auto");
-  }, [currency]);
-
-  const fxOverrideRate =
-    fxOverrideId === "auto" ? undefined : fxCandidates.find((c) => c.id === fxOverrideId)?.rate;
-  const fxConv = convert(1, baseCurrency, currency, fxOverrideRate);
 
   // ---- Premium calculation ----
   const loanBalance = loan?.outstandingBalance;
@@ -304,8 +280,6 @@ const PremiumCalculation = ({
       tax,
       commission,
       grossPremium,
-      fxRate: fxConv.rate,
-      fxSource: String(fxConv.source),
       schedule,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -314,7 +288,6 @@ const PremiumCalculation = ({
     tax,
     commission,
     grossPremium,
-    fxConv.rate,
     termN,
     loan?.loanTermYears,
     loan?.outstandingBalance,
@@ -343,7 +316,7 @@ const PremiumCalculation = ({
           <CardTitle className="text-base flex items-center gap-2">
             <Calculator className="h-4 w-4" /> Calculation Inputs
           </CardTitle>
-          <CardDescription>Values driving the calculation. Adjust riders and FX below.</CardDescription>
+          <CardDescription>Values driving the calculation. Adjust riders below.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div><div className="text-[11px] uppercase text-muted-foreground">Insured Age</div><div className="font-medium">{insuredAge}</div></div>
@@ -432,26 +405,6 @@ const PremiumCalculation = ({
         <Card><CardHeader className="pb-1.5"><CardDescription>Currency</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold">{currency}</div></CardContent></Card>
       </div>
-
-      {currency !== baseCurrency && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">FX Rate Source</CardTitle>
-            <CardDescription>Defaults to the latest rate. Choose a historic entry to apply a manual override.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Select value={fxOverrideId} onValueChange={setFxOverrideId}>
-              <SelectTrigger className="max-w-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Latest available rate (default)</SelectItem>
-                {fxCandidates.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.date} · {c.rate} · {c.source}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

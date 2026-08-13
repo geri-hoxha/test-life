@@ -342,23 +342,6 @@ export const computeVerification = (
     });
   }
 
-  // 6. FX rate manually overridden
-  if (premium?.fxSource === "Manual" || premium?.fxSource === "Override") {
-    checks.push({
-      name: "FX Rate Manually Overridden",
-      result: "Warning",
-      reason: `Conversion uses a ${premium.fxSource.toLowerCase()} rate of ${premium.fxRate}.`,
-      action: "Verify the override reason on the FX history.",
-    });
-  } else if (args.currency !== "EUR") {
-    checks.push({
-      name: "FX Rate Manually Overridden",
-      result: "Passed",
-      reason: `Latest automatic rate (${premium?.fxRate ?? "—"}) applied.`,
-      action: "No action required.",
-    });
-  }
-
   return checks;
 };
 
