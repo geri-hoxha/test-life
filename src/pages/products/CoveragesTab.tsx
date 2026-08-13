@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Shield, Info, Loader2, Save, Pencil } from "lucide-react";
+import { Plus, Trash2, Shield, Info, Loader2, Save, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { Coverage } from "@/data/coverages";
 import CoverageDialog from "./CoverageDialog";
@@ -45,137 +45,193 @@ const CHECKBOX_LIMIT_TYPES = ALL_LIMIT_TYPES.filter(
   (t) => t.type !== "fixedSumInsuredAmount"
 );
 
-/** Single row of a limit-type table: currency, type, value input, icon actions. */
-const CurrencyLimitRow = ({
-  productId,
-  coverageEntryId,
-  currency,
-  type,
-  existing,
-}: {
-  productId: string;
-  coverageEntryId: string;
-  currency: string;
-  type: ProductsCurrencyLimitType;
-  existing?: { id?: string | number; value?: number };
-}) => {
-  const [value, setValue] = useState<string>(
-    existing?.value !== undefined ? String(existing.value) : ""
+const limitKey = (entryId: string, type: ProductsCurrencyLimitType) => `${entryId}:${type}`;
+
+/** True when every supported currency has a saved limit of this type. */
+const hasAllCurrencyLimits = (
+  coverage: Coverage,
+  type: ProductsCurrencyLimitType,
+  currencies: string[]
+) => {
+  if (currencies.length === 0) return false;
+  const have = new Set(
+    (coverage.currencyLimits ?? [])
+      .filter((l) => l.type === type && l.currency && l.value !== undefined)
+      .map((l) => l.currency as string)
   );
-  const addLimit = useAddProductCoverageCurrencyLimit();
-  const removeLimit = useRemoveProductCoverageCurrencyLimit();
-
-  const save = async () => {
-    const parsed = Number(value);
-    if (value.trim() === "" || Number.isNaN(parsed) || parsed < 0) {
-      toast.error("Enter a valid non-negative value");
-      return;
-    }
-    try {
-      await addLimit.mutateAsync({
-        productId,
-        coverageEntryId,
-        body: { currency, type, value: parsed },
-      });
-      toast.success(`${currency} limit saved`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save limit");
-    }
-  };
-
-  const remove = async () => {
-    if (existing?.id === undefined) return;
-    try {
-      await removeLimit.mutateAsync({
-        productId,
-        coverageEntryId,
-        currencyLimitEntryId: String(existing.id),
-      });
-      setValue("");
-      toast.success(`${currency} limit removed`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to remove limit");
-    }
-  };
-
-  return (
-    <TableRow>
-      <TableCell className="py-2 font-mono text-xs font-medium">{currency}</TableCell>
-      <TableCell className="py-2">
-        <div className="flex items-center gap-1.5">
-          <Input
-            type="number"
-            min={0}
-            step="any"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Value"
-            className="h-7 w-24 text-xs"
-          />
-          <Button
-            variant="link"
-            size="icon"
-            className="h-7 w-7 shrink-0 text-emerald-600 hover:text-emerald-700"
-            title="Save limit"
-            onClick={() => void save()}
-            disabled={addLimit.isPending}
-          >
-            {addLimit.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Save className="h-3.5 w-3.5" />
-            )}
-          </Button>
-          {existing?.id !== undefined && (
-            <Button
-              variant="link"
-              size="icon"
-              className="h-7 w-7 shrink-0 text-destructive"
-              title="Remove limit"
-              onClick={() => void remove()}
-              disabled={removeLimit.isPending}
-            >
-              {removeLimit.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
-  );
+  return currencies.every((cur) => have.has(cur));
 };
 
-/** One table per limit type: currency, type, value (with icon actions). */
+const missingCurrenciesForType = (
+  coverage: Coverage,
+  type: ProductsCurrencyLimitType,
+  currencies: string[]
+) => {
+  const have = new Set(
+    (coverage.currencyLimits ?? [])
+      .filter((l) => l.type === type && l.currency && l.value !== undefined)
+      .map((l) => l.currency as string)
+  );
+  return currencies.filter((cur) => !have.has(cur));
+};
+
+const missingFixedSumInsuredCurrencies = (coverage: Coverage, currencies: string[]) => {
+  if (!(coverage.isSumInsuredFixed ?? true)) return [];
+  return missingCurrenciesForType(coverage, "fixedSumInsuredAmount", currencies);
+};
+
+/**
+ * Mini-table for one limit type: fill ALL currencies, then one Save that
+ * posts one currency-limits request per currency.
+ */
 const LimitTypeTable = ({
   productId,
   coverage,
   type,
   label,
   currencies,
+  required = false,
 }: {
   productId: string;
   coverage: Coverage;
   type: ProductsCurrencyLimitType;
   label: string;
   currencies: string[];
+  required?: boolean;
 }) => {
   const limitsOfType = (coverage.currencyLimits ?? []).filter((l) => l.type === type);
   const limitsByCurrency = Object.fromEntries(limitsOfType.map((l) => [l.currency ?? "", l]));
-  // Show every existing limit of this type, even if its currency is no longer supported.
   const rowCurrencies = [
     ...currencies,
     ...limitsOfType.map((l) => l.currency ?? "").filter((cur) => cur && !currencies.includes(cur)),
   ];
 
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      rowCurrencies.map((cur) => [
+        cur,
+        limitsByCurrency[cur]?.value !== undefined ? String(limitsByCurrency[cur].value) : "",
+      ])
+    )
+  );
+  const [saving, setSaving] = useState(false);
+  const addLimit = useAddProductCoverageCurrencyLimit();
+  const removeLimit = useRemoveProductCoverageCurrencyLimit();
+
+  // Sync when server data changes (after save / refetch).
+  useEffect(() => {
+    setValues(
+      Object.fromEntries(
+        rowCurrencies.map((cur) => [
+          cur,
+          limitsByCurrency[cur]?.value !== undefined ? String(limitsByCurrency[cur].value) : "",
+        ])
+      )
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh from coverage.currencyLimits
+  }, [coverage.id, type, coverage.currencyLimits, currencies.join("|")]);
+
+  const incomplete = rowCurrencies.filter((cur) => {
+    const raw = (values[cur] ?? "").trim();
+    if (raw === "") return true;
+    const n = Number(raw);
+    return Number.isNaN(n) || n < 0;
+  });
+
+  const saveAll = async () => {
+    if (rowCurrencies.length === 0) {
+      toast.error("This product has no supported currencies");
+      return;
+    }
+    if (incomplete.length > 0) {
+      toast.error(`Fill a value for every currency before saving (${incomplete.join(", ")})`);
+      return;
+    }
+    setSaving(true);
+    try {
+      await Promise.all(
+        rowCurrencies.map((currency) =>
+          addLimit.mutateAsync({
+            productId,
+            coverageEntryId: coverage.id,
+            body: { currency, type, value: Number(values[currency]) },
+          })
+        )
+      );
+      toast.success(`Saved ${rowCurrencies.length} ${label.toLowerCase()} limit(s)`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save currency limits");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearAll = async () => {
+    const existing = rowCurrencies
+      .map((cur) => limitsByCurrency[cur])
+      .filter((l): l is NonNullable<typeof l> => l?.id !== undefined);
+    if (existing.length === 0) {
+      setValues(Object.fromEntries(rowCurrencies.map((cur) => [cur, ""])));
+      return;
+    }
+    setSaving(true);
+    try {
+      await Promise.all(
+        existing.map((l) =>
+          removeLimit.mutateAsync({
+            productId,
+            coverageEntryId: coverage.id,
+            currencyLimitEntryId: String(l.id),
+          })
+        )
+      );
+      setValues(Object.fromEntries(rowCurrencies.map((cur) => [cur, ""])));
+      toast.success(`Cleared ${label.toLowerCase()} limits`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear limits");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="rounded-md border border-border bg-background overflow-hidden">
-      <div className="px-3 py-2 border-b border-border bg-muted/40">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div
+      className={`rounded-md border bg-background overflow-hidden ${
+        required && incomplete.length > 0 ? "border-amber-500/60" : "border-border"
+      }`}
+    >
+      <div className="px-3 py-2 border-b border-border bg-muted/40 flex items-center   gap-2">
+        <span className="text-xs font-semibold uppercase ">
           {label}
+          {required && <span className="text-amber-600 ml-1">*</span>}
         </span>
+        <div className="flex items-center gap-1">
+          {required && incomplete.length > 0 && (
+            <span className="text-[10px] text-amber-700 mr-1 whitespace-nowrap">
+              Fill all currencies
+            </span>
+          )}
+          <Button
+            variant="link"
+            size="icon"
+            className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+            title="Save all currency limits"
+            onClick={() => void saveAll()}
+            disabled={saving}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          </Button>
+          <Button
+            variant="link"
+            size="icon"
+            className="h-7 w-7 text-destructive"
+            title="Clear all limits of this type"
+            onClick={() => void clearAll()}
+            disabled={saving}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -186,17 +242,28 @@ const LimitTypeTable = ({
         </TableHeader>
         <TableBody>
           {rowCurrencies.map((currency) => (
-            <CurrencyLimitRow
-              key={`${coverage.id}:${type}:${currency}:${limitsByCurrency[currency]?.id ?? "new"}`}
-              productId={productId}
-              coverageEntryId={coverage.id}
-              currency={currency}
-              type={type}
-              existing={limitsByCurrency[currency]}
-            />
+            <TableRow key={`${coverage.id}:${type}:${currency}`}>
+              <TableCell className="py-2 font-mono text-xs font-medium">{currency}</TableCell>
+              <TableCell className="py-2">
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={values[currency] ?? ""}
+                  onChange={(e) =>
+                    setValues((prev) => ({ ...prev, [currency]: e.target.value }))
+                  }
+                  placeholder="Value"
+                  className="h-7 w-28 text-xs"
+                />
+              </TableCell>
+            </TableRow>
           ))}
         </TableBody>
       </Table>
+      <div className="px-3 py-2 border-t border-border bg-muted/20 text-[10px] text-muted-foreground">
+        Fill every currency, then save — {rowCurrencies.length || 0} request(s) will be sent.
+      </div>
     </div>
   );
 };
@@ -246,19 +313,53 @@ const CoveragesTab = ({ productId }: Props) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editCoverage, setEditCoverage] = useState<Coverage | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  /** Checked limit-type checkboxes, keyed by `${coverageEntryId}:${type}`. */
+  /** Limit types the agent selected to configure (plus complete ones synced from API). */
   const [selectedLimits, setSelectedLimits] = useState<Set<string>>(new Set());
+  /** Coverage entry ids whose currency-limits panel is expanded. */
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const limitKey = (entryId: string, type: ProductsCurrencyLimitType) => `${entryId}:${type}`;
+  // Auto-expand coverages that still need required fixed sum insured amounts.
+  useEffect(() => {
+    if (supportedCurrencies.length === 0) return;
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (const c of coverages) {
+        if (missingFixedSumInsuredCurrencies(c, supportedCurrencies).length > 0) {
+          next.add(c.id);
+        }
+      }
+      return next;
+    });
+  }, [coverages, supportedCurrencies]);
+
   const isLimitSelected = (entryId: string, type: ProductsCurrencyLimitType) =>
     selectedLimits.has(limitKey(entryId, type));
 
-  const toggleLimit = (entryId: string, type: ProductsCurrencyLimitType) => {
+  const toggleLimit = (coverage: Coverage, type: ProductsCurrencyLimitType) => {
+    const complete = hasAllCurrencyLimits(coverage, type, supportedCurrencies);
+    // Complete types stay checked from saved data; clicking just opens the editor.
+    if (complete) {
+      setExpandedIds((prev) => new Set(prev).add(coverage.id));
+      return;
+    }
+    const key = limitKey(coverage.id, type);
+    const currentlySelected = selectedLimits.has(key);
     setSelectedLimits((prev) => {
       const next = new Set(prev);
-      const key = limitKey(entryId, type);
-      if (next.has(key)) next.delete(key);
+      if (currentlySelected) next.delete(key);
       else next.add(key);
+      return next;
+    });
+    if (!currentlySelected) {
+      setExpandedIds((prev) => new Set(prev).add(coverage.id));
+    }
+  };
+
+  const toggleExpanded = (entryId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(entryId)) next.delete(entryId);
+      else next.add(entryId);
       return next;
     });
   };
@@ -268,6 +369,7 @@ const CoveragesTab = ({ productId }: Props) => {
       toast.error("Rating table is required");
       return;
     }
+    const isFixed = c.isSumInsuredFixed ?? true;
     try {
       await updateProductCoverage.mutateAsync({
         productId,
@@ -277,13 +379,24 @@ const CoveragesTab = ({ productId }: Props) => {
           ratingTableId: c.ratingTableId,
           ratingTableMultiplier: c.ratingTableMultiplier ?? 1,
           isMandatory: c.coverageType === "Mandatory",
-          isSumInsuredFixed: c.isSumInsuredFixed ?? true,
-          ...((c.isSumInsuredFixed ?? true)
-            ? {}
-            : { sumInsuredPercentage: c.sumInsuredPercentage ?? 1 }),
+          isSumInsuredFixed: isFixed,
+          ...(isFixed ? {} : { sumInsuredPercentage: c.sumInsuredPercentage ?? 1 }),
         },
       });
       toast.success(`Coverage ${c.name} updated`);
+      if (isFixed) {
+        const existing = coverages.find((x) => x.id === c.id);
+        const missing = missingFixedSumInsuredCurrencies(
+          { ...c, isSumInsuredFixed: true, currencyLimits: existing?.currencyLimits },
+          supportedCurrencies
+        );
+        if (missing.length > 0) {
+          setExpandedIds((prev) => new Set(prev).add(c.id));
+          toast.warning(
+            `Fill Fixed sum insured amount for: ${missing.join(", ")} — this is required.`
+          );
+        }
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update coverage");
     }
@@ -304,6 +417,7 @@ const CoveragesTab = ({ productId }: Props) => {
         if (!created.id) throw new Error("Coverage created without id");
         coverageId = created.id;
       }
+      const isFixed = c.isSumInsuredFixed ?? true;
       await addProductCoverage.mutateAsync({
         productId,
         body: {
@@ -311,13 +425,16 @@ const CoveragesTab = ({ productId }: Props) => {
           ratingTableId: c.ratingTableId,
           ratingTableMultiplier: c.ratingTableMultiplier ?? 1,
           isMandatory: c.coverageType === "Mandatory",
-          isSumInsuredFixed: c.isSumInsuredFixed ?? true,
-          ...((c.isSumInsuredFixed ?? true)
-            ? {}
-            : { sumInsuredPercentage: c.sumInsuredPercentage ?? 1 }),
+          isSumInsuredFixed: isFixed,
+          ...(isFixed ? {} : { sumInsuredPercentage: c.sumInsuredPercentage ?? 1 }),
         },
       });
       toast.success(`Coverage ${c.name} linked to product`);
+      if (isFixed) {
+        toast.warning(
+          "Fill Fixed sum insured amount for every supported currency — this is required."
+        );
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to link coverage");
     }
@@ -353,8 +470,8 @@ const CoveragesTab = ({ productId }: Props) => {
         <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-xl">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
-            Link an existing coverage or create a new one ({`{ name, description }`}), then assign a rating table.
-            Use the limit checkboxes to configure per-currency limits.
+            Check a limit type, open currency limits, fill every supported currency, then save
+            (one API request per currency). Checkboxes stay checked when all currencies are filled.
           </span>
         </div>
         <Button size="sm" onClick={() => setDialogOpen(true)} className="ml-auto gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
@@ -393,112 +510,170 @@ const CoveragesTab = ({ productId }: Props) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {coverages.map((c) => (
-                <Fragment key={c.id}>
-                  <TableRow className="hover:bg-accent-soft/40">
-                    <TableCell className="align-top">
-                      <div className="font-medium text-foreground whitespace-nowrap">{c.name}</div>
-                    </TableCell>
-                    <TableCell className="align-top max-w-md">
-                      {c.description ? (
-                        <p className="text-xs text-muted-foreground line-clamp-3" title={c.description}>
-                          {c.description}
-                        </p>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      {c.coverageType === "Mandatory" ? (
-                        <Badge className="text-[10px] bg-emerald-600 text-white hover:bg-emerald-600">Mandatory</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px]">Optional</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="text-sm whitespace-nowrap">{ratingTableLabel(c.ratingTableId)}</div>
-                    </TableCell>
-                    <TableCell className="align-top font-mono text-sm">
-                      {c.ratingTableMultiplier ?? 1}x
-                    </TableCell>
-                    <TableCell className="align-top text-sm whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+              {coverages.map((c) => {
+                const isExpanded = expandedIds.has(c.id);
+                const isFixed = c.isSumInsuredFixed ?? true;
+                const missingFixed = missingFixedSumInsuredCurrencies(c, supportedCurrencies);
+
+                return (
+                  <Fragment key={c.id}>
+                    <TableRow className="hover:bg-accent-soft/40">
+                      <TableCell className="align-top">
+                        <div className="font-medium text-foreground whitespace-nowrap">{c.name}</div>
+                      </TableCell>
+                      <TableCell className="align-top max-w-md">
+                        {c.description ? (
+                          <p className="text-xs text-muted-foreground line-clamp-3" title={c.description}>
+                            {c.description}
+                          </p>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        {c.coverageType === "Mandatory" ? (
+                          <Badge className="text-[10px] bg-emerald-600 text-white hover:bg-emerald-600">Mandatory</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">Optional</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="text-sm whitespace-nowrap">{ratingTableLabel(c.ratingTableId)}</div>
+                      </TableCell>
+                      <TableCell className="align-top font-mono text-sm">
+                        {c.ratingTableMultiplier ?? 1}x
+                      </TableCell>
+                      <TableCell className="align-top text-sm whitespace-nowrap">
+                      {(c.isSumInsuredFixed ?? true) ? (
                         <Switch
-                          checked={c.isSumInsuredFixed ?? true}
+                          checked
                           className="pointer-events-none data-[state=checked]:bg-emerald-600"
                           tabIndex={-1}
                           aria-readonly
                         />
-                        {!(c.isSumInsuredFixed ?? true) && (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {Math.round((c.sumInsuredPercentage ?? 1) * 100)}%
-                          </span>
-                        )}
-                      </div>
+                      ) : (
+                        <span className="font-mono text-sm ">
+                          {Math.round((c.sumInsuredPercentage ?? 1) * 100)}%
+                        </span>
+                      )}
                     </TableCell>
-                    {CHECKBOX_LIMIT_TYPES.map(({ type }) => (
-                      <TableCell key={type} className="align-top text-center">
-                        <Checkbox
-                          className="border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
-                          checked={isLimitSelected(c.id, type)}
-                          onCheckedChange={() => toggleLimit(c.id, type)}
-                        />
-                      </TableCell>
-                    ))}
-                    <TableCell className="align-top text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8"
-                          title="Edit coverage"
-                          onClick={() => {
-                            setEditCoverage(c);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8"
-                          title="Remove coverage"
-                          onClick={() => setDeleteId(c.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {CHECKBOX_LIMIT_TYPES.some(({ type }) => isLimitSelected(c.id, type)) && (
-                    <TableRow className="hover:bg-transparent bg-muted/20">
-                      <TableCell colSpan={COL_COUNT} className="p-4">
-                        <div
-                          className={`grid grid-cols-2 gap-3 ${
-                            (c.isSumInsuredFixed ?? true) ? "xl:grid-cols-4" : "xl:grid-cols-3"
-                          }`}
-                        >
-                          {ALL_LIMIT_TYPES.filter(({ type }) =>
-                            type === "fixedSumInsuredAmount"
-                              ? (c.isSumInsuredFixed ?? true)
-                              : isLimitSelected(c.id, type)
-                          ).map(({ type, label }) => (
-                            <LimitTypeTable
-                              key={type}
-                              productId={productId}
-                              coverage={c}
-                              type={type}
-                              label={label}
-                              currencies={supportedCurrencies}
+                      {CHECKBOX_LIMIT_TYPES.map(({ type }) => {
+                        const complete = hasAllCurrencyLimits(c, type, supportedCurrencies);
+                        const selected = isLimitSelected(c.id, type);
+                        return (
+                          <TableCell key={type} className="align-top text-center">
+                            <Checkbox
+                              className="border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
+                              checked={complete || selected}
+                              onCheckedChange={() => toggleLimit(c, type)}
+                              title={
+                                complete
+                                  ? "All currencies filled for this limit type"
+                                  : "Select to configure this limit type for all currencies"
+                              }
                             />
-                          ))}
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell className="align-top text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 px-2 text-xs gap-1"
+                            title={isExpanded ? "Hide currency limits" : "Show currency limits"}
+                            onClick={() => toggleExpanded(c.id)}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                            {isExpanded ? "Hide limits" : "Show limits"}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Edit coverage"
+                            onClick={() => {
+                              setEditCoverage(c);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Remove coverage"
+                            onClick={() => setDeleteId(c.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  )}
-                </Fragment>
-              ))}
+                    {isExpanded && (
+                      <TableRow className="hover:bg-transparent bg-muted/20">
+                        <TableCell colSpan={COL_COUNT} className="p-4">
+                          {(() => {
+                            const displayTypes = ALL_LIMIT_TYPES.filter(({ type }) =>
+                              type === "fixedSumInsuredAmount"
+                                ? isFixed
+                                : isLimitSelected(c.id, type) ||
+                                  hasAllCurrencyLimits(c, type, supportedCurrencies)
+                            );
+
+                            if (displayTypes.length === 0) {
+                              return (
+                                <p className="text-sm text-muted-foreground">
+                                  Check Min premium, Yearly limit, or Aggregate limit to configure
+                                  currency limits for this coverage.
+                                </p>
+                              );
+                            }
+
+                            const colClass =
+                              displayTypes.length >= 4
+                                ? "xl:grid-cols-4"
+                                : displayTypes.length === 3
+                                  ? "xl:grid-cols-3"
+                                  : displayTypes.length === 2
+                                    ? "xl:grid-cols-2"
+                                    : "xl:grid-cols-1";
+
+                            return (
+                              <>
+                                {isFixed && missingFixed.length > 0 && (
+                                  <p className="text-xs text-amber-700 mb-3">
+                                    Fixed sum insured amount is required for every supported currency
+                                    (missing: {missingFixed.join(", ")}).
+                                  </p>
+                                )}
+                                <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${colClass}`}>
+                                  {displayTypes.map(({ type, label }) => (
+                                    <LimitTypeTable
+                                      key={type}
+                                      productId={productId}
+                                      coverage={c}
+                                      type={type}
+                                      label={label}
+                                      currencies={supportedCurrencies}
+                                      required={type === "fixedSumInsuredAmount"}
+                                    />
+                                  ))}
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
             </TableBody>
           </Table>
         )}

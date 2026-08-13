@@ -337,6 +337,11 @@ const CoverageDialog = ({
                 onCheckedChange={(v) => setForm((s) => ({ ...s, isSumInsuredFixed: v }))}
               />
             </label>
+            {form.isSumInsuredFixed && (
+              <p className="text-xs text-muted-foreground">
+                After saving, you must set a Fixed sum insured amount for every supported currency.
+              </p>
+            )}
           </div>
 
           {!form.isSumInsuredFixed && (

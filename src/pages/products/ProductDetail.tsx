@@ -25,12 +25,14 @@ import { useListDocuments } from "@/api/documents";
 import { useListBankAccounts } from "@/api/bank-accounts";
 import { useSumInsuredBasisEnum } from "@/api/smart-enums";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
-import { Save } from "lucide-react";
+import { Save, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import CoveragesTab from "./CoveragesTab";
 import DocumentsTab from "./DocumentsTab";
 import CurrenciesTab from "./CurrenciesTab";
 import { getCurrencies } from "@/config/currencies";
+import { useListCoverages } from "@/api/coverages";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const ISSUANCE_MODE_OPTIONS = [
   { value: "annualRenewable", label: "Annual renewable" },
@@ -64,11 +66,43 @@ const ProductDetail = () => {
   const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
   const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
   const { data: sumInsuredBasisOptions = [] } = useSumInsuredBasisEnum();
+  const { data: coveragesCatalog } = useListCoverages({ pageNumber: 1, pageSize: 200 });
 
   const product = useMemo(
     () => (apiProduct ? mapApiProduct(apiProduct) : undefined),
     [apiProduct]
   );
+
+  const coverageNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        (coveragesCatalog?.items ?? []).map((c) => [c.id ?? "", c.name?.trim() || c.id || "—"])
+      ),
+    [coveragesCatalog?.items]
+  );
+
+  /** Coverages with isSumInsuredFixed that are missing fixedSumInsuredAmount for any supported currency. */
+  const incompleteFixedSumInsured = useMemo(() => {
+    const currencies = apiProduct?.supportedCurrencies ?? [];
+    if (currencies.length === 0) return [];
+    return (apiProduct?.coverages ?? [])
+      .filter((c) => c.isSumInsuredFixed)
+      .map((c) => {
+        const have = new Set(
+          (c.currencyLimits ?? [])
+            .filter((l) => l.type === "fixedSumInsuredAmount" && l.currency)
+            .map((l) => l.currency as string)
+        );
+        const missing = currencies.filter((cur) => !have.has(cur));
+        return {
+          entryId: c.id,
+          coverageId: c.coverageId ?? "",
+          name: coverageNameById[c.coverageId ?? ""] || c.coverageId || `Coverage #${c.id}`,
+          missing,
+        };
+      })
+      .filter((c) => c.missing.length > 0);
+  }, [apiProduct?.coverages, apiProduct?.supportedCurrencies, coverageNameById]);
 
   const templateDocuments = documentsPage?.items ?? [];
   const bankAccounts = bankAccountsPage?.items ?? [];
@@ -448,6 +482,37 @@ const ProductDetail = () => {
                   placeholder="e.g. 30"
                 />
               </div>
+              {incompleteFixedSumInsured.length > 0 && (
+                <div className="md:col-span-2">
+                  <Alert className="border-amber-400/70 bg-amber-50 text-amber-950 [&>svg]:text-amber-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Missing fixed sum insured amounts</AlertTitle>
+                    <AlertDescription>
+                      <p className="mb-2">
+                        Coverages with sum insured fixed require a{" "}
+                        <span className="font-medium">fixedSumInsuredAmount</span> currency limit for every
+                        supported currency.
+                      </p>
+                      <ul className="list-disc pl-4 space-y-1 mb-3 text-xs">
+                        {incompleteFixedSumInsured.map((c) => (
+                          <li key={String(c.entryId)}>
+                            <span className="font-medium">{c.name}</span>
+                            {" — missing: "}
+                            {c.missing.join(", ")}
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-amber-800 underline underline-offset-2 hover:text-amber-950"
+                        onClick={() => setActiveTab("coverages")}
+                      >
+                        Go to Coverages tab to fill the limits
+                      </button>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
               <div className="space-y-2 md:col-span-2">
                 <Label>Payment method</Label>
                 <BankAccountCombobox
