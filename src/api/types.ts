@@ -880,3 +880,27 @@ export type PaginationPagedListOfRiskListEntryResponse = {
 };
 
 export type RiskListsListRiskListEntriesRequest = PaginationPagedRequest & Record<string, unknown>;
+
+export type CurrencyRatesCurrencyRateResponse = {
+  id?: string;
+  currency?: string;
+  rateToAll?: number;
+  publishedAtUtc?: string;
+  fetchedAtUtc?: string;
+};
+
+export type PaginationPagedListOfCurrencyRateResponse = {
+  items?: CurrencyRatesCurrencyRateResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type CurrencyRatesListCurrencyRatesRequest = PaginationPagedRequest & {
+  latestOnly?: boolean;
+  currency?: string;
+};

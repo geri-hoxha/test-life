@@ -13,6 +13,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import QuickActions from "./QuickActions";
 import { Link, useLocation } from "react-router-dom";
+import { format, parseISO } from "date-fns";
+import { useListCurrencyRates } from "@/api/currency-rates";
 
 const navItems = [
   { label: "Dashboard", to: "/" },
@@ -32,8 +34,47 @@ const navItems = [
   // { label: "Administration", to: "/administration" },
 ];
 
+const formatRate = (rate: number) =>
+  rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+const buildFxLabel = (
+  items: { currency?: string; rateToAll?: number }[] | undefined,
+): string => {
+  const byCurrency = Object.fromEntries(
+    (items ?? [])
+      .filter((r) => r.currency && typeof r.rateToAll === "number")
+      .map((r) => [r.currency!.toUpperCase(), r.rateToAll as number]),
+  );
+  const parts: string[] = [];
+  if (byCurrency.EUR != null) parts.push(`EUR ${formatRate(byCurrency.EUR)}`);
+  if (byCurrency.USD != null) parts.push(`USD ${formatRate(byCurrency.USD)}`);
+  if (parts.length === 0) {
+    for (const [currency, rate] of Object.entries(byCurrency).sort(([a], [b]) => a.localeCompare(b))) {
+      parts.push(`${currency} ${formatRate(rate)}`);
+    }
+  }
+  return parts.length > 0 ? `FX rate: ${parts.join(" · ")}` : "FX rate: —";
+};
+
+const formatFetchedAt = (fetchedAtUtc?: string): string => {
+  if (!fetchedAtUtc) return "Fetched: —";
+  try {
+    return `Fetched: ${format(parseISO(fetchedAtUtc), "MMM d, yyyy HH:mm")}`;
+  } catch {
+    return "Fetched: —";
+  }
+};
+
 const TopBar = () => {
   const location = useLocation();
+  const { data: currencyRates } = useListCurrencyRates({
+    latestOnly: true,
+    pageNumber: 1,
+    pageSize: 20,
+  });
+  const fxLabel = buildFxLabel(currencyRates?.items);
+  const fetchedLabel = formatFetchedAt(currencyRates?.items?.find((r) => r.fetchedAtUtc)?.fetchedAtUtc);
+
   return (
     <header className="bg-gradient-topbar text-topbar-foreground border-b border-topbar-border sticky top-0 z-40 shadow-elevated">
       <div className="container flex items-center gap-4 h-16">
@@ -123,11 +164,15 @@ const TopBar = () => {
             );
           })}
           <div className="ml-auto hidden lg:flex items-center gap-2 text-[11px] text-topbar-muted">
-            <Badge variant="outline" className="border-topbar-border text-topbar-muted bg-topbar-hover/40 font-normal">
-              FX rate: EUR/USD 1.0842
+            <Badge
+              variant="outline"
+              className="border-topbar-border text-topbar-muted bg-topbar-hover/40 font-normal"
+              title="Latest rates to ALL"
+            >
+              {fxLabel}
             </Badge>
             <span>·</span>
-            <span>Period: April 2026</span>
+            <span title="Currency rates fetchedAtUtc">{fetchedLabel}</span>
           </div>
         </div>
       </nav>
