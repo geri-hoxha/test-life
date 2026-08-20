@@ -1,4 +1,4 @@
-import { useMemo, useState, Fragment } from "react";
+import { useEffect, useMemo, useState, Fragment } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,7 @@ import {
   Download,
   Calculator,
   Loader2,
+  Eye,
 } from "lucide-react";
 import { getOffer, statusColor } from "@/data/offers";
 import { ageFromDob } from "@/data/customers";
@@ -77,7 +78,7 @@ import {
   overallStatus,
 } from "./VerificationStep";
 import { toast } from "sonner";
-import { toastApiError } from "@/lib/api-error";
+import { toastApiError, getApiErrorMessage } from "@/lib/api-error";
 import {
   useGetOffer,
   useCancelOffer,
@@ -104,6 +105,8 @@ import {
   buildCreateDocumentFormData,
   createDocument,
   downloadDocumentFile,
+  getDocument,
+  getDocumentFile,
   useGetDocument,
 } from "@/api/documents";
 import { useGetBankAccount } from "@/api/bank-accounts";
@@ -178,6 +181,54 @@ type ScheduleDocAction = {
   label: string;
 };
 
+type DocFilePreview = {
+  documentId: string;
+  label: string;
+  fileName?: string;
+  url: string | null;
+  mimeType: string;
+  loading: boolean;
+  error: string | null;
+};
+
+const DocumentFilePreviewBody = ({
+  url,
+  mimeType,
+  fileName,
+}: {
+  url: string;
+  mimeType: string;
+  fileName?: string;
+}) => {
+  const mime = mimeType.toLowerCase();
+  const isImage =
+    mime.startsWith("image/") ||
+    /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(fileName ?? "");
+  const isPdf = mime === "application/pdf" || /\.pdf$/i.test(fileName ?? "");
+  const isText = mime.startsWith("text/") || /\.txt$/i.test(fileName ?? "");
+
+  if (isImage) {
+    return (
+      <div className="flex h-full items-center justify-center overflow-auto p-4">
+        <img src={url} alt={fileName ?? "Document preview"} className="max-h-full max-w-full object-contain" />
+      </div>
+    );
+  }
+
+  if (isPdf || isText) {
+    return <iframe src={url} title={fileName ?? "Document preview"} className="h-full w-full border-0 bg-background" />;
+  }
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+      <FileText className="h-10 w-10 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">
+        Preview is not available for this file type. Download the document to view it.
+      </p>
+    </div>
+  );
+};
+
 const ScheduleExpandedPanel = ({
   offerId,
   year,
@@ -212,6 +263,11 @@ const ScheduleExpandedPanel = ({
     offerId,
     String(year)
   );
+  const [fileBusy, setFileBusy] = useState<{
+    id: string;
+    action: "preview" | "download";
+  } | null>(null);
+  const [preview, setPreview] = useState<DocFilePreview | null>(null);
 
   const documents = useMemo(
     () =>
@@ -230,7 +286,75 @@ const ScheduleExpandedPanel = ({
     [reviewFlags]
   );
 
+  useEffect(() => {
+    return () => {
+      if (preview?.url) URL.revokeObjectURL(preview.url);
+    };
+  }, [preview?.url]);
+
+  const closePreview = () => {
+    setPreview(null);
+  };
+
+  const handlePreviewDocument = async (documentId: string, label: string) => {
+    setFileBusy({ id: documentId, action: "preview" });
+    setPreview({
+      documentId,
+      label,
+      fileName: undefined,
+      url: null,
+      mimeType: "",
+      loading: true,
+      error: null,
+    });
+    try {
+      const [meta, blob] = await Promise.all([
+        getDocument(documentId),
+        getDocumentFile(documentId),
+      ]);
+      const url = URL.createObjectURL(blob);
+      setPreview({
+        documentId,
+        label,
+        fileName: meta.originalFileName ?? meta.storedFileName ?? label,
+        url,
+        mimeType: blob.type || meta.mimeType || "",
+        loading: false,
+        error: null,
+      });
+    } catch (err) {
+      toastApiError(err, "Failed to preview document");
+      setPreview({
+        documentId,
+        label,
+        fileName: label,
+        url: null,
+        mimeType: "",
+        loading: false,
+        error: getApiErrorMessage(err, "Failed to preview document"),
+      });
+    } finally {
+      setFileBusy(null);
+    }
+  };
+
+  const handleDownloadDocument = async (documentId: string, label: string) => {
+    setFileBusy({ id: documentId, action: "download" });
+    try {
+      const meta = await getDocument(documentId);
+      await downloadDocumentFile(
+        documentId,
+        meta.originalFileName ?? meta.storedFileName ?? label
+      );
+    } catch (err) {
+      toastApiError(err, "Failed to download document");
+    } finally {
+      setFileBusy(null);
+    }
+  };
+
   return (
+    <>
     <div className="grid gap-0 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x border-t bg-muted/20">
       <div className="p-4 space-y-3 min-w-0">
         <div className="flex items-center gap-2">
@@ -256,6 +380,11 @@ const ScheduleExpandedPanel = ({
                 documentTypeNameById[d.documentTypeId] ?? d.documentTypeId;
               const canSubmit = d.status === "required" || d.status === "refused";
               const canReview = d.status === "submitted";
+              const hasFile = Boolean(d.documentId);
+              const previewBusy =
+                fileBusy?.id === d.documentId && fileBusy.action === "preview";
+              const downloadBusy =
+                fileBusy?.id === d.documentId && fileBusy.action === "download";
               return (
                 <Card
                   key={d.id || `${d.documentTypeId}-${d.documentId}`}
@@ -287,6 +416,48 @@ const ScheduleExpandedPanel = ({
                       </p>
                     ) : null}
                     <div className="flex flex-wrap items-center gap-1.5">
+                      {hasFile ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            title="Preview document"
+                            disabled={Boolean(fileBusy)}
+                            onClick={() =>
+                              d.documentId &&
+                              void handlePreviewDocument(d.documentId, label)
+                            }
+                          >
+                            {previewBusy ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">Preview</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            title="Download document"
+                            disabled={Boolean(fileBusy)}
+                            onClick={() =>
+                              d.documentId &&
+                              void handleDownloadDocument(d.documentId, label)
+                            }
+                          >
+                            {downloadBusy ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">Download</span>
+                          </Button>
+                        </>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="outline"
@@ -356,6 +527,62 @@ const ScheduleExpandedPanel = ({
         </div>
       </div>
     </div>
+
+    <Dialog
+      open={Boolean(preview)}
+      onOpenChange={(open) => {
+        if (!open) closePreview();
+      }}
+    >
+      <DialogContent className="flex max-h-[90vh] w-[92vw] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="space-y-1 border-b px-6 py-4 pr-12 text-left">
+          <DialogTitle>{preview?.label ?? "Document preview"}</DialogTitle>
+          <DialogDescription>
+            {preview?.fileName ?? "Loading document…"}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-[60vh] flex-1 bg-muted/30">
+          {preview?.loading ? (
+            <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              Loading preview…
+            </div>
+          ) : preview?.error ? (
+            <div className="flex h-full min-h-[60vh] items-center justify-center p-6 text-center text-sm text-destructive">
+              {preview.error}
+            </div>
+          ) : preview?.url ? (
+            <div className="h-[60vh]">
+              <DocumentFilePreviewBody
+                url={preview.url}
+                mimeType={preview.mimeType}
+                fileName={preview.fileName}
+              />
+            </div>
+          ) : null}
+        </div>
+        <DialogFooter className="border-t px-6 py-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-1.5"
+            disabled={!preview?.documentId || preview.loading}
+            onClick={() =>
+              preview?.documentId &&
+              void handleDownloadDocument(preview.documentId, preview.label)
+            }
+          >
+            {fileBusy?.action === "download" && fileBusy.id === preview?.documentId ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Download
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
