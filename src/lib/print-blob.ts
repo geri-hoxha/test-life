@@ -62,7 +62,7 @@ const sniffMagicMime = async (blob: Blob): Promise<string | undefined> => {
   return "text/html";
 };
 
-const printHtml = (title: string, body: string) =>
+const printShell = (title: string, body: string) =>
   `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title>
 <style>
   html, body { margin: 0; height: 100%; background: #fff; }
@@ -71,7 +71,7 @@ const printHtml = (title: string, body: string) =>
   pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.4 ui-monospace, monospace; padding: 16px; }
 </style></head><body>${body}</body></html>`;
 
-/** Templates ship with jQuery/Bootstrap. In srcdoc those relative scripts resolve to the SPA HTML. */
+/** Templates ship with jQuery/Bootstrap. Relative scripts resolve to the SPA HTML in this app. */
 const prepareHtmlForPrint = (html: string, assetBaseUrl?: string) => {
   let out = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
@@ -88,14 +88,83 @@ const prepareHtmlForPrint = (html: string, assetBaseUrl?: string) => {
   return out;
 };
 
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+const waitForPrintableWindow = async (win: Window) => {
+  const doc = win.document;
+  if (doc.readyState !== "complete") {
+    await new Promise<void>((resolve) => {
+      win.addEventListener("load", () => resolve(), { once: true });
+      window.setTimeout(() => resolve(), 1500);
+    });
+  }
+  const images = Array.from(doc.images);
+  if (images.length) {
+    await Promise.all(
+      images.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+              window.setTimeout(() => resolve(), 2000);
+            }),
+      ),
+    );
+  }
+  await wait(50);
+};
+
+const triggerWindowPrint = (win: Window, onDone?: () => void) => {
+  const finish = () => {
+    onDone?.();
+  };
+  try {
+    win.addEventListener("afterprint", () => {
+      finish();
+      try {
+        win.close();
+      } catch {
+        /* ignore */
+      }
+    }, { once: true });
+    win.focus();
+    win.print();
+    window.setTimeout(finish, 60_000);
+  } catch {
+    finish();
+  }
+};
+
+/** Must run in the click handler (before any await) so the browser allows the print popup. */
+export const openPrintTargetWindow = () => {
+  const win = window.open("about:blank", "_blank");
+  if (!win) return null;
+  try {
+    win.document.open();
+    win.document.write(
+      "<!doctype html><title>Printing…</title><body style=\"font:14px sans-serif;padding:24px;color:#444\">Preparing print preview…</body>",
+    );
+    win.document.close();
+  } catch {
+    /* ignore — window may still be usable */
+  }
+  return win;
+};
+
+const writeHtmlToWindow = (win: Window, html: string) => {
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+};
+
 /**
- * Open the browser print dialog without triggering a file download.
- * Never navigates the iframe to a raw blob URL — that makes Chrome download
- * octet-stream / Office files (and some PDFs).
+ * Open the browser print dialog for a file blob (PDF, image, HTML, etc.).
+ * Pass `targetWindow` from `openPrintTargetWindow()` called synchronously on click.
  */
 export const openBlobPrintDialog = async (
   blob: Blob,
-  options?: { fileName?: string; mimeType?: string; assetBaseUrl?: string },
+  options?: { fileName?: string; mimeType?: string; assetBaseUrl?: string; targetWindow?: Window | null },
 ) => {
   const title = options?.fileName?.trim() || "Document";
   const mime =
@@ -108,42 +177,55 @@ export const openBlobPrintDialog = async (
   const isHtml = mime === "text/html" || mime === "application/xhtml+xml";
   const isText = mime.startsWith("text/") && !isHtml;
 
+  let html: string;
   let objectUrl: string | undefined;
-  let srcdoc: string;
+
   if (isImage) {
     objectUrl = URL.createObjectURL(typed);
-    srcdoc = printHtml(title, `<img src="${escapeHtml(objectUrl)}" alt="${escapeHtml(title)}" />`);
+    html = printShell(title, `<img src="${escapeHtml(objectUrl)}" alt="${escapeHtml(title)}" />`);
   } else if (isPdf) {
     objectUrl = URL.createObjectURL(typed);
-    srcdoc = printHtml(
+    html = printShell(
       title,
       `<embed src="${escapeHtml(objectUrl)}" type="application/pdf" />`,
     );
   } else if (isText) {
-    const text = await typed.text();
-    srcdoc = printHtml(title, `<pre>${escapeHtml(text)}</pre>`);
+    html = printShell(title, `<pre>${escapeHtml(await typed.text())}</pre>`);
   } else if (isHtml) {
-    srcdoc = prepareHtmlForPrint(await typed.text(), options?.assetBaseUrl);
+    html = prepareHtmlForPrint(await typed.text(), options?.assetBaseUrl);
   } else {
-    // Never navigate to / embed this blob — the browser would download it.
-    srcdoc = printHtml(
+    html = printShell(
       title,
       `<pre>${escapeHtml(title)}\n\nThis file type cannot be shown in the print preview. Use Download to save it.</pre>`,
     );
   }
 
+  const target = options?.targetWindow && !options.targetWindow.closed ? options.targetWindow : null;
+  const cleanupUrl = () => {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  };
+
+  if (target) {
+    writeHtmlToWindow(target, html);
+    await waitForPrintableWindow(target);
+    triggerWindowPrint(target, cleanupUrl);
+    return;
+  }
+
   const iframe = document.createElement("iframe");
   iframe.setAttribute("title", title);
   iframe.style.position = "fixed";
-  iframe.style.top = "0";
-  iframe.style.left = "-12000px";
-  iframe.style.width = "1024px";
-  iframe.style.height = "1400px";
+  iframe.style.inset = "0";
+  iframe.style.width = "100%";
+  iframe.style.height = "100%";
   iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.style.zIndex = "-1";
 
   const cleanup = () => {
     iframe.remove();
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    cleanupUrl();
   };
 
   let printed = false;
@@ -159,7 +241,7 @@ export const openBlobPrintDialog = async (
   };
 
   iframe.addEventListener("load", triggerPrint, { once: true });
-  iframe.srcdoc = srcdoc;
+  iframe.srcdoc = html;
   document.body.appendChild(iframe);
-  window.setTimeout(triggerPrint, isHtml ? 800 : 1200);
+  window.setTimeout(triggerPrint, 800);
 };

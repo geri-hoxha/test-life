@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
-import { openBlobPrintDialog } from "@/lib/print-blob";
+import { openBlobPrintDialog, openPrintTargetWindow } from "@/lib/print-blob";
 import type {
   PaginationPagedListOfPolicyResponse,
   PoliciesPolicyResponse,
@@ -71,12 +71,16 @@ export const getPolicyPrint = async (id: string, signal?: AbortSignal): Promise<
     signal,
   });
 
+/** Open a blank print tab. Call this in the click handler before any await. */
+export const openPolicyPrintWindow = () => openPrintTargetWindow();
+
 /** Open print dialog for POST /api/policies/{id}/print */
-export const openPolicyPrint = async (id: string) => {
+export const openPolicyPrint = async (id: string, targetWindow?: Window | null) => {
   const blob = await getPolicyPrint(id);
   const mime = (blob.type || "").toLowerCase().split(";")[0].trim();
   await openBlobPrintDialog(blob, {
     fileName: mime.includes("html") ? "policy.html" : "policy.pdf",
     mimeType: mime || undefined,
+    targetWindow,
   });
 };

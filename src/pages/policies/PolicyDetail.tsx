@@ -40,7 +40,7 @@ import {
   policyPlanTypeLabel,
 } from "@/data/policy-plan-types";
 import { ageFromDob } from "@/data/customers";
-import { openPolicyPrint, useGetPolicy } from "@/api/policies";
+import { openPolicyPrint, openPolicyPrintWindow, useGetPolicy } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
 import { useGetProduct, mapApiProduct } from "@/api/products";
 import { customerPath, countryDisplayName } from "@/api/adapters/customers";
@@ -207,19 +207,27 @@ const PolicyDetail = () => {
     void openPreview(documentId, label);
   };
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (!policy.id) {
       toast.error("Policy id is missing");
       return;
     }
-    try {
-      setPrinting(true);
-      await openPolicyPrint(policy.id);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to print policy");
-    } finally {
-      setPrinting(false);
+    const printWindow = openPolicyPrintWindow();
+    if (!printWindow) {
+      toast.error("Pop-up blocked. Allow pop-ups to print the policy.");
+      return;
     }
+    void (async () => {
+      try {
+        setPrinting(true);
+        await openPolicyPrint(policy.id, printWindow);
+      } catch (err) {
+        printWindow.close();
+        toast.error(err instanceof Error ? err.message : "Failed to print policy");
+      } finally {
+        setPrinting(false);
+      }
+    })();
   };
 
   return (
@@ -261,7 +269,7 @@ const PolicyDetail = () => {
           <Button
             size="sm"
             className="gap-2"
-            onClick={() => void handlePrint()}
+            onClick={handlePrint}
             disabled={printing}
           >
             <Printer className="h-4 w-4" />
