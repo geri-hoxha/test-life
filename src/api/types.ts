@@ -209,8 +209,6 @@ export type ProductsCreateProductRequest = {
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
   policyPlanType?: ProductsPolicyPlanType | null;
-  issuanceMode?: ProductsIssuanceMode | null;
-  calculationMethod?: ProductsCalculationMethod | null;
   maxCoveredYears?: number | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;
@@ -248,8 +246,6 @@ export type ProductsUpdateProductRequest = {
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
   policyPlanType?: ProductsPolicyPlanType | null;
-  issuanceMode?: ProductsIssuanceMode | null;
-  calculationMethod?: ProductsCalculationMethod | null;
   maxCoveredYears?: number | null;
   /** Not yet accepted by API — will be added later. */
   code?: string;

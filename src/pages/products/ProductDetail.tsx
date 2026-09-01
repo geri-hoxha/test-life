@@ -19,11 +19,7 @@ import {
   useAddProductPaymentMethod,
   useRemoveProductPaymentMethod,
 } from "@/api/products";
-import type {
-  ProductsCalculationMethod,
-  ProductsIssuanceMode,
-  ProductsPolicyPlanType,
-} from "@/api/types";
+import type { ProductsPolicyPlanType } from "@/api/types";
 import { useListProductGroups } from "@/api/product-groups";
 import { useListDocuments } from "@/api/documents";
 import { useListBankAccounts } from "@/api/bank-accounts";
@@ -42,24 +38,12 @@ import { getCurrencies } from "@/config/currencies";
 import { useListCoverages } from "@/api/coverages";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-const ISSUANCE_MODE_OPTIONS = [
-  { value: "annualRenewable", label: "Annual renewable" },
-  { value: "wholeOfTerm", label: "Whole of term" },
-] as const;
-
-const CALCULATION_METHOD_OPTIONS = [
-  { value: "declining", label: "Declining" },
-  { value: "leveled", label: "Leveled" },
-] as const;
-
 type EditableFields = {
   name: string;
   coverageText: string;
   currencies: string[];
   defaultPrintableTemplateDocumentId: string;
   policyPlanType: ProductsPolicyPlanType | "";
-  issuanceMode: ProductsIssuanceMode | "";
-  calculationMethod: ProductsCalculationMethod | "";
   maxCoveredYears: string;
   bankAccountIds: string[];
 };
@@ -150,8 +134,6 @@ const ProductDetail = () => {
       currencies: [...product.currencies],
       defaultPrintableTemplateDocumentId: product.defaultPrintableTemplateDocumentId ?? "",
       policyPlanType: product.policyPlanType ?? "",
-      issuanceMode: (product.issuanceMode as ProductsIssuanceMode | null) ?? "",
-      calculationMethod: (product.calculationMethod as ProductsCalculationMethod | null) ?? "",
       maxCoveredYears:
         product.maxCoveredYears != null && product.maxCoveredYears !== undefined
           ? String(product.maxCoveredYears)
@@ -198,8 +180,6 @@ const ProductDetail = () => {
     JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
     fields.defaultPrintableTemplateDocumentId !== (product.defaultPrintableTemplateDocumentId ?? "") ||
     fields.policyPlanType !== (product.policyPlanType ?? "") ||
-    fields.issuanceMode !== (product.issuanceMode ?? "") ||
-    fields.calculationMethod !== (product.calculationMethod ?? "") ||
     fields.maxCoveredYears !==
       (product.maxCoveredYears != null && product.maxCoveredYears !== undefined
         ? String(product.maxCoveredYears)
@@ -233,8 +213,6 @@ const ProductDetail = () => {
           coverageText: fields.coverageText.trim() || undefined,
           defaultPrintableTemplateDocumentId: fields.defaultPrintableTemplateDocumentId || null,
           policyPlanType: fields.policyPlanType || null,
-          issuanceMode: fields.issuanceMode || null,
-          calculationMethod: fields.calculationMethod || null,
           maxCoveredYears: fields.maxCoveredYears === "" ? null : Number(fields.maxCoveredYears),
         },
       });
@@ -387,7 +365,7 @@ const ProductDetail = () => {
                   placeholder="Printable coverage text for this product"
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
                 <Label>Default printable template</Label>
                 <Select
                   value={fields.defaultPrintableTemplateDocumentId || "none"}
@@ -407,6 +385,19 @@ const ProductDetail = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+                      <div className="space-y-2">
+                <Label htmlFor="p-max-covered-years">Max covered years</Label>
+                <Input
+                  id="p-max-covered-years"
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="font-mono"
+                  value={fields.maxCoveredYears}
+                  onChange={(e) => setFields({ ...fields, maxCoveredYears: e.target.value })}
+                  placeholder="e.g. 30"
+                />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <div className="flex items-center gap-2">
@@ -451,67 +442,7 @@ const ProductDetail = () => {
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Issuance mode</Label>
-                <Select
-                  value={fields.issuanceMode || "none"}
-                  onValueChange={(v) =>
-                    setFields({
-                      ...fields,
-                      issuanceMode: v === "none" ? "" : (v as ProductsIssuanceMode),
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select issuance mode…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {ISSUANCE_MODE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Calculation method</Label>
-                <Select
-                  value={fields.calculationMethod || "none"}
-                  onValueChange={(v) =>
-                    setFields({
-                      ...fields,
-                      calculationMethod: v === "none" ? "" : (v as ProductsCalculationMethod),
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select calculation method…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {CALCULATION_METHOD_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="p-max-covered-years">Max covered years</Label>
-                <Input
-                  id="p-max-covered-years"
-                  type="number"
-                  min={0}
-                  step={1}
-                  className="font-mono"
-                  value={fields.maxCoveredYears}
-                  onChange={(e) => setFields({ ...fields, maxCoveredYears: e.target.value })}
-                  placeholder="e.g. 30"
-                />
-              </div>
+      
               {incompleteFixedSumInsured.length > 0 && (
                 <div className="md:col-span-2">
                   <Alert className="border-amber-400/70 bg-amber-50 text-amber-950 [&>svg]:text-amber-600">
