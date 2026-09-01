@@ -29,5 +29,5 @@ export const useSmartEnum = (name: string, options?: { enabled?: boolean }) =>
 export const useCountryEnum = (options?: { enabled?: boolean }) =>
   useSmartEnum("Country", options);
 
-export const useSumInsuredBasisEnum = (options?: { enabled?: boolean }) =>
-  useSmartEnum("SumInsuredBasis", options);
+export const usePolicyPlanTypeEnum = (options?: { enabled?: boolean }) =>
+  useSmartEnum("PolicyPlanType", options);

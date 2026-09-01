@@ -67,7 +67,7 @@ import {
   useAddOfferParticipant,
   useAddOfferInsuredPerson,
   useAddOfferLoanDisbursement,
-  useCalculateOfferSchedules,
+  useCalculateOfferYears,
   useCalculateOffersPremium,
 } from "@/api/offers";
 import type { OffersCalculatePremiumRequest } from "@/api/types";
@@ -248,7 +248,7 @@ const CreateOffer = () => {
   const addParticipant = useAddOfferParticipant();
   const addInsured = useAddOfferInsuredPerson();
   const addLoan = useAddOfferLoanDisbursement();
-  const calculateSchedules = useCalculateOfferSchedules();
+  const calculateSchedules = useCalculateOfferYears();
 
   // Step 1
   const [productGroupId, setProductGroupId] = useState("");
@@ -542,7 +542,7 @@ const CreateOffer = () => {
       if (row.year != null) {
         map.set(row.year, {
           insuredAmount: row.insuredAmount,
-          premium: row.premium,
+          premium: row.payPremium,
         });
       }
     }
@@ -553,7 +553,7 @@ const CreateOffer = () => {
     const rows = manualPremiumPreview ?? [];
     return {
       insuredAmount: rows.reduce((sum, r) => sum + r.insuredAmount, 0),
-      premium: rows.reduce((sum, r) => sum + r.premium, 0),
+      premium: rows.reduce((sum, r) => sum + r.payPremium, 0),
     };
   }, [manualPremiumPreview]);
 
@@ -1275,7 +1275,7 @@ const CreateOffer = () => {
                           Insured Amount
                         </TableHead>
                         <TableHead className="h-8 px-2 text-xs text-right">
-                          Premium
+                          Pay Premium
                         </TableHead>
                         <TableHead className="h-8 w-8 px-1" />
                       </TableRow>
@@ -1430,7 +1430,7 @@ const CreateOffer = () => {
                       </div>
                       <div>
                         <span className="text-muted-foreground">
-                          Total premium:{" "}
+                          Total pay premium:{" "}
                         </span>
                         <span className="font-mono font-semibold text-primary">
                           {fmtMoney(

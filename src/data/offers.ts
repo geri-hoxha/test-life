@@ -47,7 +47,7 @@ export type OfferInsuredPerson = {
   gender?: string;
 };
 
-export type OfferScheduleCoverage = {
+export type OfferYearCoverage = {
   id: string;
   coverageId: string;
   sumInsured: number;
@@ -61,7 +61,7 @@ export type OfferScheduleCoverage = {
   calculatedPremium: number;
 };
 
-export type OfferScheduleDocument = {
+export type OfferYearDocument = {
   id: string;
   documentId?: string | null;
   documentTypeId: string;
@@ -69,14 +69,14 @@ export type OfferScheduleDocument = {
   refusalReason?: string | null;
 };
 
-export type OfferScheduleDiscountRequest = {
+export type OfferYearDiscountRequest = {
   id: string;
   requestedDiscountPercentage: number;
   reason: string;
   status: "requested" | "approved" | "rejected";
 };
 
-export type OfferScheduleReviewFlag = {
+export type OfferYearReviewFlag = {
   id: string;
   type: string;
   reason: string;
@@ -85,19 +85,22 @@ export type OfferScheduleReviewFlag = {
   resolvedOnUtc?: string | null;
 };
 
-export type OfferSchedule = {
+export type OfferYear = {
   id: string;
   year: number;
   startDate: string;
   endDate: string;
   insuredAmount: number;
+  /** Actuarially-calculated premium. */
   premium: number;
+  /** Amount actually billed — differs from `premium` only on PPFM/PPFV plans. */
+  payPremium: number;
   internalStatus?: string;
   policyId?: string | null;
-  coverages: OfferScheduleCoverage[];
-  documents: OfferScheduleDocument[];
-  discountRequests: OfferScheduleDiscountRequest[];
-  reviewFlags: OfferScheduleReviewFlag[];
+  coverages: OfferYearCoverage[];
+  documents: OfferYearDocument[];
+  discountRequests: OfferYearDiscountRequest[];
+  reviewFlags: OfferYearReviewFlag[];
 };
 
 export type OfferLoanDisbursement = {
@@ -136,7 +139,7 @@ export type Offer = {
     outstandingBalance: number;
   };
   loanDisbursements: OfferLoanDisbursement[];
-  schedules: OfferSchedule[];
+  offerYears: OfferYear[];
   premium: number;
   status: OfferStatus;
   createdDate: string;
@@ -146,7 +149,7 @@ const emptyApiCollections = {
   participants: [] as OfferParticipant[],
   insuredPersons: [] as OfferInsuredPerson[],
   loanDisbursements: [] as OfferLoanDisbursement[],
-  schedules: [] as OfferSchedule[],
+  offerYears: [] as OfferYear[],
 };
 
 const seed: Offer[] = [

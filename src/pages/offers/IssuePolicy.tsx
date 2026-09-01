@@ -112,7 +112,7 @@ const IssuePolicy = () => {
   }, [apiOffer, offerId]);
 
   const scheduleYear = String(
-    apiOffer?.schedules?.[0]?.year ??
+    apiOffer?.offerYears?.[0]?.year ??
       (offer?.startDate ? Number(offer.startDate.slice(0, 4)) : new Date().getFullYear())
   );
 

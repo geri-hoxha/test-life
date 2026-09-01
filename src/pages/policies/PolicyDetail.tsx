@@ -33,6 +33,10 @@ import {
   Users,
 } from "lucide-react";
 import { getPolicy, policyStatusColor } from "@/data/policies";
+import {
+  policyPlanTypeDescription,
+  policyPlanTypeLabel,
+} from "@/data/policy-plan-types";
 import { ageFromDob } from "@/data/customers";
 import { openPolicyPrint, useGetPolicy } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
@@ -256,7 +260,7 @@ const PolicyDetail = () => {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card>
           <CardHeader className="pb-1.5">
-            <CardDescription>Gross Premium</CardDescription>
+            <CardDescription>Total Pay Premium</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-lg font-semibold text-primary">
@@ -367,6 +371,19 @@ const PolicyDetail = () => {
                 <Field
                   label="Currency"
                   value={<Badge variant="outline">{policy.currency}</Badge>}
+                />
+                <Field
+                  label="Policy plan type"
+                  value={
+                    policy.policyPlanType ? (
+                      <span title={policyPlanTypeDescription(policy.policyPlanType)}>
+                        {policyPlanTypeLabel(policy.policyPlanType)}{" "}
+                        <span className="font-mono text-xs text-muted-foreground">
+                          ({policy.policyPlanType})
+                        </span>
+                      </span>
+                    ) : undefined
+                  }
                 />
                 <Field
                   label="Policy years"
@@ -543,7 +560,7 @@ const PolicyDetail = () => {
                         <TableHead>Start</TableHead>
                         <TableHead>End</TableHead>
                         <TableHead className="text-right">Insured Amount</TableHead>
-                        <TableHead className="text-right">Premium</TableHead>
+                        <TableHead className="text-right">Pay Premium</TableHead>
                         <TableHead className="text-right">Coverages</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -587,8 +604,16 @@ const PolicyDetail = () => {
                               <TableCell className="text-right font-mono text-sm">
                                 {fmtMoney(y.insuredAmount, policy.currency)}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-sm font-semibold">
-                                {fmtMoney(y.premium, policy.currency)}
+                              <TableCell
+                                className="text-right font-mono text-sm font-semibold"
+                                title={`Calculated premium ${fmtMoney(y.premium, policy.currency)}`}
+                              >
+                                {fmtMoney(y.payPremium, policy.currency)}
+                                {y.payPremium !== y.premium && (
+                                  <div className="text-[11px] font-normal text-muted-foreground">
+                                    calc. {fmtMoney(y.premium, policy.currency)}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm">
                                 {y.coverages.length}

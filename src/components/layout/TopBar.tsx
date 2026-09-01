@@ -21,6 +21,7 @@ const navItems = [
   { label: "Products", to: "/products" },
   { label: "Customers", to: "/customers" },
   { label: "Offers", to: "/offers" },
+  // { label: "Renewals due", to: "/offers/renewals-due" },
   { label: "Policies", to: "/policies" },
   { label: "Risk list", to: "/risk-list" },
   { label: "Bank accounts", to: "/bank-accounts" },

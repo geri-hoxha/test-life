@@ -19,13 +19,17 @@ import {
   addProductDocumentType,
   addProductPaymentMethod,
 } from "@/api/products";
-import type { ProductsCalculationMethod, ProductsIssuanceMode } from "@/api/types";
+import type {
+  ProductsCalculationMethod,
+  ProductsIssuanceMode,
+  ProductsPolicyPlanType,
+} from "@/api/types";
 import { useListCoverages } from "@/api/coverages";
 import { useListRatingTables } from "@/api/rating-tables";
 import { useListDocumentTypes } from "@/api/document-types";
 import { useListDocuments } from "@/api/documents";
 import { useListBankAccounts } from "@/api/bank-accounts";
-import { useSumInsuredBasisEnum } from "@/api/smart-enums";
+import { usePolicyPlanTypeOptions } from "@/hooks/usePolicyPlanTypeOptions";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
 import CreateCoverageModal from "@/pages/products/CreateCoverageModal";
 import CreateDocumentTypeModal from "@/pages/products/CreateDocumentTypeModal";
@@ -105,7 +109,7 @@ const CreateProduct = () => {
   const { data: documentTypesPage, isLoading: documentTypesLoading } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
   const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
   const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
-  const { data: sumInsuredBasisOptions = [] } = useSumInsuredBasisEnum();
+  const policyPlanTypeOptions = usePolicyPlanTypeOptions();
   const createProduct = useCreateProduct();
 
   const apiGroups = groupsPage?.items ?? [];
@@ -122,7 +126,7 @@ const CreateProduct = () => {
   const [currencies, setCurrencies] = useState<string[]>(["EUR"]);
   const [coverageText, setCoverageText] = useState("");
   const [defaultPrintableTemplateDocumentId, setDefaultPrintableTemplateDocumentId] = useState("");
-  const [sumInsuredBasis, setSumInsuredBasis] = useState("");
+  const [policyPlanType, setPolicyPlanType] = useState<ProductsPolicyPlanType | "">("");
   const [issuanceMode, setIssuanceMode] = useState<ProductsIssuanceMode | "">("");
   const [calculationMethod, setCalculationMethod] = useState<ProductsCalculationMethod | "">("");
   const [maxCoveredYears, setMaxCoveredYears] = useState("");
@@ -215,7 +219,7 @@ const CreateProduct = () => {
         supportedCurrencies: currencies,
         coverageText: coverageText.trim() || undefined,
         defaultPrintableTemplateDocumentId: defaultPrintableTemplateDocumentId || null,
-        sumInsuredBasis: sumInsuredBasis || null,
+        policyPlanType: policyPlanType || null,
         issuanceMode: issuanceMode || null,
         calculationMethod: calculationMethod || null,
         maxCoveredYears: maxCoveredYears === "" ? null : Number(maxCoveredYears),
@@ -332,19 +336,28 @@ const CreateProduct = () => {
                 </Select>
               </div>
               <div className="space-y-1.5 md:col-span-2">
-                <Label>Sum insured basis</Label>
+                <Label>Policy plan type</Label>
                 <Select
-                  value={sumInsuredBasis || "none"}
-                  onValueChange={(v) => setSumInsuredBasis(v === "none" ? "" : v)}
+                  value={policyPlanType || "none"}
+                  onValueChange={(v) =>
+                    setPolicyPlanType(v === "none" ? "" : (v as ProductsPolicyPlanType))
+                  }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select sum insured basis…" />
+                    <SelectValue placeholder="Select policy plan type…" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {sumInsuredBasisOptions.map((opt) => (
+                    {policyPlanTypeOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.text}
+                        <span className="flex flex-col text-left">
+                          <span>{opt.label}</span>
+                          {opt.description && (
+                            <span className="text-xs text-muted-foreground">
+                              {opt.value} — {opt.description}
+                            </span>
+                          )}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>

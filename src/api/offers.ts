@@ -9,16 +9,18 @@ import type {
   OffersOfferLoanDisbursementResponse,
   OffersOfferParticipantResponse,
   OffersOfferResponse,
-  OffersOfferScheduleDiscountRequestResponse,
-  OffersOfferScheduleDocumentResponse,
-  OffersOfferScheduleResponse,
-  OffersOfferScheduleReviewFlagResponse,
+  OffersOfferYearDiscountRequestResponse,
+  OffersOfferYearDocumentResponse,
+  OffersOfferYearResponse,
+  OffersOfferYearReviewFlagResponse,
   OffersCalculatePremiumRequest,
   OffersOfferPremiumPreview,
-  OffersRejectOfferScheduleDocumentRequest,
-  OffersRequestOfferScheduleDiscountRequest,
-  OffersSubmitOfferScheduleDocumentRequest,
+  OffersOverwriteOfferYearRequest,
+  OffersRejectOfferYearDocumentRequest,
+  OffersRequestOfferYearDiscountRequest,
+  OffersSubmitOfferYearDocumentRequest,
   PaginationPagedListOfOfferResponse,
+  PaginationPagedListOfRenewalDueResponse,
   PoliciesIssuePolicyRequest,
   PoliciesPolicyResponse,
 } from "./types";
@@ -32,11 +34,13 @@ export const offersKeys = {
   premium: (offerId: string) => [...offersKeys.detail(offerId), "premium"] as const,
   premiumCalc: (params: OffersCalculatePremiumRequest) =>
     [...offersKeys.all, "premium-calc", params] as const,
-  scheduleDocuments: (offerId: string, year: string) =>
-    [...offersKeys.detail(offerId), "schedules", year, "documents"] as const,
+  yearDocuments: (offerId: string, year: string) =>
+    [...offersKeys.detail(offerId), "years", year, "documents"] as const,
+  renewalsDue: (params?: Record<string, unknown>) =>
+    [...offersKeys.all, "renewals-due", params ?? {}] as const,
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/policy */
+/** POST /api/offers/{offerId}/years/{year}/policy */
 export const issuePolicy = async (
   offerId: string,
   year: string,
@@ -45,7 +49,7 @@ export const issuePolicy = async (
 ): Promise<PoliciesPolicyResponse> =>
   apiRequest<PoliciesPolicyResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/policy`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/policy`,
     ...(body !== undefined ? { body } : {}),
     signal,
   });
@@ -183,15 +187,15 @@ export const useAddOfferParticipant = () => {
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/discount-requests/{requestId}/approval */
-export const approveOfferScheduleDiscount = async (offerId: string, year: string, requestId: string, signal?: AbortSignal): Promise<OffersOfferScheduleResponse> =>
-  apiRequest<OffersOfferScheduleResponse>({
+/** POST /api/offers/{offerId}/years/{year}/discount-requests/{requestId}/approval */
+export const approveOfferYearDiscount = async (offerId: string, year: string, requestId: string, signal?: AbortSignal): Promise<OffersOfferYearResponse> =>
+  apiRequest<OffersOfferYearResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/discount-requests/${encodeURIComponent(requestId)}/approval`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/discount-requests/${encodeURIComponent(requestId)}/approval`,
     signal,
   });
 
-export const useApproveOfferScheduleDiscount = () => {
+export const useApproveOfferYearDiscount = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
@@ -199,22 +203,22 @@ export const useApproveOfferScheduleDiscount = () => {
       year: string;
       requestId: string;
     }) =>
-      approveOfferScheduleDiscount(vars.offerId, vars.year, vars.requestId),
+      approveOfferYearDiscount(vars.offerId, vars.year, vars.requestId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/documents/{requirementId}/approval */
-export const approveOfferScheduleDocument = async (offerId: string, year: string, requirementId: string, signal?: AbortSignal): Promise<OffersOfferScheduleDocumentResponse> =>
-  apiRequest<OffersOfferScheduleDocumentResponse>({
+/** POST /api/offers/{offerId}/years/{year}/documents/{requirementId}/approval */
+export const approveOfferYearDocument = async (offerId: string, year: string, requirementId: string, signal?: AbortSignal): Promise<OffersOfferYearDocumentResponse> =>
+  apiRequest<OffersOfferYearDocumentResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/documents/${encodeURIComponent(requirementId)}/approval`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/documents/${encodeURIComponent(requirementId)}/approval`,
     signal,
   });
 
-export const useApproveOfferScheduleDocument = () => {
+export const useApproveOfferYearDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
@@ -222,31 +226,31 @@ export const useApproveOfferScheduleDocument = () => {
       year: string;
       requirementId: string;
     }) =>
-      approveOfferScheduleDocument(vars.offerId, vars.year, vars.requirementId),
+      approveOfferYearDocument(vars.offerId, vars.year, vars.requirementId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/review-flags/{flagId}/approval */
-export const approveOfferScheduleReviewFlag = async (
+/** POST /api/offers/{offerId}/years/{year}/review-flags/{flagId}/approval */
+export const approveOfferYearReviewFlag = async (
   offerId: string,
   year: string,
   flagId: string,
   signal?: AbortSignal
-): Promise<OffersOfferScheduleReviewFlagResponse> =>
-  apiRequest<OffersOfferScheduleReviewFlagResponse>({
+): Promise<OffersOfferYearReviewFlagResponse> =>
+  apiRequest<OffersOfferYearReviewFlagResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/review-flags/${encodeURIComponent(flagId)}/approval`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/review-flags/${encodeURIComponent(flagId)}/approval`,
     signal,
   });
 
-export const useApproveOfferScheduleReviewFlag = () => {
+export const useApproveOfferYearReviewFlag = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: { offerId: string; year: string; flagId: string }) =>
-      approveOfferScheduleReviewFlag(vars.offerId, vars.year, vars.flagId),
+      approveOfferYearReviewFlag(vars.offerId, vars.year, vars.flagId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
@@ -254,24 +258,25 @@ export const useApproveOfferScheduleReviewFlag = () => {
 };
 
 const mapPremiumPreviewRows = (
-  rows: OffersOfferScheduleResponse[] | null | undefined,
+  rows: OffersOfferYearResponse[] | null | undefined,
 ): OffersOfferPremiumPreview[] =>
   (rows ?? []).map((s) => ({
     year: s.year,
     insuredAmount: s.insuredAmount ?? 0,
     premium: s.premium ?? 0,
+    payPremium: s.payPremium ?? s.premium ?? 0,
   }));
 
 /**
  * POST /api/offers/{offerId}/premium
  * Non-persisting premium preview for a draft offer (per loan-disbursement year).
- * Only insuredAmount + premium are kept from the schedule response.
+ * Only the amount fields are kept from the offer-year response.
  */
 export const previewOfferPremium = async (
   offerId: string,
   signal?: AbortSignal
 ): Promise<OffersOfferPremiumPreview[]> => {
-  const rows = await apiRequest<OffersOfferScheduleResponse[]>({
+  const rows = await apiRequest<OffersOfferYearResponse[]>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/premium`,
     signal,
@@ -299,7 +304,7 @@ export const calculateOffersPremium = async (
   body: OffersCalculatePremiumRequest,
   signal?: AbortSignal,
 ): Promise<OffersOfferPremiumPreview[]> => {
-  const rows = await apiRequest<OffersOfferScheduleResponse[]>({
+  const rows = await apiRequest<OffersOfferYearResponse[]>({
     method: "POST",
     path: "/api/offers/premium",
     signal,
@@ -322,19 +327,41 @@ export const useCalculateOffersPremium = (
     placeholderData: keepPreviousData,
   });
 
-/** POST /api/offers/{offerId}/schedules */
-export const calculateOfferSchedules = async (offerId: string, signal?: AbortSignal): Promise<OffersOfferResponse> =>
+/** POST /api/offers/{offerId}/years */
+export const calculateOfferYears = async (offerId: string, signal?: AbortSignal): Promise<OffersOfferResponse> =>
   apiRequest<OffersOfferResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years`,
     signal,
     body: {}
   });
 
-export const useCalculateOfferSchedules = () => {
+export const useCalculateOfferYears = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (offerId: string) => calculateOfferSchedules(offerId),
+    mutationFn: (offerId: string) => calculateOfferYears(offerId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: offersKeys.all });
+    },
+  });
+};
+
+/** PUT /api/offers/{offerId}/years/{year}/overwrite — manual amount override. */
+export const overwriteOfferYear = async (
+  body: OffersOverwriteOfferYearRequest,
+  signal?: AbortSignal
+): Promise<OffersOfferYearResponse> =>
+  apiRequest<OffersOfferYearResponse>({
+    method: "PUT",
+    path: `/api/offers/${encodeURIComponent(body.offerId)}/years/${encodeURIComponent(body.year)}/overwrite`,
+    body,
+    signal,
+  });
+
+export const useOverwriteOfferYear = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: OffersOverwriteOfferYearRequest) => overwriteOfferYear(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
@@ -359,22 +386,22 @@ export const useCancelOffer = () => {
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/cancellation */
-export const cancelOfferSchedule = async (offerId: string, year: string, signal?: AbortSignal): Promise<OffersOfferScheduleResponse> =>
-  apiRequest<OffersOfferScheduleResponse>({
+/** POST /api/offers/{offerId}/years/{year}/cancellation */
+export const cancelOfferYear = async (offerId: string, year: string, signal?: AbortSignal): Promise<OffersOfferYearResponse> =>
+  apiRequest<OffersOfferYearResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/cancellation`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/cancellation`,
     signal,
   });
 
-export const useCancelOfferSchedule = () => {
+export const useCancelOfferYear = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
       offerId: string;
       year: string;
     }) =>
-      cancelOfferSchedule(vars.offerId, vars.year),
+      cancelOfferYear(vars.offerId, vars.year),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
@@ -432,6 +459,34 @@ export const useListOffers = (query?: ListOffersQuery, options?: { enabled?: boo
     placeholderData: keepPreviousData,
   });
 
+export type ListRenewalsDueQuery = {
+  pageNumber?: number;
+  pageSize?: number;
+};
+
+/** GET /api/offers/renewals-due */
+export const listRenewalsDue = async (
+  query?: ListRenewalsDueQuery,
+  signal?: AbortSignal
+): Promise<PaginationPagedListOfRenewalDueResponse> =>
+  apiRequest<PaginationPagedListOfRenewalDueResponse>({
+    method: "GET",
+    path: `/api/offers/renewals-due`,
+    query: query as Record<string, string | number | boolean | null | undefined>,
+    signal,
+  });
+
+export const useListRenewalsDue = (
+  query?: ListRenewalsDueQuery,
+  options?: { enabled?: boolean }
+) =>
+  useQuery({
+    queryKey: offersKeys.renewalsDue(query as Record<string, unknown> | undefined),
+    queryFn: ({ signal }) => listRenewalsDue(query, signal),
+    enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
+  });
+
 /** GET /api/offers/{id} */
 export const getOffer = async (id: string, signal?: AbortSignal): Promise<OffersOfferResponse> =>
   apiRequest<OffersOfferResponse>({
@@ -447,30 +502,30 @@ export const useGetOffer = (id: string, options?: { enabled?: boolean }) =>
     enabled: Boolean(id) && (options?.enabled ?? true),
   });
 
-/** GET /api/offers/{offerId}/schedules/{year}/documents */
-export const listOfferScheduleDocuments = async (offerId: string, year: string, signal?: AbortSignal): Promise<OffersOfferScheduleDocumentResponse[]> =>
-  apiRequest<OffersOfferScheduleDocumentResponse[]>({
+/** GET /api/offers/{offerId}/years/{year}/documents */
+export const listOfferYearDocuments = async (offerId: string, year: string, signal?: AbortSignal): Promise<OffersOfferYearDocumentResponse[]> =>
+  apiRequest<OffersOfferYearDocumentResponse[]>({
     method: "GET",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/documents`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/documents`,
     signal,
   });
 
-export const useListOfferScheduleDocuments = (offerId: string, year: string, options?: { enabled?: boolean }) =>
+export const useListOfferYearDocuments = (offerId: string, year: string, options?: { enabled?: boolean }) =>
   useQuery({
-    queryKey: offersKeys.scheduleDocuments(offerId, year),
-    queryFn: ({ signal }) => listOfferScheduleDocuments(offerId, year, signal),
+    queryKey: offersKeys.yearDocuments(offerId, year),
+    queryFn: ({ signal }) => listOfferYearDocuments(offerId, year, signal),
     enabled: Boolean(offerId) && Boolean(year) && (options?.enabled ?? true),
   });
 
-/** POST /api/offers/{offerId}/schedules/{year}/discount-requests/{requestId}/rejection */
-export const rejectOfferScheduleDiscount = async (offerId: string, year: string, requestId: string, signal?: AbortSignal): Promise<OffersOfferScheduleDiscountRequestResponse> =>
-  apiRequest<OffersOfferScheduleDiscountRequestResponse>({
+/** POST /api/offers/{offerId}/years/{year}/discount-requests/{requestId}/rejection */
+export const rejectOfferYearDiscount = async (offerId: string, year: string, requestId: string, signal?: AbortSignal): Promise<OffersOfferYearDiscountRequestResponse> =>
+  apiRequest<OffersOfferYearDiscountRequestResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/discount-requests/${encodeURIComponent(requestId)}/rejection`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/discount-requests/${encodeURIComponent(requestId)}/rejection`,
     signal,
   });
 
-export const useRejectOfferScheduleDiscount = () => {
+export const useRejectOfferYearDiscount = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
@@ -478,56 +533,56 @@ export const useRejectOfferScheduleDiscount = () => {
       year: string;
       requestId: string;
     }) =>
-      rejectOfferScheduleDiscount(vars.offerId, vars.year, vars.requestId),
+      rejectOfferYearDiscount(vars.offerId, vars.year, vars.requestId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/documents/{requirementId}/rejection */
-export const rejectOfferScheduleDocument = async (offerId: string, year: string, requirementId: string, body: OffersRejectOfferScheduleDocumentRequest, signal?: AbortSignal): Promise<OffersOfferScheduleDocumentResponse> =>
-  apiRequest<OffersOfferScheduleDocumentResponse>({
+/** POST /api/offers/{offerId}/years/{year}/documents/{requirementId}/rejection */
+export const rejectOfferYearDocument = async (offerId: string, year: string, requirementId: string, body: OffersRejectOfferYearDocumentRequest, signal?: AbortSignal): Promise<OffersOfferYearDocumentResponse> =>
+  apiRequest<OffersOfferYearDocumentResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/documents/${encodeURIComponent(requirementId)}/rejection`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/documents/${encodeURIComponent(requirementId)}/rejection`,
     body,
     signal,
   });
 
-export const useRejectOfferScheduleDocument = () => {
+export const useRejectOfferYearDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
       offerId: string;
       year: string;
       requirementId: string;
-      body: OffersRejectOfferScheduleDocumentRequest;
+      body: OffersRejectOfferYearDocumentRequest;
     }) =>
-      rejectOfferScheduleDocument(vars.offerId, vars.year, vars.requirementId, vars.body),
+      rejectOfferYearDocument(vars.offerId, vars.year, vars.requirementId, vars.body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/review-flags/{flagId}/rejection */
-export const rejectOfferScheduleReviewFlag = async (
+/** POST /api/offers/{offerId}/years/{year}/review-flags/{flagId}/rejection */
+export const rejectOfferYearReviewFlag = async (
   offerId: string,
   year: string,
   flagId: string,
   signal?: AbortSignal
-): Promise<OffersOfferScheduleReviewFlagResponse> =>
-  apiRequest<OffersOfferScheduleReviewFlagResponse>({
+): Promise<OffersOfferYearReviewFlagResponse> =>
+  apiRequest<OffersOfferYearReviewFlagResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/review-flags/${encodeURIComponent(flagId)}/rejection`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/review-flags/${encodeURIComponent(flagId)}/rejection`,
     signal,
   });
 
-export const useRejectOfferScheduleReviewFlag = () => {
+export const useRejectOfferYearReviewFlag = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: { offerId: string; year: string; flagId: string }) =>
-      rejectOfferScheduleReviewFlag(vars.offerId, vars.year, vars.flagId),
+      rejectOfferYearReviewFlag(vars.offerId, vars.year, vars.flagId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
@@ -600,49 +655,49 @@ export const useRemoveOfferParticipant = () => {
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/discount-requests */
-export const requestOfferScheduleDiscount = async (offerId: string, year: string, body: OffersRequestOfferScheduleDiscountRequest, signal?: AbortSignal): Promise<OffersOfferScheduleDiscountRequestResponse> =>
-  apiRequest<OffersOfferScheduleDiscountRequestResponse>({
+/** POST /api/offers/{offerId}/years/{year}/discount-requests */
+export const requestOfferYearDiscount = async (offerId: string, year: string, body: OffersRequestOfferYearDiscountRequest, signal?: AbortSignal): Promise<OffersOfferYearDiscountRequestResponse> =>
+  apiRequest<OffersOfferYearDiscountRequestResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/discount-requests`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/discount-requests`,
     body,
     signal,
   });
 
-export const useRequestOfferScheduleDiscount = () => {
+export const useRequestOfferYearDiscount = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
       offerId: string;
       year: string;
-      body: OffersRequestOfferScheduleDiscountRequest;
+      body: OffersRequestOfferYearDiscountRequest;
     }) =>
-      requestOfferScheduleDiscount(vars.offerId, vars.year, vars.body),
+      requestOfferYearDiscount(vars.offerId, vars.year, vars.body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },
   });
 };
 
-/** POST /api/offers/{offerId}/schedules/{year}/documents/{requirementId}/submission */
-export const submitOfferScheduleDocument = async (offerId: string, year: string, requirementId: string, body: OffersSubmitOfferScheduleDocumentRequest, signal?: AbortSignal): Promise<OffersOfferScheduleDocumentResponse> =>
-  apiRequest<OffersOfferScheduleDocumentResponse>({
+/** POST /api/offers/{offerId}/years/{year}/documents/{requirementId}/submission */
+export const submitOfferYearDocument = async (offerId: string, year: string, requirementId: string, body: OffersSubmitOfferYearDocumentRequest, signal?: AbortSignal): Promise<OffersOfferYearDocumentResponse> =>
+  apiRequest<OffersOfferYearDocumentResponse>({
     method: "POST",
-    path: `/api/offers/${encodeURIComponent(offerId)}/schedules/${encodeURIComponent(year)}/documents/${encodeURIComponent(requirementId)}/submission`,
+    path: `/api/offers/${encodeURIComponent(offerId)}/years/${encodeURIComponent(year)}/documents/${encodeURIComponent(requirementId)}/submission`,
     body,
     signal,
   });
 
-export const useSubmitOfferScheduleDocument = () => {
+export const useSubmitOfferYearDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
       offerId: string;
       year: string;
       requirementId: string;
-      body: OffersSubmitOfferScheduleDocumentRequest;
+      body: OffersSubmitOfferYearDocumentRequest;
     }) =>
-      submitOfferScheduleDocument(vars.offerId, vars.year, vars.requirementId, vars.body),
+      submitOfferYearDocument(vars.offerId, vars.year, vars.requirementId, vars.body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: offersKeys.all });
     },

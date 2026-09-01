@@ -19,11 +19,19 @@ import {
   useAddProductPaymentMethod,
   useRemoveProductPaymentMethod,
 } from "@/api/products";
-import type { ProductsCalculationMethod, ProductsIssuanceMode } from "@/api/types";
+import type {
+  ProductsCalculationMethod,
+  ProductsIssuanceMode,
+  ProductsPolicyPlanType,
+} from "@/api/types";
 import { useListProductGroups } from "@/api/product-groups";
 import { useListDocuments } from "@/api/documents";
 import { useListBankAccounts } from "@/api/bank-accounts";
-import { useSumInsuredBasisEnum } from "@/api/smart-enums";
+import { usePolicyPlanTypeOptions } from "@/hooks/usePolicyPlanTypeOptions";
+import {
+  SCHEDULE_BASIS_DESCRIPTIONS,
+  SCHEDULE_BASIS_LABELS,
+} from "@/data/policy-plan-types";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
 import { Save, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -49,7 +57,7 @@ type EditableFields = {
   coverageText: string;
   currencies: string[];
   defaultPrintableTemplateDocumentId: string;
-  sumInsuredBasis: string;
+  policyPlanType: ProductsPolicyPlanType | "";
   issuanceMode: ProductsIssuanceMode | "";
   calculationMethod: ProductsCalculationMethod | "";
   maxCoveredYears: string;
@@ -65,7 +73,7 @@ const ProductDetail = () => {
   const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
   const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
   const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
-  const { data: sumInsuredBasisOptions = [] } = useSumInsuredBasisEnum();
+  const policyPlanTypeOptions = usePolicyPlanTypeOptions();
   const { data: coveragesCatalog } = useListCoverages({ pageNumber: 1, pageSize: 200 });
 
   const product = useMemo(
@@ -141,7 +149,7 @@ const ProductDetail = () => {
       coverageText: product.coverageText ?? "",
       currencies: [...product.currencies],
       defaultPrintableTemplateDocumentId: product.defaultPrintableTemplateDocumentId ?? "",
-      sumInsuredBasis: product.sumInsuredBasis ?? "",
+      policyPlanType: product.policyPlanType ?? "",
       issuanceMode: (product.issuanceMode as ProductsIssuanceMode | null) ?? "",
       calculationMethod: (product.calculationMethod as ProductsCalculationMethod | null) ?? "",
       maxCoveredYears:
@@ -189,7 +197,7 @@ const ProductDetail = () => {
     fields.coverageText !== (product.coverageText ?? "") ||
     JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
     fields.defaultPrintableTemplateDocumentId !== (product.defaultPrintableTemplateDocumentId ?? "") ||
-    fields.sumInsuredBasis !== (product.sumInsuredBasis ?? "") ||
+    fields.policyPlanType !== (product.policyPlanType ?? "") ||
     fields.issuanceMode !== (product.issuanceMode ?? "") ||
     fields.calculationMethod !== (product.calculationMethod ?? "") ||
     fields.maxCoveredYears !==
@@ -224,7 +232,7 @@ const ProductDetail = () => {
           supportedCurrencies: fields.currencies,
           coverageText: fields.coverageText.trim() || undefined,
           defaultPrintableTemplateDocumentId: fields.defaultPrintableTemplateDocumentId || null,
-          sumInsuredBasis: fields.sumInsuredBasis || null,
+          policyPlanType: fields.policyPlanType || null,
           issuanceMode: fields.issuanceMode || null,
           calculationMethod: fields.calculationMethod || null,
           maxCoveredYears: fields.maxCoveredYears === "" ? null : Number(fields.maxCoveredYears),
@@ -401,25 +409,47 @@ const ProductDetail = () => {
                 </Select>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Sum insured basis</Label>
+                <div className="flex items-center gap-2">
+                  <Label>Policy plan type</Label>
+                  {product.scheduleBasis && (
+                    <Badge variant="outline" title={SCHEDULE_BASIS_DESCRIPTIONS[product.scheduleBasis]}>
+                      {SCHEDULE_BASIS_LABELS[product.scheduleBasis]}
+                    </Badge>
+                  )}
+                </div>
                 <Select
-                  value={fields.sumInsuredBasis || "none"}
+                  value={fields.policyPlanType || "none"}
                   onValueChange={(v) =>
-                    setFields({ ...fields, sumInsuredBasis: v === "none" ? "" : v })
+                    setFields({
+                      ...fields,
+                      policyPlanType: v === "none" ? "" : (v as ProductsPolicyPlanType),
+                    })
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select sum insured basis…" />
+                    <SelectValue placeholder="Select policy plan type…" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {sumInsuredBasisOptions.map((opt) => (
+                    {policyPlanTypeOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.text}
+                        <span className="flex flex-col text-left">
+                          <span>{opt.label}</span>
+                          {opt.description && (
+                            <span className="text-xs text-muted-foreground">
+                              {opt.value} — {opt.description}
+                            </span>
+                          )}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {product.scheduleBasis && (
+                  <p className="text-xs text-muted-foreground">
+                    {SCHEDULE_BASIS_DESCRIPTIONS[product.scheduleBasis]}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Issuance mode</Label>

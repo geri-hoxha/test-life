@@ -29,7 +29,10 @@ export type PolicyYear = {
   startDate: string;
   endDate: string;
   insuredAmount: number;
+  /** Actuarially-calculated premium. */
   premium: number;
+  /** Amount actually billed — differs from `premium` only on PPFM/PPFV plans. */
+  payPremium: number;
   coverages: PolicyCoverage[];
 };
 
@@ -54,6 +57,8 @@ export type Policy = {
   beneficiaries: Beneficiary[];
   participants: OfferParticipant[];
   insuredPersons: OfferInsuredPerson[];
+  /** Product plan classification, snapshotted at issuance. */
+  policyPlanType?: string | null;
   policyYears: PolicyYear[];
   /** Flattened coverages across all policy years (convenience). */
   coverages: PolicyCoverage[];

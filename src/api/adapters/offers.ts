@@ -5,9 +5,9 @@ import type {
   DomainOffersOfferStatus,
   OffersOfferParticipantResponse,
   OffersOfferInsuredPersonResponse,
-  OffersOfferScheduleResponse,
+  OffersOfferYearResponse,
   OffersOfferLoanDisbursementResponse,
-  DomainOffersOfferScheduleDocumentStatus,
+  DomainOffersOfferYearDocumentStatus,
 } from "../types";
 import type {
   Offer,
@@ -15,7 +15,7 @@ import type {
   PaymentMode,
   OfferParticipant,
   OfferInsuredPerson,
-  OfferSchedule,
+  OfferYear,
   OfferLoanDisbursement,
   Beneficiary,
 } from "@/data/offers";
@@ -67,13 +67,14 @@ const mapInsuredPerson = (p: OffersOfferInsuredPersonResponse): OfferInsuredPers
   gender: p.gender,
 });
 
-const mapSchedule = (s: OffersOfferScheduleResponse): OfferSchedule => ({
+const mapOfferYear = (s: OffersOfferYearResponse): OfferYear => ({
   id: String(s.id ?? ""),
   year: s.year ?? 0,
   startDate: s.period?.startDate?.slice(0, 10) ?? "",
   endDate: s.period?.endDate?.slice(0, 10) ?? "",
   insuredAmount: s.insuredAmount ?? 0,
   premium: s.premium ?? 0,
+  payPremium: s.payPremium ?? s.premium ?? 0,
   internalStatus: s.internalStatus,
   policyId: s.policyId ?? null,
   coverages:
@@ -90,7 +91,7 @@ const mapSchedule = (s: OffersOfferScheduleResponse): OfferSchedule => ({
       id: String(d.id ?? ""),
       documentId: d.documentId ?? null,
       documentTypeId: d.documentTypeId ?? "",
-      status: (d.status ?? "required") as DomainOffersOfferScheduleDocumentStatus,
+      status: (d.status ?? "required") as DomainOffersOfferYearDocumentStatus,
       refusalReason: d.refusalReason,
     })) ?? [],
   discountRequests:
@@ -122,7 +123,7 @@ const mapLoanDisbursement = (l: OffersOfferLoanDisbursementResponse): OfferLoanD
 export const mapApiOffer = (o: OffersOfferResponse): Offer => {
   const participants = (o.participants ?? []).map(mapParticipant);
   const insuredPersons = (o.insuredPersons ?? []).map(mapInsuredPerson);
-  const schedules = (o.schedules ?? []).map(mapSchedule);
+  const offerYears = (o.offerYears ?? []).map(mapOfferYear);
   const loanDisbursements = (o.loanDisbursements ?? []).map(mapLoanDisbursement);
 
   const holder = participants.find((p) => p.role === "policyHolder");
@@ -141,15 +142,16 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
       uniqueIdentifier: p.uniqueIdentifier,
     }));
 
-  const schedule = schedules[0];
+  const firstYear = offerYears[0];
   const premium =
-    schedule?.premium ??
-    schedule?.coverages.reduce((sum, c) => sum + c.calculatedPremium, 0) ??
+    firstYear?.payPremium ??
+    firstYear?.premium ??
+    firstYear?.coverages.reduce((sum, c) => sum + c.calculatedPremium, 0) ??
     0;
 
   const created = o.createdOnUtc?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
-  const start = schedule?.startDate || created;
-  const end = schedule?.endDate || created;
+  const start = firstYear?.startDate || created;
+  const end = firstYear?.endDate || created;
   const startYear = Number(start.slice(0, 4)) || new Date().getFullYear();
   const endYear = Number(end.slice(0, 4)) || startYear;
   const loan = loanDisbursements[0];
@@ -181,7 +183,7 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
         }
       : undefined,
     loanDisbursements,
-    schedules,
+    offerYears,
     premium,
     status: statusFromApi(o.status),
     createdDate: created,

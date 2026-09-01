@@ -15,6 +15,7 @@ import OffersList from "./pages/offers/OffersList.tsx";
 import CreateOffer from "./pages/offers/CreateOffer.tsx";
 import OfferDetail from "./pages/offers/OfferDetail.tsx";
 import IssuePolicy from "./pages/offers/IssuePolicy.tsx";
+import RenewalsDue from "./pages/offers/RenewalsDue.tsx";
 import PoliciesList from "./pages/policies/PoliciesList.tsx";
 import PolicyDetail from "./pages/policies/PolicyDetail.tsx";
 import PaymentsList from "./pages/payments/PaymentsList.tsx";
@@ -47,6 +48,7 @@ const App = () => (
           <Route path="/customers/:id/edit" element={<CustomerForm />} />
           <Route path="/offers" element={<OffersList />} />
           <Route path="/offers/new" element={<CreateOffer />} />
+          {/* <Route path="/offers/renewals-due" element={<RenewalsDue />} /> */}
           <Route path="/offers/:id" element={<OfferDetail />} />
           <Route path="/offers/:offerId/issue" element={<IssuePolicy />} />
           <Route path="/policies" element={<PoliciesList />} />

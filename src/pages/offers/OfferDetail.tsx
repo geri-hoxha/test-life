@@ -79,21 +79,22 @@ import {
 } from "./VerificationStep";
 import { toast } from "sonner";
 import { toastApiError, getApiErrorMessage } from "@/lib/api-error";
+import { ApiError } from "@/api/client";
 import {
   useGetOffer,
   useCancelOffer,
-  useCalculateOfferSchedules,
+  useCalculateOfferYears,
   usePreviewOfferPremium,
-  useCancelOfferSchedule,
-  useRequestOfferScheduleDiscount,
-  useApproveOfferScheduleDiscount,
-  useRejectOfferScheduleDiscount,
-  useApproveOfferScheduleDocument,
-  useRejectOfferScheduleDocument,
-  useSubmitOfferScheduleDocument,
-  useListOfferScheduleDocuments,
-  useApproveOfferScheduleReviewFlag,
-  useRejectOfferScheduleReviewFlag,
+  useCancelOfferYear,
+  useRequestOfferYearDiscount,
+  useApproveOfferYearDiscount,
+  useRejectOfferYearDiscount,
+  useApproveOfferYearDocument,
+  useRejectOfferYearDocument,
+  useSubmitOfferYearDocument,
+  useListOfferYearDocuments,
+  useApproveOfferYearReviewFlag,
+  useRejectOfferYearReviewFlag,
   useIssueOfferPolicy,
   useRenewOffer,
 } from "@/api/offers";
@@ -118,7 +119,7 @@ const fmtMoney = (v: number, ccy: string) =>
 const titleCase = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined;
 
-const scheduleStatusColor: Record<string, string> = {
+const yearStatusColor: Record<string, string> = {
   draft: "bg-muted text-muted-foreground border-transparent",
   pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
   active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
@@ -175,7 +176,7 @@ const docStatusBadge = (status: string) => {
   }
 };
 
-type ScheduleDocAction = {
+type YearDocAction = {
   requirementId: string;
   year: number;
   label: string;
@@ -229,7 +230,7 @@ const DocumentFilePreviewBody = ({
   );
 };
 
-const ScheduleExpandedPanel = ({
+const OfferYearExpandedPanel = ({
   offerId,
   year,
   reviewFlags,
@@ -253,13 +254,13 @@ const ScheduleExpandedPanel = ({
   documentTypeNameById: Record<string, string>;
   docActionPending: boolean;
   flagActionPending: boolean;
-  onSubmit: (args: ScheduleDocAction) => void;
-  onApprove: (args: ScheduleDocAction) => void;
-  onReject: (args: ScheduleDocAction) => void;
+  onSubmit: (args: YearDocAction) => void;
+  onApprove: (args: YearDocAction) => void;
+  onReject: (args: YearDocAction) => void;
   onApproveFlag: (flagId: string) => void;
   onRejectFlag: (flagId: string) => void;
 }) => {
-  const { data, isLoading, isError, error } = useListOfferScheduleDocuments(
+  const { data, isLoading, isError, error } = useListOfferYearDocuments(
     offerId,
     String(year)
   );
@@ -281,7 +282,7 @@ const ScheduleExpandedPanel = ({
     [data]
   );
 
-  const scheduleChecks = useMemo(
+  const yearChecks = useMemo(
     () => mapReviewFlagsToChecks(reviewFlags),
     [reviewFlags]
   );
@@ -371,7 +372,7 @@ const ScheduleExpandedPanel = ({
           </div>
         ) : documents.length === 0 ? (
           <div className="rounded-md border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
-            No documents on this schedule.
+            No documents on this offer year.
           </div>
         ) : (
           <div className="grid gap-2">
@@ -519,7 +520,7 @@ const ScheduleExpandedPanel = ({
         </div>
         <div className="bg-background rounded-md">
           <VerificationChecksTable
-            checks={scheduleChecks}
+            checks={yearChecks}
             actionPending={flagActionPending}
             onApprove={onApproveFlag}
             onReject={onRejectFlag}
@@ -599,23 +600,23 @@ const OfferDetail = () => {
     refetch: refetchPremiumPreview,
   } = usePreviewOfferPremium(id ?? "", { enabled: Boolean(id) });
   const cancelOffer = useCancelOffer();
-  const calculateSchedules = useCalculateOfferSchedules();
-  const cancelSchedule = useCancelOfferSchedule();
-  const requestDiscount = useRequestOfferScheduleDiscount();
-  const approveDiscount = useApproveOfferScheduleDiscount();
-  const rejectDiscount = useRejectOfferScheduleDiscount();
-  const approveScheduleDocument = useApproveOfferScheduleDocument();
-  const rejectScheduleDocument = useRejectOfferScheduleDocument();
-  const submitScheduleDocument = useSubmitOfferScheduleDocument();
-  const approveReviewFlag = useApproveOfferScheduleReviewFlag();
-  const rejectReviewFlag = useRejectOfferScheduleReviewFlag();
+  const calculateYears = useCalculateOfferYears();
+  const cancelOfferYear = useCancelOfferYear();
+  const requestDiscount = useRequestOfferYearDiscount();
+  const approveDiscount = useApproveOfferYearDiscount();
+  const rejectDiscount = useRejectOfferYearDiscount();
+  const approveYearDocument = useApproveOfferYearDocument();
+  const rejectYearDocument = useRejectOfferYearDocument();
+  const submitYearDocument = useSubmitOfferYearDocument();
+  const approveReviewFlag = useApproveOfferYearReviewFlag();
+  const rejectReviewFlag = useRejectOfferYearReviewFlag();
   const issueOfferPolicy = useIssueOfferPolicy();
   const renewOffer = useRenewOffer();
   const { data: coveragesPage } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
 
   const previewPremiumTotal = useMemo(
-    () => (premiumPreview ?? []).reduce((sum, s) => sum + s.premium, 0),
+    () => (premiumPreview ?? []).reduce((sum, s) => sum + s.payPremium, 0),
     [premiumPreview],
   );
   const previewInsuredTotal = useMemo(
@@ -623,7 +624,7 @@ const OfferDetail = () => {
     [premiumPreview],
   );
 
-  const [cancelScheduleYear, setCancelScheduleYear] = useState<number | null>(null);
+  const [cancelYear, setCancelYear] = useState<number | null>(null);
   const [discountDialog, setDiscountDialog] = useState<{ year: number } | null>(null);
   const [discountPct, setDiscountPct] = useState("50");
   const [discountReason, setDiscountReason] = useState("");
@@ -651,7 +652,7 @@ const OfferDetail = () => {
     year: number;
     label: string;
   } | null>(null);
-  const [expandedScheduleYears, setExpandedScheduleYears] = useState<Set<number>>(
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(
     () => new Set()
   );
   const [issuancePending, setIssuancePending] = useState<"issue" | "renew" | null>(
@@ -667,8 +668,8 @@ const OfferDetail = () => {
     pctLabel: string;
   } | null>(null);
 
-  const toggleScheduleExpanded = (year: number) => {
-    setExpandedScheduleYears((prev) => {
+  const toggleYearExpanded = (year: number) => {
+    setExpandedYears((prev) => {
       const next = new Set(prev);
       if (next.has(year)) next.delete(year);
       else next.add(year);
@@ -743,9 +744,9 @@ const OfferDetail = () => {
   const holder = offer.participants.find((p) => p.role === "policyHolder");
   const payer = offer.participants.find((p) => p.role === "invoiced") ?? holder;
   const insuredPerson = offer.insuredPersons[0];
-  const scheduleCoverages = offer.schedules.flatMap((s) => s.coverages);
+  const yearCoverages = offer.offerYears.flatMap((s) => s.coverages);
 
-  const verificationChecks: VerificationCheck[] = offer.schedules.flatMap((s) =>
+  const verificationChecks: VerificationCheck[] = offer.offerYears.flatMap((s) =>
     mapReviewFlagsToChecks(s.reviewFlags)
   );
   const verifOverall = overallStatus(verificationChecks);
@@ -767,33 +768,41 @@ const OfferDetail = () => {
 
   const issuanceMode = product?.issuanceMode ?? null;
 
-  const orderedSchedules = [...offer.schedules]
+  const orderedYears = [...offer.offerYears]
     .filter((s) => s.internalStatus !== "cancelled")
     .sort((a, b) => a.year - b.year);
 
-  const isScheduleApproved = (s: (typeof orderedSchedules)[number]) =>
+  const isYearApproved = (s: (typeof orderedYears)[number]) =>
     Boolean(s.policyId) || s.internalStatus === "active";
 
-  const firstScheduleApproved = orderedSchedules[0]
-    ? isScheduleApproved(orderedSchedules[0])
+  const firstYearApproved = orderedYears[0]
+    ? isYearApproved(orderedYears[0])
     : false;
 
   /** wholeOfTerm: issue once only, no renew. annualRenewable: issue then renew. */
   const isWholeOfTerm = issuanceMode === "wholeOfTerm";
   const showRenewButton = !isWholeOfTerm;
-  const canIssuePolicy = !firstScheduleApproved;
-  const canRenew = showRenewButton && firstScheduleApproved;
+  const canIssuePolicy = !firstYearApproved;
+  const canRenew = showRenewButton && firstYearApproved;
 
-  const scheduleIssueTargets = orderedSchedules.filter((s) => !s.policyId);
+  const yearIssueTargets = orderedYears.filter((s) => !s.policyId);
+
+  /**
+   * Pricing is no longer one-shot: products priced per renewal only ever have their next
+   * year priced, so the action stays available. The backend rejects a premature call with
+   * a 422 when the prior year's policy has not been issued yet.
+   */
+  const canCalculateYears =
+    offer.offerYears.length === 0 || product?.scheduleBasis === "perRenewalInfo";
 
   const handleIssueOfferPolicy = async () => {
     try {
       setIssuancePending("issue");
       if (issuanceMode === "annualRenewable") {
         const targets =
-          scheduleIssueTargets.length > 0 ? scheduleIssueTargets : [null];
+          yearIssueTargets.length > 0 ? yearIssueTargets : [null];
         let issued = 0;
-        for (const _schedule of targets) {
+        for (const _year of targets) {
           await issueOfferPolicy.mutateAsync({
             offerId: offer.id,
             body: issuePolicyBody,
@@ -822,9 +831,9 @@ const OfferDetail = () => {
     try {
       setIssuancePending("renew");
       const targets =
-        scheduleIssueTargets.length > 0 ? scheduleIssueTargets : [null];
+        yearIssueTargets.length > 0 ? yearIssueTargets : [null];
       let renewed = 0;
-      for (const _schedule of targets) {
+      for (const _year of targets) {
         await renewOffer.mutateAsync(offer.id);
         renewed += 1;
       }
@@ -847,27 +856,35 @@ const OfferDetail = () => {
     }
   };
 
-  const handleCommitSchedules = async () => {
+  const handleCalculateYears = async () => {
     try {
-      await calculateSchedules.mutateAsync(offer.id);
-      toast.success("Schedules calculated");
+      await calculateYears.mutateAsync(offer.id);
+      toast.success("Offer years calculated");
       void refetchPremiumPreview();
     } catch (err) {
-      toastApiError(err, "Failed to calculate schedules");
+      // A 422 here means the prior year's policy is not issued yet — a normal
+      // validation outcome for per-renewal products, not a failure.
+      if (err instanceof ApiError && err.status === 422) {
+        toast.warning(
+          getApiErrorMessage(err, "The next year cannot be priced yet."),
+        );
+        return;
+      }
+      toastApiError(err, "Failed to calculate offer years");
     }
   };
 
-  const handleCancelSchedule = async () => {
-    if (cancelScheduleYear == null) return;
+  const handleCancelYear = async () => {
+    if (cancelYear == null) return;
     try {
-      await cancelSchedule.mutateAsync({
+      await cancelOfferYear.mutateAsync({
         offerId: offer.id,
-        year: String(cancelScheduleYear),
+        year: String(cancelYear),
       });
-      toast.success(`Schedule ${cancelScheduleYear} cancelled`);
-      setCancelScheduleYear(null);
+      toast.success(`Offer year ${cancelYear} cancelled`);
+      setCancelYear(null);
     } catch (err) {
-      toastApiError(err, "Failed to cancel schedule");
+      toastApiError(err, "Failed to cancel offer year");
     }
   };
 
@@ -891,7 +908,7 @@ const OfferDetail = () => {
           reason: discountReason.trim(),
         },
       });
-      toast.success(`Discount requested for schedule ${discountDialog.year}`);
+      toast.success(`Discount requested for offer year ${discountDialog.year}`);
       setDiscountDialog(null);
       setDiscountPct("50");
       setDiscountReason("");
@@ -926,10 +943,10 @@ const OfferDetail = () => {
     }
   };
 
-  const handleApproveScheduleDocument = async () => {
+  const handleApproveYearDocument = async () => {
     if (!pendingDocApprove) return;
     try {
-      await approveScheduleDocument.mutateAsync({
+      await approveYearDocument.mutateAsync({
         offerId: offer.id,
         year: String(pendingDocApprove.year),
         requirementId: pendingDocApprove.requirementId,
@@ -941,14 +958,14 @@ const OfferDetail = () => {
     }
   };
 
-  const handleRejectScheduleDocument = async () => {
+  const handleRejectYearDocument = async () => {
     if (!docRejectDialog) return;
     if (!docRejectReason.trim()) {
       toast.error("Rejection reason is required");
       return;
     }
     try {
-      await rejectScheduleDocument.mutateAsync({
+      await rejectYearDocument.mutateAsync({
         offerId: offer.id,
         year: String(docRejectDialog.year),
         requirementId: docRejectDialog.requirementId,
@@ -962,7 +979,7 @@ const OfferDetail = () => {
     }
   };
 
-  const handleSubmitScheduleDocument = async () => {
+  const handleSubmitYearDocument = async () => {
     if (!docSubmitDialog) return;
     if (!docSubmitFile) {
       toast.error("Choose a file to upload");
@@ -974,7 +991,7 @@ const OfferDetail = () => {
         buildCreateDocumentFormData(docSubmitFile, docSubmitFile.name)
       );
       if (!uploaded.id) throw new Error("Upload did not return a document id");
-      await submitScheduleDocument.mutateAsync({
+      await submitYearDocument.mutateAsync({
         offerId: offer.id,
         year: String(docSubmitDialog.year),
         requirementId: docSubmitDialog.requirementId,
@@ -1055,7 +1072,7 @@ const OfferDetail = () => {
         ? {
             title: "Renew this offer?",
             description:
-              "This will create a renewal for the next eligible schedule year.",
+              "This will create a renewal for the next eligible offer year.",
             confirmLabel: "Renew",
             destructive: false,
           }
@@ -1065,7 +1082,7 @@ const OfferDetail = () => {
               description: isWholeOfTerm
                 ? "This will issue the policy for this whole-of-term offer. This can only be done once."
                 : issuanceMode === "annualRenewable"
-                  ? "This will issue a policy for each eligible schedule on this offer."
+                  ? "This will issue a policy for each eligible offer year on this offer."
                   : "This will issue the initial policy for this offer.",
               confirmLabel: "Issue policy",
               destructive: false,
@@ -1076,13 +1093,13 @@ const OfferDetail = () => {
     ? discountConfirm.kind === "approve"
       ? {
           title: "Approve discount request?",
-          description: `Approve the ${discountConfirm.pctLabel} discount for schedule year ${discountConfirm.year}.`,
+          description: `Approve the ${discountConfirm.pctLabel} discount for offer year ${discountConfirm.year}.`,
           confirmLabel: "Approve",
           destructive: false,
         }
       : {
           title: "Reject discount request?",
-          description: `Reject the ${discountConfirm.pctLabel} discount for schedule year ${discountConfirm.year}.`,
+          description: `Reject the ${discountConfirm.pctLabel} discount for offer year ${discountConfirm.year}.`,
           confirmLabel: "Reject",
           destructive: true,
         }
@@ -1160,16 +1177,25 @@ const OfferDetail = () => {
             <RefreshCw className={`h-4 w-4 ${premiumPreviewLoading ? "animate-spin" : ""}`} />
             Preview Premium
           </Button>
-          {offer.schedules.length === 0 && (
+          {canCalculateYears && (
             <Button
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => void handleCommitSchedules()}
-              disabled={calculateSchedules.isPending}
+              onClick={() => void handleCalculateYears()}
+              disabled={calculateYears.isPending}
+              title={
+                offer.offerYears.length > 0
+                  ? "Prices the next not-yet-priced year. Only available once the prior year's policy has been issued."
+                  : undefined
+              }
             >
               <Calculator className="h-4 w-4" />
-              {calculateSchedules.isPending ? "Calculating…" : "Commit Schedules"}
+              {calculateYears.isPending
+                ? "Calculating…"
+                : offer.offerYears.length > 0
+                  ? "Calculate Next Year"
+                  : "Calculate Offer Years"}
             </Button>
           )}
           <Button
@@ -1268,15 +1294,30 @@ const OfferDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {offer.status === "Partially Bound" && product?.scheduleBasis === "perRenewalInfo" && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-500/40 bg-sky-500/5 px-4 py-3">
+          <p className="text-sm text-sky-800 dark:text-sky-200">
+            This product prices one year at a time, so the offer stays partially bound
+            until every covered year has been issued. Future years are picked up from the
+            renewals worklist.
+          </p>
+          {/* <Button variant="outline" size="sm" className="gap-2" asChild>
+            <Link to="/offers/renewals-due">
+              <RefreshCw className="h-3.5 w-3.5" /> Renewals Due
+            </Link>
+          </Button> */}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card>
-          <CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
+          <CardHeader className="pb-1.5"><CardDescription>Pay Premium</CardDescription></CardHeader>
           <CardContent>
             <div className="text-lg font-semibold text-primary">
-              {premiumPreviewLoading && !premiumPreview && offer.schedules.length === 0
+              {premiumPreviewLoading && !premiumPreview && offer.offerYears.length === 0
                 ? "…"
                 : fmtMoney(
-                    offer.schedules.length > 0
+                    offer.offerYears.length > 0
                       ? offer.premium || 0
                       : premiumPreview
                         ? previewPremiumTotal
@@ -1284,12 +1325,12 @@ const OfferDetail = () => {
                     offer.currency,
                   )}
             </div>
-            {offer.schedules.length === 0 && premiumPreview && (
+            {offer.offerYears.length === 0 && premiumPreview && (
               <div className="text-[11px] text-muted-foreground mt-0.5">
                 Preview · not committed
               </div>
             )}
-            {offer.schedules.length === 0 && premiumPreviewError && (
+            {offer.offerYears.length === 0 && premiumPreviewError && (
               <div className="text-[11px] text-destructive mt-0.5">
                 {premiumPreviewErr instanceof Error
                   ? premiumPreviewErr.message
@@ -1303,12 +1344,12 @@ const OfferDetail = () => {
           <CardContent><div className="text-lg font-semibold">{offer.currency}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1.5"><CardDescription>Schedules</CardDescription></CardHeader>
+          <CardHeader className="pb-1.5"><CardDescription>Offer Years</CardDescription></CardHeader>
           <CardContent>
             <div className="text-lg font-semibold">
-              {offer.schedules.length}
+              {offer.offerYears.length}
               <span className="text-sm font-normal text-muted-foreground ml-1">
-                {offer.schedules.length === 1 ? "schedule" : "schedules"}
+                {offer.offerYears.length === 1 ? "year" : "years"}
               </span>
             </div>
           </CardContent>
@@ -1340,7 +1381,7 @@ const OfferDetail = () => {
       <Tabs defaultValue="summary" className="w-full">
         <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full md:w-auto">
           <TabsTrigger value="summary" className="gap-1.5"><Package className="h-3.5 w-3.5" />Summary</TabsTrigger>
-          <TabsTrigger value="schedule" className="gap-1.5"><Calendar className="h-3.5 w-3.5" />Schedule</TabsTrigger>
+          <TabsTrigger value="years" className="gap-1.5"><Calendar className="h-3.5 w-3.5" />Years</TabsTrigger>
           <TabsTrigger value="discounts" className="gap-1.5"><Percent className="h-3.5 w-3.5" />Discount Requests</TabsTrigger>
           <TabsTrigger value="people" className="gap-1.5"><Users className="h-3.5 w-3.5" />People</TabsTrigger>
           {/* <TabsTrigger value="notes" className="gap-1.5"><StickyNote className="h-3.5 w-3.5" />Notes</TabsTrigger> */}
@@ -1408,8 +1449,8 @@ const OfferDetail = () => {
                   }
                 />
                 <div className="col-span-2">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Schedule Coverages</div>
-                  {scheduleCoverages.length === 0 ? (
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Offer Year Coverages</div>
+                  {yearCoverages.length === 0 ? (
                     <span className="text-sm text-muted-foreground">No coverages on this offer yet.</span>
                   ) : (
                     <div className="rounded-md border">
@@ -1423,7 +1464,7 @@ const OfferDetail = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {scheduleCoverages.map((c) => (
+                          {yearCoverages.map((c) => (
                             <TableRow key={c.id || c.coverageId}>
                               <TableCell>
                                 <div className="text-sm font-medium">
@@ -1534,20 +1575,20 @@ const OfferDetail = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="schedule" className="mt-4 space-y-4">
+        <TabsContent value="years" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Offer Schedules</CardTitle>
+              <CardTitle className="text-base">Offer Years</CardTitle>
               <CardDescription>
-                Expand a schedule row to view its documents and verification side by side.
+                Expand an offer-year row to view its documents and verification side by side.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {offer.schedules.length === 0 ? (
+              {offer.offerYears.length === 0 ? (
                 premiumPreview && premiumPreview.length > 0 ? (
                   <div className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Premium preview (not committed). Commit schedules to persist these amounts.
+                      Premium preview (not committed). Calculate offer years to persist these amounts.
                     </p>
                     <div className="grid grid-cols-2 gap-3 max-w-md">
                       <div className="rounded-md border p-3">
@@ -1557,7 +1598,7 @@ const OfferDetail = () => {
                         </div>
                       </div>
                       <div className="rounded-md border p-3">
-                        <div className="text-xs text-muted-foreground">Premium</div>
+                        <div className="text-xs text-muted-foreground">Pay Premium</div>
                         <div className="text-lg font-semibold font-mono text-primary mt-1">
                           {fmtMoney(previewPremiumTotal, offer.currency)}
                         </div>
@@ -1570,7 +1611,7 @@ const OfferDetail = () => {
                       ? "Loading premium preview…"
                       : premiumPreviewError
                         ? "Premium preview unavailable — add loan disbursements and an insured person, then retry."
-                        : "No schedules calculated for this offer yet."}
+                        : "No offer years calculated for this offer yet."}
                   </div>
                 )
               ) : (
@@ -1583,7 +1624,7 @@ const OfferDetail = () => {
                         <TableHead>Start</TableHead>
                         <TableHead>End</TableHead>
                         <TableHead className="text-right">Insured Amount</TableHead>
-                        <TableHead className="text-right">Premium</TableHead>
+                        <TableHead className="text-right">Pay Premium</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Coverages</TableHead>
                         <TableHead className="text-right">Documents</TableHead>
@@ -1591,12 +1632,12 @@ const OfferDetail = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {offer.schedules.map((s) => {
+                      {offer.offerYears.map((s) => {
                         const isCancelled = s.internalStatus === "cancelled";
-                        const isExpanded = expandedScheduleYears.has(s.year);
+                        const isExpanded = expandedYears.has(s.year);
                         const docActionPending =
-                          approveScheduleDocument.isPending ||
-                          rejectScheduleDocument.isPending ||
+                          approveYearDocument.isPending ||
+                          rejectYearDocument.isPending ||
                           docSubmitPending;
 
                         return (
@@ -1613,11 +1654,11 @@ const OfferDetail = () => {
                                   className="h-8 w-8 text-muted-foreground"
                                   aria-label={
                                     isExpanded
-                                      ? `Collapse schedule ${s.year}`
-                                      : `Expand schedule ${s.year}`
+                                      ? `Collapse offer year ${s.year}`
+                                      : `Expand offer year ${s.year}`
                                   }
                                   aria-expanded={isExpanded}
-                                  onClick={() => toggleScheduleExpanded(s.year)}
+                                  onClick={() => toggleYearExpanded(s.year)}
                                 >
                                   {isExpanded ? (
                                     <ChevronDown className="h-4 w-4" />
@@ -1632,14 +1673,22 @@ const OfferDetail = () => {
                               <TableCell className="text-right font-mono text-sm">
                                 {fmtMoney(s.insuredAmount, offer.currency)}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-sm font-semibold">
-                                {fmtMoney(s.premium, offer.currency)}
+                              <TableCell
+                                className="text-right font-mono text-sm font-semibold"
+                                title={`Calculated premium ${fmtMoney(s.premium, offer.currency)}`}
+                              >
+                                {fmtMoney(s.payPremium, offer.currency)}
+                                {s.payPremium !== s.premium && (
+                                  <div className="text-[11px] font-normal text-muted-foreground">
+                                    calc. {fmtMoney(s.premium, offer.currency)}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Badge
                                   variant="outline"
                                   className={
-                                    scheduleStatusColor[s.internalStatus ?? ""] ??
+                                    yearStatusColor[s.internalStatus ?? ""] ??
                                     "bg-muted text-muted-foreground"
                                   }
                                 >
@@ -1671,8 +1720,8 @@ const OfferDetail = () => {
                                     size="sm"
                                     variant="secondary"
                                     className="gap-1.5 h-8 text-destructive hover:text-destructive"
-                                    disabled={isCancelled || cancelSchedule.isPending}
-                                    onClick={() => setCancelScheduleYear(s.year)}
+                                    disabled={isCancelled || cancelOfferYear.isPending}
+                                    onClick={() => setCancelYear(s.year)}
                                   >
                                     <XCircle className="h-3.5 w-3.5" /> Cancel
                                   </Button>
@@ -1683,7 +1732,7 @@ const OfferDetail = () => {
                             {isExpanded && (
                               <TableRow className="hover:bg-transparent">
                                 <TableCell colSpan={10} className="p-0">
-                                  <ScheduleExpandedPanel
+                                  <OfferYearExpandedPanel
                                     offerId={offer.id}
                                     year={s.year}
                                     reviewFlags={s.reviewFlags}
@@ -1731,13 +1780,13 @@ const OfferDetail = () => {
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {fmtMoney(
-                            offer.schedules.reduce((sum, s) => sum + s.insuredAmount, 0),
+                            offer.offerYears.reduce((sum, s) => sum + s.insuredAmount, 0),
                             offer.currency
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm font-semibold text-primary">
                           {fmtMoney(
-                            offer.schedules.reduce((sum, s) => sum + s.premium, 0),
+                            offer.offerYears.reduce((sum, s) => sum + s.payPremium, 0),
                             offer.currency
                           )}
                         </TableCell>
@@ -1751,27 +1800,27 @@ const OfferDetail = () => {
           </Card>
 
           <AlertDialog
-            open={cancelScheduleYear != null}
-            onOpenChange={(open) => !open && setCancelScheduleYear(null)}
+            open={cancelYear != null}
+            onOpenChange={(open) => !open && setCancelYear(null)}
           >
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Cancel schedule {cancelScheduleYear}?</AlertDialogTitle>
+                <AlertDialogTitle>Cancel offer year {cancelYear}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will cancel the schedule for year {cancelScheduleYear} on this offer.
+                  This will cancel the offer year {cancelYear} on this offer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={cancelSchedule.isPending}>Keep schedule</AlertDialogCancel>
+                <AlertDialogCancel disabled={cancelOfferYear.isPending}>Keep year</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={(e) => {
                     e.preventDefault();
-                    void handleCancelSchedule();
+                    void handleCancelYear();
                   }}
-                  disabled={cancelSchedule.isPending}
+                  disabled={cancelOfferYear.isPending}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  {cancelSchedule.isPending ? "Cancelling…" : "Cancel schedule"}
+                  {cancelOfferYear.isPending ? "Cancelling…" : "Cancel schedule"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -1791,7 +1840,7 @@ const OfferDetail = () => {
               <DialogHeader>
                 <DialogTitle>Request discount · Year {discountDialog?.year}</DialogTitle>
                 <DialogDescription>
-                  Submit a discount request for this schedule year.
+                  Submit a discount request for this offer year.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-2">
@@ -1848,19 +1897,19 @@ const OfferDetail = () => {
                 <AlertDialogTitle>Approve document?</AlertDialogTitle>
                 <AlertDialogDescription>
                   Approve <span className="font-medium text-foreground">{pendingDocApprove?.label}</span> for
-                  schedule year {pendingDocApprove?.year}.
+                  offer year {pendingDocApprove?.year}.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={approveScheduleDocument.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={approveYearDocument.isPending}>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={approveScheduleDocument.isPending}
+                  disabled={approveYearDocument.isPending}
                   onClick={(e) => {
                     e.preventDefault();
-                    void handleApproveScheduleDocument();
+                    void handleApproveYearDocument();
                   }}
                 >
-                  {approveScheduleDocument.isPending ? "Approving…" : "Approve"}
+                  {approveYearDocument.isPending ? "Approving…" : "Approve"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -1878,7 +1927,7 @@ const OfferDetail = () => {
                 <AlertDialogDescription>
                   {pendingFlagAction?.kind === "reject" ? "Reject" : "Approve"}{" "}
                   <span className="font-medium text-foreground">{pendingFlagAction?.label}</span> for
-                  schedule year {pendingFlagAction?.year}.
+                  offer year {pendingFlagAction?.year}.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1940,16 +1989,16 @@ const OfferDetail = () => {
                     setDocRejectDialog(null);
                     setDocRejectReason("");
                   }}
-                  disabled={rejectScheduleDocument.isPending}
+                  disabled={rejectYearDocument.isPending}
                 >
                   Cancel
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => void handleRejectScheduleDocument()}
-                  disabled={rejectScheduleDocument.isPending || !docRejectReason.trim()}
+                  onClick={() => void handleRejectYearDocument()}
+                  disabled={rejectYearDocument.isPending || !docRejectReason.trim()}
                 >
-                  {rejectScheduleDocument.isPending ? "Rejecting…" : "Reject"}
+                  {rejectYearDocument.isPending ? "Rejecting…" : "Reject"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1968,7 +2017,7 @@ const OfferDetail = () => {
               <DialogHeader>
                 <DialogTitle>Submit document · {docSubmitDialog?.label}</DialogTitle>
                 <DialogDescription>
-                  Upload a file to submit for schedule year {docSubmitDialog?.year}.
+                  Upload a file to submit for offer year {docSubmitDialog?.year}.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2 py-2">
@@ -1997,7 +2046,7 @@ const OfferDetail = () => {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => void handleSubmitScheduleDocument()}
+                  onClick={() => void handleSubmitYearDocument()}
                   disabled={docSubmitPending || !docSubmitFile}
                 >
                   {docSubmitPending ? "Submitting…" : "Submit"}
@@ -2009,15 +2058,15 @@ const OfferDetail = () => {
 
         <TabsContent value="discounts" className="mt-4">
           {(() => {
-            const discountRows = offer.schedules.flatMap((s) =>
-              s.discountRequests.map((r) => ({ ...r, scheduleYear: s.year }))
+            const discountRows = offer.offerYears.flatMap((s) =>
+              s.discountRequests.map((r) => ({ ...r, offerYear: s.year }))
             );
             return (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Discount Requests</CardTitle>
                   <CardDescription>
-                    Discount requests attached to offer schedules.
+                    Discount requests attached to offer years.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -2043,8 +2092,8 @@ const OfferDetail = () => {
                           discountRows.map((r) => {
                             const canAct = r.status === "requested";
                             return (
-                              <TableRow key={`${r.scheduleYear}-${r.id}`}>
-                                <TableCell className="font-mono">{r.scheduleYear}</TableCell>
+                              <TableRow key={`${r.offerYear}-${r.id}`}>
+                                <TableCell className="font-mono">{r.offerYear}</TableCell>
                                 <TableCell className="text-center font-mono text-sm font-semibold min-w-[320px]">
                                   {Math.round(r.requestedDiscountPercentage * 10000) / 100}%
                                 </TableCell>
@@ -2072,7 +2121,7 @@ const OfferDetail = () => {
                                       onClick={() =>
                                         setDiscountConfirm({
                                           kind: "approve",
-                                          year: r.scheduleYear,
+                                          year: r.offerYear,
                                           requestId: r.id,
                                           pctLabel: `${Math.round(r.requestedDiscountPercentage * 10000) / 100}%`,
                                         })
@@ -2088,7 +2137,7 @@ const OfferDetail = () => {
                                       onClick={() =>
                                         setDiscountConfirm({
                                           kind: "reject",
-                                          year: r.scheduleYear,
+                                          year: r.offerYear,
                                           requestId: r.id,
                                           pctLabel: `${Math.round(r.requestedDiscountPercentage * 10000) / 100}%`,
                                         })

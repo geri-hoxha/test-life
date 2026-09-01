@@ -153,9 +153,13 @@ export type ProductsProductResponse = {
   coverageText?: string;
   productGroupId?: string;
   supportedCurrencies?: string[];
-  sumInsuredBasis?: string | null;
+  policyPlanType?: ProductsPolicyPlanType | null;
+  /** Derived from `policyPlanType`. */
   issuanceMode?: string | null;
+  /** Derived from `policyPlanType`. */
   calculationMethod?: string | null;
+  /** Read-only, derived from `policyPlanType`. Omitted for Upfront/PPI/NA plans. */
+  scheduleBasis?: ProductsScheduleBasis | null;
   maxCoveredYears?: number | null;
   coverages?: ProductsProductCoverageResponse[];
   productDocumentTypes?: ProductsProductDocumentTypeResponse[];
@@ -186,13 +190,25 @@ export type ProductsProductResponse = {
 export type ProductsIssuanceMode = "annualRenewable" | "wholeOfTerm";
 export type ProductsCalculationMethod = "declining" | "leveled";
 
+/** Product classification. Replaces the former `premiumPlan` + `sumInsuredBasis` pair. */
+export type ProductsPolicyPlanType =
+  | "PPR-SIB"
+  | "PPR-STB"
+  | "PGP"
+  | "PPRS"
+  | "PPFM"
+  | "PPFV"
+  | "NA";
+
+export type ProductsScheduleBasis = "tabled" | "perRenewalInfo";
+
 export type ProductsCreateProductRequest = {
   name: string;
   productGroupId?: string;
   supportedCurrencies: string[];
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
-  sumInsuredBasis?: string | null;
+  policyPlanType?: ProductsPolicyPlanType | null;
   issuanceMode?: ProductsIssuanceMode | null;
   calculationMethod?: ProductsCalculationMethod | null;
   maxCoveredYears?: number | null;
@@ -231,7 +247,7 @@ export type ProductsUpdateProductRequest = {
   supportedCurrencies: string[];
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
-  sumInsuredBasis?: string | null;
+  policyPlanType?: ProductsPolicyPlanType | null;
   issuanceMode?: ProductsIssuanceMode | null;
   calculationMethod?: ProductsCalculationMethod | null;
   maxCoveredYears?: number | null;
@@ -369,7 +385,10 @@ export type PoliciesPolicyYearResponse = {
   year?: number;
   period?: OffersDateOnlyRangeResponse;
   insuredAmount?: number;
+  /** Actuarially-calculated premium. */
   premium?: number;
+  /** Amount actually billed. Equals `premium` except on PPFM/PPFV plans, where it is leveled. */
+  payPremium?: number;
   coverages?: PoliciesPolicyCoverageResponse[];
 };
 
@@ -378,6 +397,8 @@ export type PoliciesPolicyResponse = {
   productId?: string;
   currency?: string;
   offerId?: string;
+  /** Snapshotted from the product at issuance. */
+  policyPlanType?: ProductsPolicyPlanType | null;
   issuedOnUtc?: string;
   effectiveFromUtc?: string;
   effectiveToUtc?: string;
@@ -578,9 +599,9 @@ export type OffersAddOfferParticipantRequest = {
   share?: number | null;
 };
 
-export type DomainOffersInternalOfferScheduleStatus = "draft" | "pending" | "active" | "cancelled";
+export type DomainOffersInternalOfferYearStatus = "draft" | "pending" | "active" | "cancelled";
 
-export type OffersOfferScheduleCoverageResponse = {
+export type OffersOfferYearCoverageResponse = {
   id?: number;
   coverageId?: string;
   sumInsured?: number;
@@ -589,48 +610,51 @@ export type OffersOfferScheduleCoverageResponse = {
   calculatedPremium?: number;
 };
 
-export type DomainOffersOfferScheduleDocumentStatus = "required" | "submitted" | "accepted" | "refused";
+export type DomainOffersOfferYearDocumentStatus = "required" | "submitted" | "accepted" | "refused";
 
-export type OffersOfferScheduleDocumentResponse = {
+export type OffersOfferYearDocumentResponse = {
   id?: number;
   documentId?: string | null;
   documentTypeId?: string;
-  status?: DomainOffersOfferScheduleDocumentStatus;
+  status?: DomainOffersOfferYearDocumentStatus;
   refusalReason?: string | null;
 };
 
-export type DomainOffersOfferScheduleDiscountRequestStatus = "requested" | "approved" | "rejected";
+export type DomainOffersOfferYearDiscountRequestStatus = "requested" | "approved" | "rejected";
 
-export type OffersOfferScheduleDiscountRequestResponse = {
+export type OffersOfferYearDiscountRequestResponse = {
   id?: number;
   requestedDiscountPercentage?: number;
   reason?: string;
-  status?: DomainOffersOfferScheduleDiscountRequestStatus;
+  status?: DomainOffersOfferYearDiscountRequestStatus;
 };
 
-export type DomainOffersOfferScheduleReviewFlagStatus = "pending" | "approved" | "rejected";
+export type DomainOffersOfferYearReviewFlagStatus = "pending" | "approved" | "rejected";
 
-export type OffersOfferScheduleReviewFlagResponse = {
+export type OffersOfferYearReviewFlagResponse = {
   id?: number;
   type?: string;
   reason?: string;
-  status?: DomainOffersOfferScheduleReviewFlagStatus | string;
+  status?: DomainOffersOfferYearReviewFlagStatus | string;
   raisedOnUtc?: string;
   resolvedOnUtc?: string | null;
 };
 
-export type OffersOfferScheduleResponse = {
+export type OffersOfferYearResponse = {
   id?: number;
   year?: number;
   period?: OffersDateOnlyRangeResponse;
   insuredAmount?: number;
+  /** Actuarially-calculated premium. */
   premium?: number;
-  internalStatus?: DomainOffersInternalOfferScheduleStatus;
+  /** Amount actually billed. Equals `premium` except on PPFM/PPFV plans, where it is leveled. */
+  payPremium?: number;
+  internalStatus?: DomainOffersInternalOfferYearStatus;
   policyId?: string | null;
-  coverages?: OffersOfferScheduleCoverageResponse[];
-  documents?: OffersOfferScheduleDocumentResponse[];
-  discountRequests?: OffersOfferScheduleDiscountRequestResponse[];
-  reviewFlags?: OffersOfferScheduleReviewFlagResponse[];
+  coverages?: OffersOfferYearCoverageResponse[];
+  documents?: OffersOfferYearDocumentResponse[];
+  discountRequests?: OffersOfferYearDiscountRequestResponse[];
+  reviewFlags?: OffersOfferYearReviewFlagResponse[];
 };
 
 /** Slim shape used by POST /offers/{offerId}/premium and POST /offers/premium preview UI. */
@@ -638,6 +662,7 @@ export type OffersOfferPremiumPreview = {
   year?: number;
   insuredAmount: number;
   premium: number;
+  payPremium: number;
 };
 
 /** POST /api/offers/premium — unbound premium calc from product + insured + loan rows. */
@@ -649,11 +674,11 @@ export type OffersCalculatePremiumRequest = {
   loanDisbursements: OffersAddOfferLoanDisbursementRequest[];
 };
 
-export type OffersApproveOfferScheduleDiscountRequest = Record<string, unknown>;
+export type OffersApproveOfferYearDiscountRequest = Record<string, unknown>;
 
-export type OffersApproveOfferScheduleDocumentRequest = Record<string, unknown>;
+export type OffersApproveOfferYearDocumentRequest = Record<string, unknown>;
 
-export type OffersApproveOfferScheduleReviewFlagRequest = Record<string, unknown>;
+export type OffersApproveOfferYearReviewFlagRequest = Record<string, unknown>;
 
 export type DomainOffersOfferStatus = "draft" | "quoted" | "partiallyBound" | "bound" | "cancelled" | "expired";
 
@@ -666,14 +691,47 @@ export type OffersOfferResponse = {
   participants?: OffersOfferParticipantResponse[];
   insuredPersons?: OffersOfferInsuredPersonResponse[];
   loanDisbursements?: OffersOfferLoanDisbursementResponse[];
-  schedules?: OffersOfferScheduleResponse[];
+  offerYears?: OffersOfferYearResponse[];
 };
 
-export type OffersCalculateOfferSchedulesRequest = Record<string, unknown>;
+/** Item of GET /api/offers/renewals-due. */
+export type OffersRenewalDueResponse = {
+  offerId?: string;
+  productId?: string;
+  nextYear?: number;
+  /** true → next year is already priced, go straight to POST /offers/{offerId}/renewal. */
+  readyToRenew?: boolean;
+  currentPolicyEffectiveToUtc?: string;
+};
+
+export type PaginationPagedListOfRenewalDueResponse = {
+  items?: OffersRenewalDueResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type OffersListRenewalsDueRequest = PaginationPagedRequest & Record<string, unknown>;
+
+export type OffersCalculateOfferYearsRequest = Record<string, unknown>;
 
 export type OffersCancelOfferRequest = Record<string, unknown>;
 
-export type OffersCancelOfferScheduleRequest = Record<string, unknown>;
+/** PUT /api/offers/{offerId}/years/{year}/overwrite */
+export type OffersOverwriteOfferYearRequest = {
+  offerId: string;
+  year: number;
+  insuredAmount: number;
+  premium: number;
+  /** Required. Defaults to `premium` on every plan except PPFM/PPFV. */
+  payPremium: number;
+};
+
+export type OffersCancelOfferYearRequest = Record<string, unknown>;
 
 export type OffersCreateOfferRequest = {
   productId?: string;
@@ -682,7 +740,7 @@ export type OffersCreateOfferRequest = {
 
 export type OffersGetOfferRequest = Record<string, unknown>;
 
-export type OffersListOfferScheduleDocumentsRequest = Record<string, unknown>;
+export type OffersListOfferYearDocumentsRequest = Record<string, unknown>;
 
 export type PaginationPagedListOfOfferResponse = {
   items?: OffersOfferResponse[];
@@ -697,13 +755,13 @@ export type PaginationPagedListOfOfferResponse = {
 
 export type OffersListOffersRequest = PaginationPagedRequest & Record<string, unknown>;
 
-export type OffersRejectOfferScheduleDiscountRequest = Record<string, unknown>;
+export type OffersRejectOfferYearDiscountRequest = Record<string, unknown>;
 
-export type OffersRejectOfferScheduleDocumentRequest = {
+export type OffersRejectOfferYearDocumentRequest = {
   reason: string;
 };
 
-export type OffersRejectOfferScheduleReviewFlagRequest = Record<string, unknown>;
+export type OffersRejectOfferYearReviewFlagRequest = Record<string, unknown>;
 
 export type OffersRemoveOfferInsuredPersonRequest = Record<string, unknown>;
 
@@ -711,12 +769,12 @@ export type OffersRemoveOfferLoanDisbursementRequest = Record<string, unknown>;
 
 export type OffersRemoveOfferParticipantRequest = Record<string, unknown>;
 
-export type OffersRequestOfferScheduleDiscountRequest = {
+export type OffersRequestOfferYearDiscountRequest = {
   requestedDiscountPercentage?: number;
   reason: string;
 };
 
-export type OffersSubmitOfferScheduleDocumentRequest = {
+export type OffersSubmitOfferYearDocumentRequest = {
   documentId?: string;
 };
 

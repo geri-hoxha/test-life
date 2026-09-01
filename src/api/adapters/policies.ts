@@ -69,6 +69,7 @@ const mapPolicyYear = (y: PoliciesPolicyYearResponse, i: number): PolicyYear => 
   endDate: y.period?.endDate?.slice(0, 10) ?? "",
   insuredAmount: y.insuredAmount ?? 0,
   premium: y.premium ?? 0,
+  payPremium: y.payPremium ?? y.premium ?? 0,
   coverages: (y.coverages ?? []).map(mapCoverage),
 });
 
@@ -109,7 +110,7 @@ export const mapApiPolicy = (p: PoliciesPolicyResponse): Policy => {
     }));
 
   const premium =
-    policyYears.reduce((sum, y) => sum + (y.premium ?? 0), 0) ||
+    policyYears.reduce((sum, y) => sum + (y.payPremium ?? y.premium ?? 0), 0) ||
     coverages.reduce((sum, c) => sum + (c.calculatedPremium ?? 0), 0);
 
   const insuredAmount =
@@ -136,6 +137,7 @@ export const mapApiPolicy = (p: PoliciesPolicyResponse): Policy => {
     beneficiaries,
     participants,
     insuredPersons,
+    policyPlanType: p.policyPlanType ?? null,
     policyYears,
     coverages,
     documents,

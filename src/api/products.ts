@@ -7,6 +7,8 @@ import type {
   ProductsAddProductDocumentTypeRequest,
   ProductsAddProductPaymentMethodRequest,
   ProductsCreateProductRequest,
+  ProductsPolicyPlanType,
+  ProductsScheduleBasis,
   ProductsProductCoverageCurrencyLimitResponse,
   ProductsProductCoverageResponse,
   ProductsProductDocumentTypeResponse,
@@ -380,9 +382,10 @@ export type MappedProduct = {
   productGroupId?: string;
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
-  sumInsuredBasis?: string | null;
+  policyPlanType?: ProductsPolicyPlanType | null;
   issuanceMode?: string | null;
   calculationMethod?: string | null;
+  scheduleBasis?: ProductsScheduleBasis | null;
   maxCoveredYears?: number | null;
   paymentModel?: string;
   premiumTableId?: string;
@@ -452,9 +455,10 @@ export const mapApiProduct = (p: ProductsProductResponse): MappedProduct => {
     productGroupId: p.productGroupId,
     coverageText: p.coverageText,
     defaultPrintableTemplateDocumentId: p.defaultPrintableTemplateDocumentId ?? null,
-    sumInsuredBasis: p.sumInsuredBasis ?? null,
+    policyPlanType: p.policyPlanType ?? null,
     issuanceMode: p.issuanceMode ?? null,
     calculationMethod: p.calculationMethod ?? null,
+    scheduleBasis: p.scheduleBasis ?? null,
     maxCoveredYears: p.maxCoveredYears ?? null,
     paymentModel: p.paymentModel ?? undefined,
     premiumTableId: p.premiumTableId ?? undefined,

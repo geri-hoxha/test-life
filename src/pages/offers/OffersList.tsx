@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Plus } from "lucide-react";
+import { Eye, Plus, RefreshCw } from "lucide-react";
 import { statusColor, OfferStatus, offerStatusToApi, type Offer } from "@/data/offers";
 import { getCurrencies } from "@/config/currencies";
 import { listOffers, offersKeys, useListOffers } from "@/api/offers";
@@ -165,10 +165,20 @@ const OffersList = () => {
             Draft policies awaiting quotation, review, or issuance.
           </p>
         </div>
-        <Button onClick={() => navigate("/offers/new")} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Offer
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* <Button
+            variant="outline"
+            onClick={() => navigate("/offers/renewals-due")}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Renewals Due
+          </Button> */}
+          <Button onClick={() => navigate("/offers/new")} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Offer
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
@@ -275,7 +285,7 @@ const OffersList = () => {
                   <TableHead>Insured</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Currency</TableHead>
-                  <TableHead className="text-right">Premium</TableHead>
+                  <TableHead className="text-right">Pay Premium</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-[140px] text-right">Actions</TableHead>
@@ -300,7 +310,7 @@ const OffersList = () => {
                     const holder = holderParticipant?.displayName?.trim() || null;
                     const insured = insuredName(o);
                     const product = productMap[o.productId];
-                    const hasSchedule = o.schedules.length > 0;
+                    const hasOfferYears = o.offerYears.length > 0;
                     return (
                       <TableRow key={o.id}>
                         <TableCell>
@@ -332,7 +342,7 @@ const OffersList = () => {
                         <TableCell className="text-sm">{product?.name ?? o.productId}</TableCell>
                         <TableCell><Badge variant="outline">{o.currency}</Badge></TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {hasSchedule
+                          {hasOfferYears
                             ? new Intl.NumberFormat("en-US", {
                                 style: "currency",
                                 currency: o.currency,
