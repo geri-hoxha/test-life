@@ -105,6 +105,7 @@ import { useListDocumentTypes } from "@/api/document-types";
 import {
   buildCreateDocumentFormData,
   createDocument,
+  downloadDocumentFile,
   useGetDocument,
 } from "@/api/documents";
 import { useGetBankAccount } from "@/api/bank-accounts";
@@ -417,6 +418,7 @@ const OfferDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  const { data: apiOffer, isLoading } = useGetOffer(id ?? "", { enabled: Boolean(id) });
   const { data: countryOptions = [] } = useCountryEnum();
   const countryLabel = (code?: string) => countryDisplayName(code, countryOptions) ?? code;
   const {

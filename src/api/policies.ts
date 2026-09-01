@@ -74,8 +74,9 @@ export const getPolicyPrint = async (id: string, signal?: AbortSignal): Promise<
 /** Open print dialog for POST /api/policies/{id}/print */
 export const openPolicyPrint = async (id: string) => {
   const blob = await getPolicyPrint(id);
+  const mime = (blob.type || "").toLowerCase().split(";")[0].trim();
   await openBlobPrintDialog(blob, {
-    fileName: "policy.pdf",
-    mimeType: "application/pdf",
+    fileName: mime.includes("html") ? "policy.html" : "policy.pdf",
+    mimeType: mime || undefined,
   });
 };
