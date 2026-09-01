@@ -36,7 +36,7 @@ export const useAddCompanyAddress = () => {
       addCompanyAddress(vars.companyId, vars.body),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: companiesKeys.detail(vars.companyId) });
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
     },
   });
 };
@@ -58,7 +58,7 @@ export const useCreateCompany = () => {
       if (data.id) {
         queryClient.setQueryData(companiesKeys.detail(data.id), data);
       }
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
     },
   });
 };
@@ -132,7 +132,7 @@ export const useUpdateCompany = () => {
         ...data,
         addresses: data.addresses ?? prev?.addresses,
       }));
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
     },
   });
 };
@@ -155,7 +155,7 @@ export const useRemoveCompanyAddress = () => {
       removeCompanyAddress(vars.companyId, vars.addressEntryId),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: companiesKeys.detail(vars.companyId) });
-      void queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: companiesKeys.all });
     },
   });
 };

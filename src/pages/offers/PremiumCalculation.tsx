@@ -182,9 +182,9 @@ const PremiumCalculation = ({
     netPremium = Math.max(0, serverPreview.premium);
   }
 
-  const TAX_RATE = 0.10;
-  const tax = netPremium * TAX_RATE;
-  const grossPremium = netPremium + tax;
+  const TAX_RATE = 0;
+  const tax = 0;
+  const grossPremium = netPremium;
 
   const effectiveCommissionPct =
     template ? (template.agentCommission + template.bankCommission) * 100 : (subtotal > 0 ? (weightedCommission / subtotal) * 100 : 0);
@@ -393,8 +393,6 @@ const PremiumCalculation = ({
             )}
           </CardContent>
         </Card>
-        <Card><CardHeader className="pb-1.5"><CardDescription>Tax (10%)</CardDescription></CardHeader>
-          <CardContent><div className="text-lg font-semibold">{fmt(tax, currency)}</div></CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Gross Premium</CardDescription></CardHeader>
           <CardContent><div className="text-lg font-semibold text-primary">{fmt(grossPremium, currency)}</div></CardContent></Card>
         <Card><CardHeader className="pb-1.5"><CardDescription>Agent Commission</CardDescription></CardHeader>

@@ -55,11 +55,12 @@ import {
   useListDocuments,
   useUpdateDocument,
 } from "@/api/documents";
+import { useDocumentPreview } from "@/components/documents/DocumentPreview";
 import type { DocumentsDocumentResponse } from "@/api/types";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toastApiError } from "@/lib/api-error";
-import { Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type DeletedFilter = "all" | "yes" | "no";
@@ -105,6 +106,7 @@ const DocumentsList = () => {
 
   const [deleteTarget, setDeleteTarget] = useState<DocumentsDocumentResponse | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const { fileBusy, openPreview } = useDocumentPreview();
 
   const createDocument = useCreateDocument();
   const updateDocument = useUpdateDocument();
@@ -205,6 +207,11 @@ const DocumentsList = () => {
     } finally {
       setDownloadingId(null);
     }
+  };
+
+  const handlePreview = (row: DocumentsDocumentResponse) => {
+    if (!row.id) return;
+    void openPreview(row.id, row.originalFileName ?? "Document");
   };
 
   const handleDelete = () => {
@@ -362,11 +369,29 @@ const DocumentsList = () => {
                               variant="ghost"
                               size="sm"
                               className="h-8"
+                              disabled={!row.id || Boolean(fileBusy) || deleted}
+                              onClick={() => handlePreview(row)}
+                              title="View file"
+                            >
+                              {fileBusy?.id === row.id && fileBusy.action === "preview" ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
                               disabled={!row.id || downloadingId === row.id || deleted}
                               onClick={() => void handleDownload(row)}
                               title="Download file"
                             >
-                              <Download className="h-3.5 w-3.5" />
+                              {downloadingId === row.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5" />
+                              )}
                             </Button>
                             <Button
                               variant="ghost"

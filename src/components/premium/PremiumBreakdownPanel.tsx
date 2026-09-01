@@ -6,7 +6,8 @@ import { getLatestRate } from "@/data/fxRates";
 export type PremiumBreakdownInput = {
   currency: string;
   grossPremium: number;
-  taxRate?: number;              // default 0.10
+  taxRate?: number;              // default 0 — tax is not applied
+
   bankCommissionPct?: number;    // decimal, e.g. 0.40
   agentCommissionPct?: number;   // decimal, e.g. 0.10
   fxRate?: number;
@@ -46,9 +47,9 @@ const Row = ({
 );
 
 const PremiumBreakdownPanel = ({ data }: { data: PremiumBreakdownInput }) => {
-  const taxRate = data.taxRate ?? 0.10;
+  const taxRate = data.taxRate ?? 0;
   const gross = data.grossPremium;
-  const tax = +(gross * taxRate / (1 + taxRate)).toFixed(2); // gross is tax-inclusive
+  const tax = taxRate > 0 ? +(gross * taxRate / (1 + taxRate)).toFixed(2) : 0;
   const net = +(gross - tax).toFixed(2);
 
   const bankPct = data.bankCommissionPct ?? 0;
@@ -90,12 +91,14 @@ const PremiumBreakdownPanel = ({ data }: { data: PremiumBreakdownInput }) => {
         <section>
           <div className="rounded-md border bg-muted/20 px-3">
             <Row label="Gross Premium" value={fmt(gross, data.currency)} hint="Total amount the customer pays." />
-            <Row
-              label={`State Tax (${(taxRate * 100).toFixed(0)}%)`}
-              value={`− ${fmt(tax, data.currency)}`}
-              hint="Statutory insurance tax remitted to the state."
-              muted
-            />
+            {taxRate > 0 && (
+              <Row
+                label={`State Tax (${(taxRate * 100).toFixed(0)}%)`}
+                value={`− ${fmt(tax, data.currency)}`}
+                hint="Statutory insurance tax remitted to the state."
+                muted
+              />
+            )}
             <Row label="NET Premium" value={fmt(net, data.currency)} accent />
           </div>
         </section>

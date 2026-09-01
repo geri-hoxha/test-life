@@ -108,6 +108,7 @@ export const customerSchema = z.object({
   dateOfBirth: z.string().optional().or(z.literal("")),
   gender: z.enum(["Male", "Female", "Other"]).optional(),
   nationality: z.string().trim().max(80).optional().or(z.literal("")),
+  ssnIssuingCountry: z.string().trim().max(80).optional().or(z.literal("")),
   placeOfBirth: z.string().trim().max(120).optional().or(z.literal("")),
   companyName: z.string().trim().max(160).optional().or(z.literal("")),
   nipt: z.string().trim().max(30).optional().or(z.literal("")),
@@ -131,29 +132,21 @@ export const customerSchema = z.object({
     if (!c.nationality?.trim() || c.nationality === "N/A") {
       ctx.addIssue({ code: "custom", message: "Nationality is required", path: ["nationality"] });
     }
+    const country = c.ssnIssuingCountry || c.country;
+    if (!country?.trim() || country === "N/A") {
+      ctx.addIssue({ code: "custom", message: "Country is required", path: ["ssnIssuingCountry"] });
+    }
   } else {
     if (!c.companyName?.trim()) ctx.addIssue({ code: "custom", message: "Company name is required", path: ["companyName"] });
     if (!c.nipt?.trim()) ctx.addIssue({ code: "custom", message: "NIPT is required", path: ["nipt"] });
     if (!c.nationality?.trim() || c.nationality === "N/A") {
       ctx.addIssue({ code: "custom", message: "Nationality is required", path: ["nationality"] });
     }
+    if (!c.country?.trim() || c.country === "N/A") {
+      ctx.addIssue({ code: "custom", message: "Country is required", path: ["country"] });
+    }
   }
 });
-
-export const SSN_ISSUING_COUNTRIES = [
-  "Albania",
-  "Kosovo",
-  "North Macedonia",
-  "Montenegro",
-  "Greece",
-  "Italy",
-  "Germany",
-  "France",
-  "United Kingdom",
-  "United States",
-  "Turkey",
-  "Other",
-];
 
 const seed: Customer[] = [
   { id: "CUS-0001", customerType: "Individual", firstName: "Arben", lastName: "Hoxha", fatherName: "Petrit", personalId: "AL-TR-J70412900A",

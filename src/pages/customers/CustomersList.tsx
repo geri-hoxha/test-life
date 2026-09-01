@@ -20,7 +20,7 @@ import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
 import { useCountryEnum } from "@/api/smart-enums";
-import { customerPath, mapCompanyToCustomer, mapPersonToCustomer, newOfferPath } from "@/api/adapters/customers";
+import { customerPath, mapCompanyToCustomer, mapPersonToCustomer, newOfferPath, countryDisplayName } from "@/api/adapters/customers";
 import { Plus, Pencil, FileText } from "lucide-react";
 import { fullName, COMPANY_TYPE_OPTIONS, companyTypeLabel } from "@/data/customers";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -87,10 +87,8 @@ const CustomersList = () => {
 
   const { data: nationalityOptions = [] } = useCountryEnum();
 
-  const nationalityLabel = (code?: string) => {
-    if (!code) return "—";
-    return nationalityOptions.find((o) => o.value === code)?.text ?? code;
-  };
+  const nationalityLabel = (code?: string) =>
+    countryDisplayName(code, nationalityOptions) ?? "—";
 
   const loadPeople = typeFilter === "person";
   const loadCompanies = typeFilter === "company";

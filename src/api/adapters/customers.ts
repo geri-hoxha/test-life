@@ -12,43 +12,19 @@ import type { Customer, Gender } from "@/data/customers";
 
 const NA = "N/A";
 
-const countryToCode: Record<string, string> = {
-  Albania: "AL",
-  Kosovo: "XK",
-  "North Macedonia": "MK",
-  Montenegro: "ME",
-  Greece: "GR",
-  Italy: "IT",
-  Germany: "DE",
-  France: "FR",
-  "United Kingdom": "GB",
-  "United States": "US",
-  Turkey: "TR",
-  AL: "AL",
-};
-
-const codeToCountry: Record<string, string> = {
-  AL: "Albania",
-  XK: "Kosovo",
-  MK: "North Macedonia",
-  ME: "Montenegro",
-  GR: "Greece",
-  IT: "Italy",
-  DE: "Germany",
-  FR: "France",
-  GB: "United Kingdom",
-  US: "United States",
-  TR: "Turkey",
-};
-
+/** Country smart-enum `value` as stored on the API (e.g. `ALB`). */
 export const toCountryCode = (value?: string) => {
-  if (!value || value === NA) return "AL";
-  return countryToCode[value] ?? (value.length === 2 ? value.toUpperCase() : "AL");
+  if (!value || value === NA) return "";
+  return value.trim();
 };
 
-export const fromCountryCode = (code?: string) => {
-  if (!code) return NA;
-  return codeToCountry[code.toUpperCase()] ?? code;
+/** Look up Country enum `text` for a stored `value` (`ALB` → `Albania`). */
+export const countryDisplayName = (
+  code?: string,
+  options?: { value: string; text: string }[],
+) => {
+  if (!code || code === NA) return undefined;
+  return options?.find((o) => o.value === code)?.text ?? code;
 };
 
 export const toApiGender = (g?: Gender | string) => {
@@ -70,7 +46,7 @@ export const mapPersonToCustomer = (p: PeoplePersonResponse): Customer => ({
   lastName: p.lastName ?? "",
   fatherName: "",
   personalId: p.personalIdentifier ?? "",
-  ssnIssuingCountry: fromCountryCode(p.countryCode),
+  ssnIssuingCountry: p.countryCode ?? "",
   dateOfBirth: p.dateOfBirth?.slice(0, 10) ?? "",
   gender: fromApiGender(p.gender),
   nationality: p.nationality ?? "",
@@ -78,7 +54,7 @@ export const mapPersonToCustomer = (p: PeoplePersonResponse): Customer => ({
   f5Location: NA,
   address: "",
   city: "",
-  country: fromCountryCode(p.countryCode),
+  country: p.countryCode ?? "",
   phone: "",
   email: "",
   occupation: "",
@@ -109,7 +85,7 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
     address: main?.street ?? "",
     city: main?.city ?? "",
     postalCode: main?.postalCode ?? "",
-    country: fromCountryCode(c.countryCode ?? main?.countryCode),
+    country: c.countryCode ?? main?.countryCode ?? "",
     phone: "",
     email: "",
     occupation: "",

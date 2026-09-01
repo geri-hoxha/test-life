@@ -17,11 +17,13 @@ import { useGetPerson } from "@/api/people";
 import { useGetCompany } from "@/api/companies";
 import {
   customerPath,
+  countryDisplayName,
   mapCompanyToCustomer,
   mapPersonToCustomer,
   newOfferPath,
   parseCustomerPartyType,
 } from "@/api/adapters/customers";
+import { useCountryEnum } from "@/api/smart-enums";
 
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -77,6 +79,11 @@ const CustomerDetail = () => {
   }, [partyType, personQ.data, companyQ.data]);
 
   const companyAddresses = partyType !== "person" ? (companyQ.data?.addresses ?? []) : [];
+  const { data: countryOptions = [] } = useCountryEnum();
+  const countryLabel = countryDisplayName(
+    customer?.ssnIssuingCountry || customer?.country,
+    countryOptions,
+  );
 
   const isLoading =
     partyType === "company"
@@ -170,13 +177,13 @@ const CustomerDetail = () => {
               <>
                 <div className="flex items-center gap-2 text-muted-foreground"><BadgeCheck className="h-4 w-4" /> <span className="font-mono">{customer.nipt || "—"}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> {companyTypeLabel(customer.companyType) || "—"}</div>
-                <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {customer.country || "—"}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {countryLabel || "—"}</div>
                 <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {[customer.address, customer.city, customer.postalCode].filter(Boolean).join(", ") || "—"}</div>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-muted-foreground"><BadgeCheck className="h-4 w-4" /> <span className="font-mono">{customer.personalId || "—"}</span></div>
-                <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {customer.ssnIssuingCountry || customer.country || "—"}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {countryLabel || "—"}</div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="h-4 w-4" /> {customer.dateOfBirth ? format(parseISO(customer.dateOfBirth), "MMM dd, yyyy") : "—"}</div>
               </>
             )}
@@ -205,7 +212,7 @@ const CustomerDetail = () => {
                     {customer.tradeName ? (
                       <Field icon={Briefcase} label="Trade name" value={customer.tradeName} />
                     ) : null}
-                    <Field icon={MapPin} label="Country" value={customer.country} />
+                    <Field icon={MapPin} label="Country" value={countryLabel} />
                     <Field
                       icon={MapPin}
                       label="Main address"
@@ -215,7 +222,7 @@ const CustomerDetail = () => {
                 ) : (
                   <>
                     <Field icon={BadgeCheck} label="Personal ID" value={<span className="font-mono">{customer.personalId}</span>} />
-                    <Field icon={MapPin} label="Country" value={customer.ssnIssuingCountry || customer.country} />
+                    <Field icon={MapPin} label="Country" value={countryLabel} />
                     <Field icon={Calendar} label="Date of Birth" value={customer.dateOfBirth ? `${format(parseISO(customer.dateOfBirth), "PPP")}${age != null ? ` (${age} y/o)` : ""}` : "—"} />
                     <Field icon={ShieldCheck} label="Gender" value={customer.gender} />
                   </>
@@ -239,7 +246,7 @@ const CustomerDetail = () => {
                       <li key={a.id ?? `${a.street}-${a.city}`} className="text-sm flex items-start gap-2">
                         <MapPin className="h-3.5 w-3.5 text-accent mt-0.5 shrink-0" />
                         <span>
-                          {[a.street, a.city, a.postalCode, a.countryCode].filter(Boolean).join(", ")}
+                          {[a.street, a.city, a.postalCode, countryDisplayName(a.countryCode, countryOptions) ?? a.countryCode].filter(Boolean).join(", ")}
                           {a.isMain ? (
                             <Badge className="ml-2 bg-success/15 text-success border-0 text-[10px]">Main</Badge>
                           ) : null}

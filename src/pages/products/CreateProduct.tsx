@@ -19,11 +19,7 @@ import {
   addProductDocumentType,
   addProductPaymentMethod,
 } from "@/api/products";
-import type {
-  ProductsCalculationMethod,
-  ProductsIssuanceMode,
-  ProductsPolicyPlanType,
-} from "@/api/types";
+import type { ProductsPolicyPlanType } from "@/api/types";
 import { useListCoverages } from "@/api/coverages";
 import { useListRatingTables } from "@/api/rating-tables";
 import { useListDocumentTypes } from "@/api/document-types";
@@ -36,16 +32,6 @@ import CreateDocumentTypeModal from "@/pages/products/CreateDocumentTypeModal";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { getCurrencies } from "@/config/currencies";
-
-const ISSUANCE_MODE_OPTIONS = [
-  { value: "annualRenewable", label: "Annual renewable" },
-  { value: "wholeOfTerm", label: "Whole of term" },
-] as const;
-
-const CALCULATION_METHOD_OPTIONS = [
-  { value: "declining", label: "Declining" },
-  { value: "leveled", label: "Leveled" },
-] as const;
 
 const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
   <div className="mb-5">
@@ -127,8 +113,6 @@ const CreateProduct = () => {
   const [coverageText, setCoverageText] = useState("");
   const [defaultPrintableTemplateDocumentId, setDefaultPrintableTemplateDocumentId] = useState("");
   const [policyPlanType, setPolicyPlanType] = useState<ProductsPolicyPlanType | "">("");
-  const [issuanceMode, setIssuanceMode] = useState<ProductsIssuanceMode | "">("");
-  const [calculationMethod, setCalculationMethod] = useState<ProductsCalculationMethod | "">("");
   const [maxCoveredYears, setMaxCoveredYears] = useState("");
   // Payment methods — POST /api/products/{id}/payment-methods (one per account)
   const [bankAccountIds, setBankAccountIds] = useState<string[]>([]);
@@ -220,8 +204,6 @@ const CreateProduct = () => {
         coverageText: coverageText.trim() || undefined,
         defaultPrintableTemplateDocumentId: defaultPrintableTemplateDocumentId || null,
         policyPlanType: policyPlanType || null,
-        issuanceMode: issuanceMode || null,
-        calculationMethod: calculationMethod || null,
         maxCoveredYears: maxCoveredYears === "" ? null : Number(maxCoveredYears),
       });
       if (!created.id) throw new Error("Product created without id");
@@ -316,7 +298,7 @@ const CreateProduct = () => {
                   placeholder="Printable coverage description"
                 />
               </div>
-              <div className="space-y-1.5 md:col-span-2">
+              <div className="space-y-1.5  ">
                 <Label>Default printable template</Label>
                 <Select
                   value={defaultPrintableTemplateDocumentId || "none"}
@@ -335,7 +317,7 @@ const CreateProduct = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5 md:col-span-2">
+              <div className="space-y-1.5  ">
                 <Label>Policy plan type</Label>
                 <Select
                   value={policyPlanType || "none"}
@@ -364,48 +346,6 @@ const CreateProduct = () => {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Issuance mode</Label>
-                <Select
-                  value={issuanceMode || "none"}
-                  onValueChange={(v) =>
-                    setIssuanceMode(v === "none" ? "" : (v as ProductsIssuanceMode))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select issuance mode…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {ISSUANCE_MODE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Calculation method</Label>
-                <Select
-                  value={calculationMethod || "none"}
-                  onValueChange={(v) =>
-                    setCalculationMethod(v === "none" ? "" : (v as ProductsCalculationMethod))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select calculation method…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {CALCULATION_METHOD_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label htmlFor="max-covered-years">Max covered years</Label>
                 <Input
                   id="max-covered-years"
@@ -418,7 +358,7 @@ const CreateProduct = () => {
                   placeholder="e.g. 30"
                 />
               </div>
-              <div className="space-y-1.5 md:col-span-2">
+              <div className="space-y-1.5  ">
                 <Label>Payment method</Label>
                 <BankAccountCombobox
                   multiple

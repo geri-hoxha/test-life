@@ -32,7 +32,7 @@ export const useCreatePerson = () => {
       if (data.id) {
         queryClient.setQueryData(peopleKeys.detail(data.id), data);
       }
-      void queryClient.invalidateQueries({ queryKey: peopleKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
     },
   });
 };
@@ -101,7 +101,7 @@ export const useUpdatePerson = () => {
       updatePerson(vars.id, vars.body),
     onSuccess: (data, vars) => {
       queryClient.setQueryData(peopleKeys.detail(vars.id), data);
-      void queryClient.invalidateQueries({ queryKey: peopleKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
     },
   });
 };

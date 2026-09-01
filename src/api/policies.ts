@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
+import { openBlobPrintDialog } from "@/lib/print-blob";
 import type {
   PaginationPagedListOfPolicyResponse,
   PoliciesPolicyResponse,
@@ -73,38 +74,8 @@ export const getPolicyPrint = async (id: string, signal?: AbortSignal): Promise<
 /** Open print dialog for POST /api/policies/{id}/print */
 export const openPolicyPrint = async (id: string) => {
   const blob = await getPolicyPrint(id);
-  const url = URL.createObjectURL(blob);
-
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  iframe.style.opacity = "0";
-  iframe.style.pointerEvents = "none";
-  iframe.src = url;
-  document.body.appendChild(iframe);
-
-  const cleanup = () => {
-    iframe.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  let printed = false;
-  const triggerPrint = () => {
-    if (printed) return;
-    printed = true;
-    try {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-    } finally {
-      // Keep iframe/blob alive until the print dialog finishes loading.
-      window.setTimeout(cleanup, 60_000);
-    }
-  };
-
-  iframe.addEventListener("load", triggerPrint, { once: true });
-  window.setTimeout(triggerPrint, 750);
+  await openBlobPrintDialog(blob, {
+    fileName: "policy.pdf",
+    mimeType: "application/pdf",
+  });
 };

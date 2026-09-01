@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
+import { openBlobPrintDialog } from "@/lib/print-blob";
 import type {
   DocumentsDocumentResponse,
   DocumentsListDocumentsRequest,
@@ -148,6 +149,15 @@ export const downloadDocumentFile = async (id: string, fileName?: string) => {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+};
+
+/** Open the browser print dialog for GET /api/documents/{id}/file (does not download). */
+export const openDocumentPrint = async (id: string) => {
+  const [meta, blob] = await Promise.all([getDocument(id), getDocumentFile(id)]);
+  await openBlobPrintDialog(blob, {
+    fileName: meta.originalFileName ?? meta.storedFileName,
+    mimeType: meta.mimeType || blob.type,
+  });
 };
 
 /** Helper to build multipart body for `createDocument`. */

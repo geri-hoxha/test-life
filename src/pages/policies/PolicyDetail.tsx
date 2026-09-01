@@ -26,8 +26,10 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
+  Eye,
   FileText,
   Files,
+  Loader2,
   Printer,
   ShieldCheck,
   Users,
@@ -41,9 +43,11 @@ import { ageFromDob } from "@/data/customers";
 import { openPolicyPrint, useGetPolicy } from "@/api/policies";
 import { mapApiPolicy } from "@/api/adapters/policies";
 import { useGetProduct, mapApiProduct } from "@/api/products";
-import { customerPath } from "@/api/adapters/customers";
+import { customerPath, countryDisplayName } from "@/api/adapters/customers";
+import { useCountryEnum } from "@/api/smart-enums";
 import { useListDocumentTypes } from "@/api/document-types";
-import { downloadDocumentFile, useGetDocument } from "@/api/documents";
+import { useGetDocument } from "@/api/documents";
+import { useDocumentPreview } from "@/components/documents/DocumentPreview";
 
 const fmtMoney = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", {
@@ -115,6 +119,8 @@ const PolicyDetail = () => {
 
   const { data: apiPolicy, isLoading } = useGetPolicy(id ?? "", { enabled: Boolean(id) });
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
+  const { data: countryOptions = [] } = useCountryEnum();
+  const countryLabel = (code?: string) => countryDisplayName(code, countryOptions) ?? code;
 
   const policy = useMemo(() => {
     if (apiPolicy) return mapApiPolicy(apiPolicy);
@@ -144,6 +150,7 @@ const PolicyDetail = () => {
   }, [documentTypesPage?.items]);
 
   const [expandedYears, setExpandedYears] = useState<Set<number>>(() => new Set());
+  const { fileBusy, openPreview, download } = useDocumentPreview();
 
   const toggleYearExpanded = (year: number) => {
     setExpandedYears((prev) => {
@@ -189,9 +196,15 @@ const PolicyDetail = () => {
       toast.error("Document file is not available");
       return;
     }
-    void downloadDocumentFile(documentId, fileName).catch((err) =>
-      toast.error(err instanceof Error ? err.message : "Failed to download file"),
-    );
+    void download(documentId, fileName ?? "document");
+  };
+
+  const handlePreview = (documentId: string | null | undefined, label: string) => {
+    if (!documentId) {
+      toast.error("Document file is not available");
+      return;
+    }
+    void openPreview(documentId, label);
   };
 
   const handlePrint = async () => {
@@ -352,8 +365,31 @@ const PolicyDetail = () => {
                         <Button
                           type="button"
                           size="icon"
+                          variant="outline"
+                          className="h-7 w-7 shrink-0"
+                          title="View template"
+                          disabled={Boolean(fileBusy)}
+                          onClick={() =>
+                            handlePreview(
+                              templateDocumentId,
+                              templateDocument?.originalFileName ??
+                                templateDocument?.storedFileName ??
+                                "Printable template",
+                            )
+                          }
+                        >
+                          {fileBusy?.id === templateDocumentId && fileBusy.action === "preview" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
                           className="h-7 w-7 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
                           title="Download template"
+                          disabled={Boolean(fileBusy)}
                           onClick={() =>
                             handleDownload(
                               templateDocumentId,
@@ -362,7 +398,11 @@ const PolicyDetail = () => {
                             )
                           }
                         >
-                          <Download className="h-4 w-4" />
+                          {fileBusy?.id === templateDocumentId && fileBusy.action === "download" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     ) : undefined
@@ -721,7 +761,7 @@ const PolicyDetail = () => {
                       }
                     />
                     <Field label="Party Type" value={titleCase(holder.partyType)} />
-                    <Field label="Country" value={holder.countryCode} />
+                    <Field label="Country" value={countryLabel(holder.countryCode)} />
                     <Field
                       label="Leader"
                       value={holder.isLeader == null ? undefined : holder.isLeader ? "Yes" : "No"}
@@ -768,7 +808,7 @@ const PolicyDetail = () => {
                       }
                     />
                     <Field label="Gender" value={titleCase(insuredPerson.gender)} />
-                    <Field label="Country" value={insuredPerson.countryCode} />
+                    <Field label="Country" value={countryLabel(insuredPerson.countryCode)} />
                   </>
                 ) : (
                   <div className="text-sm text-muted-foreground">Not assigned</div>
@@ -801,7 +841,7 @@ const PolicyDetail = () => {
                       }
                     />
                     <Field label="Party Type" value={titleCase(payer.partyType)} />
-                    <Field label="Country" value={payer.countryCode} />
+                    <Field label="Country" value={countryLabel(payer.countryCode)} />
                   </>
                 ) : (
                   <div className="text-sm text-muted-foreground">Not assigned</div>
@@ -849,7 +889,7 @@ const PolicyDetail = () => {
                               {ip.dateOfBirth ?? "—"}
                             </TableCell>
                             <TableCell>{titleCase(ip.gender) ?? "—"}</TableCell>
-                            <TableCell>{ip.countryCode ?? "—"}</TableCell>
+                            <TableCell>{countryLabel(ip.countryCode) ?? "—"}</TableCell>
                           </TableRow>
                         );
                       })}
@@ -876,7 +916,7 @@ const PolicyDetail = () => {
                     <TableRow>
                       <TableHead>Document Type</TableHead>
                       <TableHead>Document ID</TableHead>
-                      <TableHead className="w-[100px] text-right">Actions</TableHead>
+                      <TableHead className="w-[180px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -905,17 +945,38 @@ const PolicyDetail = () => {
                               {d.documentId ? shortId(d.documentId) : "—"}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 gap-1.5"
-                                disabled={!d.documentId}
-                                onClick={() => handleDownload(d.documentId, typeName)}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                                Download
-                              </Button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5"
+                                  disabled={!d.documentId || Boolean(fileBusy)}
+                                  onClick={() => handlePreview(d.documentId, typeName)}
+                                >
+                                  {fileBusy?.id === d.documentId && fileBusy.action === "preview" ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Eye className="h-3.5 w-3.5" />
+                                  )}
+                                  View
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5"
+                                  disabled={!d.documentId || Boolean(fileBusy)}
+                                  onClick={() => handleDownload(d.documentId, typeName)}
+                                >
+                                  {fileBusy?.id === d.documentId && fileBusy.action === "download" ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Download className="h-3.5 w-3.5" />
+                                  )}
+                                  Download
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );

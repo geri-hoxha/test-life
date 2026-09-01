@@ -25,7 +25,6 @@ import { toast } from "sonner";
 import {
   Customer, customerSchema, ageFromDob,
   Gender, CustomerType, CompanyType, COMPANY_TYPE_OPTIONS,
-  SSN_ISSUING_COUNTRIES,
 } from "@/data/customers";
 import { useCreatePerson, useGetPerson, useUpdatePerson } from "@/api/people";
 import { useCountryEnum } from "@/api/smart-enums";
@@ -43,7 +42,7 @@ import {
   customerToCreatePerson,
   customerToUpdateCompany,
   customerToUpdatePerson,
-  fromCountryCode,
+  countryDisplayName,
   mapCompanyToCustomer,
   mapPersonToCustomer,
   parseCustomerPartyType,
@@ -68,7 +67,7 @@ const blankAddress = (overrides?: Partial<AddressRow>): AddressRow => ({
   key: `draft-${crypto.randomUUID()}`,
   street: "",
   city: "",
-  country: "Albania",
+  country: "",
   postalCode: "",
   isMain: false,
   persisted: false,
@@ -81,7 +80,7 @@ const fromApiAddress = (a: CompaniesCompanyAddressResponse): AddressRow =>
     entryId: a.id,
     street: a.street ?? "",
     city: a.city ?? "",
-    country: fromCountryCode(a.countryCode) === NA ? "Albania" : fromCountryCode(a.countryCode),
+    country: a.countryCode ?? "",
     postalCode: a.postalCode ?? "",
     isMain: Boolean(a.isMain),
     persisted: a.id != null,
@@ -99,13 +98,13 @@ const blank = (): Customer => ({
   id: "",
   customerType: "Individual",
   firstName: "", lastName: "", fatherName: "", personalId: "",
-  ssnIssuingCountry: NA,
+  ssnIssuingCountry: "",
   dateOfBirth: "", gender: "Other",
   nationality: "", placeOfBirth: "",
   companyName: "", tradeName: "", nipt: "", companyType: undefined,
   registrationDate: "", legalRepresentative: "",
   f5Location: NA,
-  address: "", city: "", country: "Albania",
+  address: "", city: "", country: "",
   phone: "", email: "", occupation: "",
   notes: "",
   totalExposure: 0,
@@ -149,11 +148,15 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
   const updateCompany = useUpdateCompany();
   const addCompanyAddress = useAddCompanyAddress();
   const removeCompanyAddress = useRemoveCompanyAddress();
-  const { data: nationalityOptions = [] } = useCountryEnum();
+  const { data: countryOptions = [] } = useCountryEnum();
 
   const [c, setC] = useState<Customer>(blank());
   const set = <K extends keyof Customer>(k: K, v: Customer[K]) => setC((s) => ({ ...s, [k]: v }));
   const isCompany = c.customerType === "Company";
+
+  const setCountry = (v: string) => {
+    setC((s) => ({ ...s, country: v, ssnIssuingCountry: v }));
+  };
 
   const [addresses, setAddresses] = useState<AddressRow[]>([]);
   const [draft, setDraft] = useState<AddressRow>(blankAddress({ isMain: true }));
@@ -395,8 +398,6 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
     ? (isCompany ? `Edit ${c.companyName || ""}`.trim() : `Edit ${c.firstName} ${c.lastName}`.trim())
     : "New Customer";
 
-  const countryOptions = SSN_ISSUING_COUNTRIES.filter((x) => x !== "Other");
-
   const addressesSection = (
     <Card className="shadow-card border-border overflow-hidden">
       <div className="p-6 border-b border-border">
@@ -430,7 +431,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                 <TableCell className="text-sm align-top">
                   <div className="font-medium text-foreground">{row.street}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {[row.city, row.postalCode, row.country].filter(Boolean).join(", ")}
+                    {[row.city, row.postalCode, countryDisplayName(row.country, countryOptions) ?? row.country].filter(Boolean).join(", ")}
                   </div>
                 </TableCell>
                 <TableCell className="align-top ">
@@ -495,13 +496,13 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
         <div className="space-y-1.5">
           <Label>Country *</Label>
           <Select
-            value={draft.country}
+            value={draft.country || undefined}
             onValueChange={(v) => setDraft((s) => ({ ...s, country: v }))}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
             <SelectContent>
-              {countryOptions.map((country) => (
-                <SelectItem key={country} value={country}>{country}</SelectItem>
+              {countryOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.text}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -611,11 +612,11 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                 </div>
                 <div className="space-y-1.5">
                   <Label>Country *</Label>
-                  <Select value={c.country && c.country !== NA ? c.country : "Albania"} onValueChange={(v) => set("country", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={c.country || undefined} onValueChange={setCountry}>
+                    <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
                     <SelectContent>
-                      {countryOptions.map((country) => (
-                        <SelectItem key={country} value={country}>{country}</SelectItem>
+                      {countryOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.text}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -630,7 +631,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                       <SelectValue placeholder="Select nationality" />
                     </SelectTrigger>
                     <SelectContent>
-                      {nationalityOptions.map((opt) => (
+                      {countryOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.text}
                         </SelectItem>
@@ -651,12 +652,11 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                 </div>
                 <div className="space-y-1.5">
                   <Label>Country *</Label>
-                  <Select value={c.ssnIssuingCountry || NA} onValueChange={(v) => set("ssnIssuingCountry", v)}>
-                    <SelectTrigger><SelectValue placeholder="N/A" /></SelectTrigger>
+                  <Select value={c.ssnIssuingCountry || c.country || undefined} onValueChange={setCountry}>
+                    <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NA}>N/A</SelectItem>
-                      {SSN_ISSUING_COUNTRIES.map((country) => (
-                        <SelectItem key={country} value={country}>{country}</SelectItem>
+                      {countryOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.text}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -700,7 +700,7 @@ const CustomerForm = ({ embedded = false, onSuccess, onCancel }: CustomerFormPro
                       <SelectValue placeholder="Select nationality" />
                     </SelectTrigger>
                     <SelectContent>
-                      {nationalityOptions.map((opt) => (
+                      {countryOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.text}
                         </SelectItem>
