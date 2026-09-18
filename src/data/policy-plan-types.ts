@@ -6,7 +6,16 @@
  * same API label; `description` is the only thing distinguishing them in the UI.
  */
 
-import type { ProductsPolicyPlanType, ProductsScheduleBasis } from "@/api/types";
+import type {
+  ProductsActuarialCode,
+  ProductsBillingCadence,
+  ProductsCoveragePeriodCadence,
+  ProductsOfferScheduleMode,
+  ProductsPolicyContinuationMode,
+  ProductsPolicyPlanRules,
+  ProductsPolicyPlanType,
+  ProductsPremiumCalculationMethod,
+} from "@/api/types";
 
 export type PolicyPlanTypeOption = {
   value: ProductsPolicyPlanType;
@@ -38,7 +47,8 @@ export const POLICY_PLAN_TYPE_OPTIONS: PolicyPlanTypeOption[] = [
   },
   { value: "PPFM", label: "Pagesa me prim fiks mujor", description: "Fixed monthly" },
   { value: "PPFV", label: "Pagesa me prim fiks vjetor", description: "Fixed annual" },
-  { value: "NA", label: "NA", description: "Not loan-linked" },
+  { value: "VOLUNTARY", label: "Voluntary", description: "Voluntary life cover" },
+  { value: "PROTECT-55", label: "Protect 55", description: "Protect 55 plan" },
 ];
 
 const OPTION_BY_VALUE = new Map(POLICY_PLAN_TYPE_OPTIONS.map((o) => [o.value, o]));
@@ -55,15 +65,73 @@ export const policyPlanTypeDescription = (value?: string | null): string | undef
 export const isLeveledPayPremiumPlan = (value?: string | null): boolean =>
   value === "PPFM" || value === "PPFV";
 
-export const SCHEDULE_BASIS_LABELS: Record<ProductsScheduleBasis, string> = {
-  tabled: "Tabled",
-  perRenewalInfo: "Per renewal",
+export const ACTUARIAL_CODES: ProductsActuarialCode[] = [
+  "RT",
+  "ST",
+  "STs",
+  "STst",
+  "STmc",
+  "STmc-t",
+  "STse",
+  "STe",
+  "STmc-EX",
+  "STmc-ST",
+  "STmc-SU",
+  "STmu",
+  "STet",
+  "RP",
+];
+
+export const OFFER_SCHEDULE_LABELS: Record<ProductsOfferScheduleMode, string> = {
+  initialPeriodOnly: "Initial period only",
+  fullScheduleAtQuote: "Full schedule at quote",
+  singleCoveragePeriod: "Single coverage period",
 };
 
-export const SCHEDULE_BASIS_DESCRIPTIONS: Record<ProductsScheduleBasis, string> = {
-  tabled: "Every covered year is priced up front.",
-  perRenewalInfo: "Only the next year is priced; further years appear on renewal.",
+export const CONTINUATION_MODE_LABELS: Record<ProductsPolicyContinuationMode, string> = {
+  appendCoveragePeriodAtRenewal: "Append period at renewal",
+  issueAllPeriodsAtInception: "Issue all periods at inception",
+  issueNewPolicyAtRenewal: "Issue new policy at renewal",
 };
 
-export const scheduleBasisLabel = (value?: string | null): string | undefined =>
-  value ? (SCHEDULE_BASIS_LABELS[value as ProductsScheduleBasis] ?? value) : undefined;
+export const COVERAGE_CADENCE_LABELS: Record<ProductsCoveragePeriodCadence, string> = {
+  annual: "Annual",
+  monthly: "Monthly",
+  wholeTerm: "Whole of term",
+};
+
+export const BILLING_CADENCE_LABELS: Record<ProductsBillingCadence, string> = {
+  singleAtInception: "Single at inception",
+  oncePerCoveragePeriod: "Once per coverage period",
+  monthlyWithinCoveragePeriod: "Monthly within coverage period",
+};
+
+export const PREMIUM_CALCULATION_LABELS: Record<ProductsPremiumCalculationMethod, string> = {
+  declining: "Declining",
+  leveled: "Leveled",
+  singlePremium: "Single premium",
+  nonDecliningProrated: "Non-declining prorated",
+  entryAgeFixedMonthly: "Entry-age fixed monthly",
+};
+
+export const isWholeOfTermPlan = (rules?: ProductsPolicyPlanRules | null): boolean =>
+  rules?.coverageCadence === "wholeTerm" ||
+  rules?.continuation === "issueAllPeriodsAtInception";
+
+export const isAnnualRenewablePlan = (rules?: ProductsPolicyPlanRules | null): boolean =>
+  rules?.coverageCadence === "annual" ||
+  rules?.continuation === "appendCoveragePeriodAtRenewal" ||
+  rules?.continuation === "issueNewPolicyAtRenewal";
+
+/** Products that price only the next period; further years appear on renewal. */
+export const pricesInitialPeriodOnly = (rules?: ProductsPolicyPlanRules | null): boolean =>
+  rules?.offerSchedule === "initialPeriodOnly";
+
+export const formatCoverageTermMonths = (months?: number | null): string => {
+  if (months == null) return "—";
+  if (months % 12 === 0) {
+    const years = months / 12;
+    return years === 1 ? "1 year" : `${years} years`;
+  }
+  return months === 1 ? "1 month" : `${months} months`;
+};

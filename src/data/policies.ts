@@ -92,7 +92,7 @@ const seed: Policy[] = [
   },
 ];
 
-let policies: Policy[] = [...seed];
+const policies: Policy[] = [...seed];
 
 export const listPolicies = () => [...policies].sort((a, b) => (a.issueDate < b.issueDate ? 1 : -1));
 export const getPolicy = (id: string) => policies.find((p) => p.id === id);

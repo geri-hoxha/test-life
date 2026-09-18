@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
+import { PageLoader } from "@/components/Loader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DatePicker } from "@/components/ui/date-picker";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -32,24 +31,22 @@ import {
   FileCheck2,
   ClipboardCheck,
 } from "lucide-react";
-import { getOffer } from "@/data/offers";
-import { listVersions } from "@/data/productVersions";
-import { listTemplates } from "@/data/templates";
 import { fullName } from "@/data/customers";
-import { listDocuments } from "@/data/documents";
-import { computeVerification, overallStatus } from "./VerificationStep";
 import { toast } from "sonner";
-import { useGetOffer, useIssuePolicy } from "@/api/offers";
+import { useGetOffer, useIssueOfferPolicy } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useGetProduct, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
 import { mergeCustomers } from "@/api/adapters/customers";
+import { useRelationshipToInsuredEnum, smartEnumLabel } from "@/api/smart-enums";
+import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
+import { mapReviewFlagsToChecks, overallStatus } from "./VerificationStep";
+import { formatOfferMoney, offerStatusLabel } from "./offer-ui";
 
 type Step = 1 | 2;
 
-const fmtMoney = (v: number, ccy: string) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(v);
+const fmtMoney = (v: number, ccy: string) => formatOfferMoney(v, ccy);
 
 const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
@@ -97,7 +94,10 @@ const IssuePolicy = () => {
   const navigate = useNavigate();
 
   const { data: apiOffer, isLoading } = useGetOffer(offerId ?? "", { enabled: Boolean(offerId) });
-  const issuePolicy = useIssuePolicy();
+  const { data: relationshipOptions = [] } = useRelationshipToInsuredEnum();
+  const relationshipLabel = (value?: string | null) => smartEnumLabel(relationshipOptions, value);
+  const policyPlanTypeLabel = usePolicyPlanTypeLabel();
+  const issuePolicy = useIssueOfferPolicy();
   const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
   const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
   const customers = useMemo(
@@ -108,13 +108,8 @@ const IssuePolicy = () => {
 
   const offer = useMemo(() => {
     if (apiOffer) return mapApiOffer(apiOffer);
-    return offerId ? getOffer(offerId) : undefined;
-  }, [apiOffer, offerId]);
-
-  const scheduleYear = String(
-    apiOffer?.offerYears?.[0]?.year ??
-      (offer?.startDate ? Number(offer.startDate.slice(0, 4)) : new Date().getFullYear())
-  );
+    return undefined;
+  }, [apiOffer]);
 
   const { data: apiProduct } = useGetProduct(offer?.productId ?? "", {
     enabled: Boolean(offer?.productId),
@@ -125,15 +120,12 @@ const IssuePolicy = () => {
   );
 
   const [step, setStep] = useState<Step>(1);
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [confirmed, setConfirmed] = useState(false);
 
   if (isLoading) {
     return (
       <AppShell>
-        <div className="text-center py-20">
-          <h1 className="text-xl font-semibold">Loading offer…</h1>
-        </div>
+        <PageLoader label="Loading offer…" />
       </AppShell>
     );
   }
@@ -149,40 +141,28 @@ const IssuePolicy = () => {
     );
   }
 
-  const version = listVersions(offer.productId).find((v) => v.id === offer.versionId);
-  const template = listTemplates(offer.productId, offer.versionId).find((t) => t.id === offer.templateId);
+  const holderParticipant = offer.participants.find((p) => p.role === "policyHolder");
+  const payerParticipant = offer.participants.find((p) => p.role === "invoiced") ?? holderParticipant;
   const holder = getCustomerLocal(offer.policyHolderId);
   const insured = getCustomerLocal(offer.insuredId);
   const payer = getCustomerLocal(offer.payerId);
-  const docs = listDocuments(offer.productId, offer.versionId);
-  const mandatoryDocs = docs.filter((d) => d.isMandatory);
+  const outstandingDocs = offer.documentRequirements.filter((d) => !d.isSatisfied && d.status !== "waived");
 
-  // Re-run verification using the same logic
-  const checks = computeVerification({
-    productId: offer.productId,
-    versionId: offer.versionId,
-    templateId: offer.templateId,
-    currency: offer.currency,
-    policyHolderId: offer.policyHolderId,
-    insuredId: offer.insuredId,
-    premium: null,
-    loanOutstanding: offer.loan?.outstandingBalance,
-  });
+  const checks = mapReviewFlagsToChecks(offer.reviewFlags);
   const verifStatus = overallStatus(checks);
 
-  // Build warnings list
   const warnings: { title: string; detail: string; level: "warning" | "blocker" }[] = [];
-  if (offer.status !== "Quoted" && offer.status !== "Partially Bound") {
+  if (offer.status !== "Quoted") {
     warnings.push({
       title: "Offer is not ready to issue",
-      detail: `Current status: ${offer.status}. Issuance is normally only permitted for quoted or partially bound offers.`,
+      detail: `Current status: ${offerStatusLabel(offer.status)}. Issuance is only permitted for quoted offers.`,
       level: offer.status === "Bound" ? "blocker" : "warning",
     });
   }
-  if (mandatoryDocs.length > 0) {
+  if (outstandingDocs.length > 0) {
     warnings.push({
-      title: "Required documents missing",
-      detail: `${mandatoryDocs.length} mandatory document(s) not yet collected: ${mandatoryDocs.map((d) => d.name).join(", ")}.`,
+      title: "Required documents outstanding",
+      detail: `${outstandingDocs.length} document requirement(s) are not yet satisfied.`,
       level: "warning",
     });
   }
@@ -190,14 +170,6 @@ const IssuePolicy = () => {
     warnings.push({
       title: "Manual review is pending",
       detail: "One or more verification checks require review before issuance.",
-      level: "warning",
-    });
-  }
-  const premiumChk = checks.find((c) => c.name === "Premium Manually Overridden" && c.result === "Requires Review");
-  if (premiumChk) {
-    warnings.push({
-      title: "Premium override is not approved",
-      detail: "A manual premium override has been entered and still requires management sign-off.",
       level: "warning",
     });
   }
@@ -215,11 +187,14 @@ const IssuePolicy = () => {
     }
 
     try {
-      const policy = await issuePolicy.mutateAsync({
+      const issued = await issuePolicy.mutateAsync({
         offerId: offer.id,
-        year: scheduleYear,
       });
-      const policyId = policy.id ?? offer.id;
+      const policyId = issued.policy?.id;
+      if (!policyId) {
+        toast.error("Policy was issued but the server did not return an id");
+        return;
+      }
       toast.success(`Policy ${policyId} issued successfully`);
       navigate(`/policies/${policyId}`);
     } catch (err) {
@@ -298,9 +273,18 @@ const IssuePolicy = () => {
               <CardHeader><CardTitle className="text-base">Product & Coverage</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
                 <Field label="Product" value={product?.name} />
-                <Field label="Version" value={`${version?.name} (${version?.number})`} />
-                <Field label="Template" value={template?.name} />
+                <Field
+                  label="Plan"
+                  value={
+                    offer.policyPlan
+                      ? policyPlanTypeLabel(offer.policyPlan)
+                      : product?.policyPlanType
+                        ? policyPlanTypeLabel(product.policyPlanType)
+                        : "—"
+                  }
+                />
                 <Field label="Currency" value={<Badge variant="outline">{offer.currency}</Badge>} />
+                <Field label="Policy" value={offer.policyId ?? "Not issued"} />
               </CardContent>
             </Card>
 
@@ -308,7 +292,7 @@ const IssuePolicy = () => {
               <CardHeader><CardTitle className="text-base">Premium</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 <Field label="Gross Premium" value={<span className="text-primary font-semibold">{fmtMoney(offer.premium, offer.currency)}</span>} />
-                <Field label="Payment Plan" value={offer.paymentMode} />
+                <Field label="Status" value={offerStatusLabel(offer.status)} />
               </CardContent>
             </Card>
           </div>
@@ -316,9 +300,9 @@ const IssuePolicy = () => {
           <Card>
             <CardHeader><CardTitle className="text-base">Parties</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field label="Policy Holder" value={holder ? fullName(holder) : "—"} />
-              <Field label="Insured Person" value={insured ? fullName(insured) : "—"} />
-              <Field label="Payer" value={payer ? fullName(payer) : "—"} />
+              <Field label="Policy Holder" value={holderParticipant?.displayName ?? (holder ? fullName(holder) : "—")} />
+              <Field label="Insured Person" value={insured ? fullName(insured) : offer.insuredPersons[0] ? [offer.insuredPersons[0].firstName, offer.insuredPersons[0].lastName].filter(Boolean).join(" ") : "—"} />
+              <Field label="Payer" value={payerParticipant?.displayName ?? (payer ? fullName(payer) : "—")} />
             </CardContent>
           </Card>
 
@@ -343,7 +327,7 @@ const IssuePolicy = () => {
                         return (
                           <TableRow key={b.id}>
                             <TableCell>{c ? fullName(c) : "—"}</TableCell>
-                            <TableCell>{b.relationship}</TableCell>
+                            <TableCell>{relationshipLabel(b.relationship)}</TableCell>
                             <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
                           </TableRow>
                         );
@@ -360,7 +344,7 @@ const IssuePolicy = () => {
                 <Field label="Start Date" value={<span className="font-mono text-xs">{offer.startDate}</span>} />
                 <Field label="End Date" value={<span className="font-mono text-xs">{offer.endDate}</span>} />
                 <Field label="Term" value={`${offer.termYears} years`} />
-                <Field label="Payment Mode" value={offer.paymentMode} />
+                <Field label="Loan balances required" value={offer.requiresLoanBalances ? "Yes" : "No"} />
               </CardContent>
             </Card>
           </div>
@@ -371,13 +355,13 @@ const IssuePolicy = () => {
               <CardDescription>Inherited from the product configuration.</CardDescription>
             </CardHeader>
             <CardContent>
-              {docs.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No documents configured.</div>
+              {offer.documentRequirements.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No documents on this offer.</div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {docs.map((d) => (
-                    <Badge key={d.id} variant={d.isMandatory ? "default" : "outline"}>
-                      {d.name} {d.isMandatory && <span className="ml-1 text-[10px] opacity-80">· required</span>}
+                  {offer.documentRequirements.map((d) => (
+                    <Badge key={d.id} variant={d.isSatisfied || d.status === "waived" ? "outline" : "default"}>
+                      {d.documentTypeId} · {d.status}
                     </Badge>
                   ))}
                 </div>
@@ -413,25 +397,15 @@ const IssuePolicy = () => {
               <CardTitle className="text-base">Generated Policy Identifiers</CardTitle>
               <CardDescription>Auto-assigned on confirmation. These cannot be changed afterwards.</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field
                 label="Policy Number"
-                value={<span className="font-mono text-base text-primary text-muted-foreground">Assigned on issue</span>}
+                value={<span className="font-mono text-base text-muted-foreground">Assigned on issue</span>}
               />
               <Field
-                label="Schedule Year"
-                value={<span className="font-mono text-xs">{scheduleYear}</span>}
+                label="Coverage term"
+                value={<span className="font-mono text-xs">{offer.startDate} → {offer.endDate}</span>}
               />
-              <div>
-                <Label htmlFor="issue-date">Issue Date</Label>
-                <DatePicker
-                  value={issueDate ? parseISO(issueDate) : undefined}
-                  onChange={(d) => setIssueDate(d ? format(d, "yyyy-MM-dd") : "")}
-                />
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Issue date is not yet sent to the API (coming later).
-                </p>
-              </div>
             </CardContent>
           </Card>
 
@@ -439,13 +413,20 @@ const IssuePolicy = () => {
             <CardHeader><CardTitle className="text-base">Policy Snapshot</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Field label="Product" value={product?.name} />
-              <Field label="Template" value={template?.name} />
-              <Field label="Policy Holder" value={holder ? fullName(holder) : "—"} />
+              <Field
+                label="Plan"
+                value={
+                  offer.policyPlan
+                    ? policyPlanTypeLabel(offer.policyPlan)
+                    : "—"
+                }
+              />
+              <Field label="Policy Holder" value={holderParticipant?.displayName ?? (holder ? fullName(holder) : "—")} />
               <Field label="Insured" value={insured ? fullName(insured) : "—"} />
               <Field label="Start" value={<span className="font-mono text-xs">{offer.startDate}</span>} />
               <Field label="End" value={<span className="font-mono text-xs">{offer.endDate}</span>} />
               <Field label="Premium" value={<span className="text-primary font-semibold">{fmtMoney(offer.premium, offer.currency)}</span>} />
-              <Field label="Payment Plan" value={offer.paymentMode} />
+              <Field label="Status" value={offerStatusLabel(offer.status)} />
             </CardContent>
           </Card>
 
@@ -460,8 +441,8 @@ const IssuePolicy = () => {
                 />
                 <Label htmlFor="confirm" className="text-sm font-normal leading-relaxed cursor-pointer">
                   <strong className="block mb-1">I confirm this policy should be issued.</strong>
-                  Once confirmed, the offer status changes to <Badge variant="outline" className="mx-0.5">Issued</Badge>,
-                  the policy becomes <Badge variant="outline" className="mx-0.5">Active</Badge>,
+                  Once confirmed, the offer status changes to <Badge variant="outline" className="mx-0.5">Bound</Badge>,
+                  the policy is created as <Badge variant="outline" className="mx-0.5">Pending activation</Badge>,
                   and it will appear in the Policies module.
                 </Label>
               </div>

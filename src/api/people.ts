@@ -3,6 +3,7 @@ import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfPersonResponse,
   PeopleCreatePersonRequest,
+  PeopleListPeopleRequest,
   PeoplePersonResponse,
   PeopleUpdatePersonRequest,
 } from "./types";
@@ -37,12 +38,7 @@ export const useCreatePerson = () => {
   });
 };
 
-export type ListPeopleQuery = {
-  personalIdentifier?: string;
-  nationality?: string;
-  firstName?: string;
-  lastName?: string;
-  gender?: string;
+export type ListPeopleQuery = PeopleListPeopleRequest & {
   pageNumber?: number;
   pageSize?: number;
 };

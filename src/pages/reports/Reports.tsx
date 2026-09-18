@@ -1,6 +1,17 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
+import { FilterGrid } from "@/components/FilterGrid";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -40,27 +51,36 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { OfferStatus } from "@/data/offers";
 import { fullName } from "@/data/customers";
 import { useListOffers } from "@/api/offers";
 import { useListPolicies } from "@/api/policies";
 import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
-import { mapApiOffer } from "@/api/adapters/offers";
-import { mapApiPolicy } from "@/api/adapters/policies";
 import { customerPath, mergeCustomers } from "@/api/adapters/customers";
+import {
+  formatPolicyDate,
+  POLICY_STATUSES,
+  policyNumberLabel,
+  policyStatusLabel,
+} from "@/pages/policies/policy-ui";
+import {
+  OFFER_STATUSES,
+  formatOfferDate,
+  offerStatusLabel,
+  shortOfferId,
+} from "@/pages/offers/offer-ui";
+import type { DomainOffersOfferStatus } from "@/api/types";
 
 const fmtMoney = (v: number, ccy = "EUR") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 0 }).format(v);
 
-const STATUS_COLORS: Record<OfferStatus, string> = {
-  Draft: "hsl(var(--muted-foreground))",
-  Quoted: "hsl(217 91% 60%)",
-  "Partially Bound": "hsl(38 92% 50%)",
-  Bound: "hsl(160 84% 39%)",
-  Cancelled: "hsl(var(--destructive))",
-  Expired: "hsl(var(--muted-foreground))",
+const STATUS_COLORS: Record<DomainOffersOfferStatus, string> = {
+  draft: "hsl(var(--muted-foreground))",
+  quoted: "hsl(217 91% 60%)",
+  bound: "hsl(160 84% 39%)",
+  cancelled: "hsl(var(--destructive))",
+  expired: "hsl(var(--muted-foreground))",
 };
 
 const Reports = () => {
@@ -70,14 +90,13 @@ const Reports = () => {
   const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
   const { data: companiesPage } = useListCompanies({ pageNumber: 1, pageSize: 200 });
 
-  const offers = useMemo(
-    () => (offersPage?.items ?? []).map(mapApiOffer),
-    [offersPage?.items]
-  );
-  const policies = useMemo(
-    () => (policiesPage?.items ?? []).map(mapApiPolicy),
-    [policiesPage?.items]
-  );
+  const [productId, setProductId] = useState("__all__");
+  const [offerStatus, setOfferStatus] = useState("ALL");
+  const [policyStatus, setPolicyStatus] = useState("ALL");
+  const [query, setQuery] = useState("");
+
+  const allOffers = offersPage?.items ?? [];
+  const allPolicies = policiesPage?.items ?? [];
   const products = useMemo(
     () => (productsPage?.items ?? []).map(mapApiProduct),
     [productsPage?.items]
@@ -88,32 +107,64 @@ const Reports = () => {
   );
   const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
 
+  const offers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allOffers.filter((o) => {
+      if (productId !== "__all__" && o.productId !== productId) return false;
+      if (offerStatus !== "ALL" && o.status !== offerStatus) return false;
+      if (!q) return true;
+      return [o.productName, o.policyHolderName, o.insuredName, o.id]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [allOffers, productId, offerStatus, query]);
+
+  const policies = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allPolicies.filter((p) => {
+      if (productId !== "__all__" && p.productId !== productId) return false;
+      if (policyStatus !== "ALL" && p.status !== policyStatus) return false;
+      if (!q) return true;
+      return [p.productName, p.policyHolderName, p.insuredName, p.id, p.serial]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [allPolicies, productId, policyStatus, query]);
+
+  const hasFilters =
+    productId !== "__all__" ||
+    offerStatus !== "ALL" ||
+    policyStatus !== "ALL" ||
+    Boolean(query.trim());
+
   // Offers by Status
   const offersByStatus = useMemo(() => {
-    const order: OfferStatus[] = [
-      "Draft",
-      "Quoted",
-      "Partially Bound",
-      "Bound",
-      "Cancelled",
-      "Expired",
-    ];
-    return order.map((s) => ({ status: s, count: offers.filter((o) => o.status === s).length }));
+    return OFFER_STATUSES.map((s) => ({
+      status: s,
+      label: offerStatusLabel(s),
+      count: offers.filter((o) => o.status === s).length,
+    }));
   }, [offers]);
 
   // Policies issued this month
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const policiesThisMonth = policies.filter((p) => p.issueDate.startsWith(ym));
+  const policiesThisMonth = policies.filter((p) => p.issuedOnUtc?.startsWith(ym));
 
   // Premium by product
   const premiumByProduct = useMemo(() => {
     const map = new Map<string, { name: string; premium: number; count: number }>();
     policies.forEach((p) => {
       const prod = products.find((x) => x.id === p.productId);
-      const key = p.productId;
-      const cur = map.get(key) ?? { name: prod?.name ?? p.productId, premium: 0, count: 0 };
-      cur.premium += p.premium;
+      const key = p.productId ?? "";
+      const cur = map.get(key) ?? {
+        name: p.productName?.trim() || prod?.name || p.productId || "—",
+        premium: 0,
+        count: 0,
+      };
+      cur.premium += p.firstPeriodChargePremium ?? 0;
       cur.count += 1;
       map.set(key, cur);
     });
@@ -121,7 +172,13 @@ const Reports = () => {
   }, [policies, products]);
 
   // Pending manual verification
-  const pendingReview = offers.filter((o) => o.status === "Partially Bound");
+  const pendingReview = offers.filter(
+    (o) =>
+      o.status === "quoted" &&
+      ((o.outstandingDocumentCount ?? 0) > 0 ||
+        (o.raisedReviewFlagCount ?? 0) > 0 ||
+        (o.pendingDiscountRequestCount ?? 0) > 0),
+  );
 
   // Expiring policies — within next 365 days
   const expiring = useMemo(() => {
@@ -129,10 +186,14 @@ const Reports = () => {
     horizon.setDate(horizon.getDate() + 365);
     return policies
       .filter((p) => {
-        const end = new Date(p.endDate);
-        return end >= now && end <= horizon;
+        const end = p.coverageTerm?.endDate;
+        if (!end) return false;
+        const endDate = new Date(end);
+        return endDate >= now && endDate <= horizon;
       })
-      .sort((a, b) => (a.endDate < b.endDate ? -1 : 1));
+      .sort((a, b) =>
+        (a.coverageTerm?.endDate ?? "") < (b.coverageTerm?.endDate ?? "") ? -1 : 1,
+      );
   }, [policies]);
 
   // Customer exposure — sum of policy premiums + active offer premiums per customer (as policy holder)
@@ -146,15 +207,25 @@ const Reports = () => {
       cur.total += amount;
       map.set(cid, cur);
     };
-    policies.forEach((p) => add(p.policyHolderId, p.premium, true));
+    policies.forEach((p) => {
+      const name = p.policyHolderName?.trim();
+      if (!name) return;
+      const customer = customers.find((c) => fullName(c) === name);
+      if (customer) add(customer.id, p.firstPeriodChargePremium ?? 0, true);
+    });
     offers
-      .filter((o) => o.status !== "Cancelled" && o.status !== "Expired" && o.status !== "Bound")
-      .forEach((o) => add(o.policyHolderId, o.premium, false));
+      .filter((o) => o.status !== "cancelled" && o.status !== "expired" && o.status !== "bound")
+      .forEach((o) => {
+        const name = o.policyHolderName?.trim();
+        if (!name) return;
+        const customer = customers.find((c) => fullName(c) === name);
+        if (customer) add(customer.id, o.firstPeriodChargePremium ?? 0, false);
+      });
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [policies, offers]);
 
   const offerStatusConfig = Object.fromEntries(
-    offersByStatus.map((d) => [d.status, { label: d.status, color: STATUS_COLORS[d.status] }])
+    offersByStatus.map((d) => [d.status, { label: d.label, color: STATUS_COLORS[d.status] }])
   );
 
   return (
@@ -167,6 +238,81 @@ const Reports = () => {
         </p>
       </div>
 
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Filters</CardTitle>
+                <CardDescription>Applied to the tables and charts below.</CardDescription>
+              </div>
+              {hasFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-muted-foreground"
+                  onClick={() => {
+                    setProductId("__all__");
+                    setOfferStatus("ALL");
+                    setPolicyStatus("ALL");
+                    setQuery("");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
+            </div>
+            <FilterGrid>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Search</Label>
+                <Input
+                  className="h-9"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Name, product, ID…"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Product</Label>
+                <Select value={productId} onValueChange={setProductId}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All products</SelectItem>
+                    {products.filter((p) => p.id).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Offer status</Label>
+                <Select value={offerStatus} onValueChange={setOfferStatus}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All statuses</SelectItem>
+                    {OFFER_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{offerStatusLabel(s)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Policy status</Label>
+                <Select value={policyStatus} onValueChange={setPolicyStatus}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All statuses</SelectItem>
+                    {POLICY_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{policyStatusLabel(s)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </FilterGrid>
+          </div>
+        </CardHeader>
+      </Card>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Total Offers</CardDescription></CardHeader>
@@ -174,7 +320,7 @@ const Reports = () => {
         </Card>
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Active Policies</CardDescription></CardHeader>
-          <CardContent><div className="text-2xl font-semibold">{policies.filter((p) => p.status === "Active").length}</div></CardContent>
+          <CardContent><div className="text-2xl font-semibold">{policies.filter((p) => p.status === "active").length}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-1.5"><CardDescription>Issued This Month</CardDescription></CardHeader>
@@ -196,7 +342,7 @@ const Reports = () => {
             <ChartContainer config={offerStatusConfig} className="h-[260px] w-full">
               <PieChart>
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Pie data={offersByStatus} dataKey="count" nameKey="status" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                <Pie data={offersByStatus} dataKey="count" nameKey="label" innerRadius={50} outerRadius={90} paddingAngle={2}>
                   {offersByStatus.map((d) => <Cell key={d.status} fill={STATUS_COLORS[d.status]} />)}
                 </Pie>
               </PieChart>
@@ -206,7 +352,7 @@ const Reports = () => {
                 <div key={d.status} className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-sm" style={{ background: STATUS_COLORS[d.status] }} />
-                    {d.status}
+                    {d.label}
                   </span>
                   <span className="font-mono font-medium">{d.count}</span>
                 </div>
@@ -277,13 +423,12 @@ const Reports = () => {
                   {policiesThisMonth.length === 0 ? (
                     <TableRow><TableCell colSpan={4} className="text-center py-6 text-sm text-muted-foreground">No policies issued this month.</TableCell></TableRow>
                   ) : policiesThisMonth.map((p) => {
-                    const ph = getCustomerLocal(p.policyHolderId);
                     return (
                       <TableRow key={p.id}>
-                        <TableCell><Link to={`/policies/${p.id}`} className="font-mono text-xs text-primary hover:underline">{p.number}</Link></TableCell>
-                        <TableCell className="text-sm">{ph ? fullName(ph) : "—"}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{p.issueDate}</TableCell>
-                        <TableCell className="text-right font-mono">{fmtMoney(p.premium, p.currency)}</TableCell>
+                        <TableCell><Link to={`/policies/${p.id}`} className="font-mono text-xs text-primary hover:underline">{policyNumberLabel(p.serial, p.id)}</Link></TableCell>
+                        <TableCell className="text-sm">{p.policyHolderName?.trim() || "—"}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatPolicyDate(p.issuedOnUtc)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmtMoney(p.firstPeriodChargePremium ?? 0, p.currency)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -312,17 +457,14 @@ const Reports = () => {
                 <TableBody>
                   {pendingReview.length === 0 ? (
                     <TableRow><TableCell colSpan={4} className="text-center py-6 text-sm text-muted-foreground">No offers awaiting review. </TableCell></TableRow>
-                  ) : pendingReview.map((o) => {
-                    const ph = getCustomerLocal(o.policyHolderId);
-                    return (
+                  ) : pendingReview.map((o) => (
                       <TableRow key={o.id}>
-                        <TableCell><Link to={`/offers/${o.id}`} className="font-mono text-xs text-primary hover:underline">{o.number}</Link></TableCell>
-                        <TableCell className="text-sm">{ph ? fullName(ph) : "—"}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{o.createdDate}</TableCell>
-                        <TableCell className="text-right font-mono">{fmtMoney(o.premium, o.currency)}</TableCell>
+                        <TableCell><Link to={`/offers/${o.id}`} className="font-mono text-xs text-primary hover:underline">{shortOfferId(o.id)}</Link></TableCell>
+                        <TableCell className="text-sm">{o.policyHolderName?.trim() || "—"}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatOfferDate(o.createdOnUtc)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmtMoney(o.firstPeriodChargePremium ?? 0, o.currency)}</TableCell>
                       </TableRow>
-                    );
-                  })}
+                    ))}
                 </TableBody>
               </Table>
             </div>
@@ -351,17 +493,17 @@ const Reports = () => {
                 {expiring.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">No policies expiring in the next year.</TableCell></TableRow>
                 ) : expiring.map((p) => {
-                  const ph = getCustomerLocal(p.policyHolderId);
-                  const days = Math.ceil((new Date(p.endDate).getTime() - now.getTime()) / 86400000);
+                  const endDate = p.coverageTerm?.endDate ?? "";
+                  const days = Math.ceil((new Date(endDate).getTime() - now.getTime()) / 86400000);
                   return (
                     <TableRow key={p.id}>
-                      <TableCell><Link to={`/policies/${p.id}`} className="font-mono text-xs text-primary hover:underline">{p.number}</Link></TableCell>
-                      <TableCell className="text-sm">{ph ? fullName(ph) : "—"}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{p.endDate}</TableCell>
+                      <TableCell><Link to={`/policies/${p.id}`} className="font-mono text-xs text-primary hover:underline">{policyNumberLabel(p.serial, p.id)}</Link></TableCell>
+                      <TableCell className="text-sm">{p.policyHolderName?.trim() || "—"}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{formatPolicyDate(endDate)}</TableCell>
                       <TableCell>
                         <Badge variant={days < 60 ? "destructive" : "outline"} className="font-mono">{days}d</Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono">{fmtMoney(p.premium, p.currency)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmtMoney(p.firstPeriodChargePremium ?? 0, p.currency)}</TableCell>
                     </TableRow>
                   );
                 })}

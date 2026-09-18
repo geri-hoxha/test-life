@@ -5,6 +5,7 @@ import type {
   CompaniesCompanyAddressResponse,
   CompaniesCompanyResponse,
   CompaniesCreateCompanyRequest,
+  CompaniesListCompaniesRequest,
   CompaniesUpdateCompanyRequest,
   PaginationPagedListOfCompanyResponse,
 } from "./types";
@@ -63,12 +64,7 @@ export const useCreateCompany = () => {
   });
 };
 
-export type ListCompaniesQuery = {
-  registrationNumber?: string;
-  countryCode?: string;
-  legalName?: string;
-  tradeName?: string;
-  companyType?: string;
+export type ListCompaniesQuery = CompaniesListCompaniesRequest & {
   pageNumber?: number;
   pageSize?: number;
 };

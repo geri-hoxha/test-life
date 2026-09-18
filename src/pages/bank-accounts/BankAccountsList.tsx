@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/layout/AppShell";
+import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { Button } from "@/components/ui/button";
 import {
@@ -355,11 +356,7 @@ const BankAccountsList = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading data, please wait…
-                    </TableCell>
-                  </TableRow>
+                  <TableLoadingRow colSpan={7} />
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">

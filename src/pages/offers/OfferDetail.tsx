@@ -1,6 +1,7 @@
 import { useMemo, useState, Fragment } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
+import { OverlayLoader, PageLoader } from "@/components/Loader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,7 +48,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   ArrowLeft,
-  Edit,
   RefreshCw,
   CheckCircle2,
   XCircle,
@@ -57,19 +57,16 @@ import {
   Calendar,
   Users,
   FileText,
-  // StickyNote,
   Package,
   AlertTriangle,
   Percent,
   Upload,
-  ChevronRight,
-  ChevronDown,
   Download,
   Calculator,
   Loader2,
   Eye,
 } from "lucide-react";
-import { getOffer, statusColor } from "@/data/offers";
+import { statusColor } from "@/data/offers";
 import { ageFromDob } from "@/data/customers";
 import {
   VerificationCheck,
@@ -78,25 +75,23 @@ import {
   overallStatus,
 } from "./VerificationStep";
 import { toast } from "sonner";
-import { toastApiError, getApiErrorMessage } from "@/lib/api-error";
-import { ApiError } from "@/api/client";
+import { toastApiError } from "@/lib/api-error";
 import {
   useGetOffer,
   useCancelOffer,
-  useCalculateOfferYears,
   usePreviewOfferPremium,
-  useCancelOfferYear,
-  useRequestOfferYearDiscount,
-  useApproveOfferYearDiscount,
-  useRejectOfferYearDiscount,
-  useApproveOfferYearDocument,
-  useRejectOfferYearDocument,
-  useSubmitOfferYearDocument,
-  useListOfferYearDocuments,
-  useApproveOfferYearReviewFlag,
-  useRejectOfferYearReviewFlag,
+  useRequestOfferDiscount,
+  useApproveOfferDiscount,
+  useRejectOfferDiscount,
+  useAcceptOfferDocument,
+  useRefuseOfferDocument,
+  useSubmitOfferDocument,
+  useWaiveOfferDocument,
+  useApproveOfferReviewFlag,
+  useRejectOfferReviewFlag,
   useIssueOfferPolicy,
-  useRenewOffer,
+  useRateOffer,
+  useQuoteOffer,
 } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
 import { useGetProduct, mapApiProduct } from "@/api/products";
@@ -110,27 +105,29 @@ import {
 } from "@/api/documents";
 import { useGetBankAccount } from "@/api/bank-accounts";
 import { customerPath, countryDisplayName } from "@/api/adapters/customers";
-import { useCountryEnum } from "@/api/smart-enums";
+import { useCountryEnum, useRelationshipToInsuredEnum, smartEnumLabel } from "@/api/smart-enums";
+import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { useDocumentPreview } from "@/components/documents/DocumentPreview";
+import {
+  REASON_MAX_LENGTH,
+  discountStatusClass,
+  discountStatusLabel,
+  documentStatusLabel,
+  formatDiscountPct,
+  formatOfferDate,
+  formatOfferDateTime,
+  formatOfferMoney,
+  formatRate,
+  periodStatusClass,
+  periodStatusLabel,
+  salesChannelLabel,
+  submissionSourceLabel,
+} from "./offer-ui";
 
-const fmtMoney = (v: number, ccy: string) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(v);
+const fmtMoney = (v: number, ccy: string) => formatOfferMoney(v, ccy);
 
 const titleCase = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined;
-
-const yearStatusColor: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground border-transparent",
-  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-  cancelled: "bg-destructive/15 text-destructive border-destructive/30",
-};
-
-const discountRequestStatusColor: Record<string, string> = {
-  requested: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  approved: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-  rejected: "bg-destructive/15 text-destructive border-destructive/30",
-};
 
 const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
@@ -161,30 +158,30 @@ const PartyLink = ({
 
 const docStatusBadge = (status: string) => {
   switch (status) {
+    case "waived":
+      return <Badge variant="secondary">{documentStatusLabel(status)}</Badge>;
     case "accepted":
-      return <Badge variant="default" className="bg-emerald-600">Accepted</Badge>;
+      return <Badge variant="default" className="bg-emerald-600">{documentStatusLabel(status)}</Badge>;
     case "submitted":
-      return <Badge variant="secondary">Submitted</Badge>;
+      return <Badge variant="secondary">{documentStatusLabel(status)}</Badge>;
     case "refused":
-      return <Badge variant="destructive">Refused</Badge>;
+      return <Badge variant="destructive">{documentStatusLabel(status)}</Badge>;
     default:
       return (
         <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
-          <AlertTriangle className="h-3 w-3 mr-1" /> Required
+          <AlertTriangle className="h-3 w-3 mr-1" /> {documentStatusLabel(status)}
         </Badge>
       );
   }
 };
 
-type YearDocAction = {
+type DocAction = {
   requirementId: string;
-  year: number;
   label: string;
 };
 
-const OfferYearExpandedPanel = ({
-  offerId,
-  year,
+const OfferDocumentsPanel = ({
+  documents,
   reviewFlags,
   documentTypeNameById,
   docActionPending,
@@ -192,11 +189,21 @@ const OfferYearExpandedPanel = ({
   onSubmit,
   onApprove,
   onReject,
+  onWaive,
   onApproveFlag,
   onRejectFlag,
 }: {
-  offerId: string;
-  year: number;
+  documents: {
+    id: string;
+    documentId?: string | null;
+    documentTypeId: string;
+    status: string;
+    submissionSource?: string | null;
+    refusalReason?: string | null;
+    waiverReason?: string | null;
+    submittedOnUtc?: string | null;
+    decidedOnUtc?: string | null;
+  }[];
   reviewFlags: {
     id: string;
     type: string;
@@ -206,29 +213,14 @@ const OfferYearExpandedPanel = ({
   documentTypeNameById: Record<string, string>;
   docActionPending: boolean;
   flagActionPending: boolean;
-  onSubmit: (args: YearDocAction) => void;
-  onApprove: (args: YearDocAction) => void;
-  onReject: (args: YearDocAction) => void;
+  onSubmit: (args: DocAction) => void;
+  onApprove: (args: DocAction) => void;
+  onReject: (args: DocAction) => void;
+  onWaive: (args: DocAction) => void;
   onApproveFlag: (flagId: string) => void;
   onRejectFlag: (flagId: string) => void;
 }) => {
-  const { data, isLoading, isError, error } = useListOfferYearDocuments(
-    offerId,
-    String(year)
-  );
   const { fileBusy, openPreview, download } = useDocumentPreview();
-
-  const documents = useMemo(
-    () =>
-      (data ?? []).map((d) => ({
-        id: String(d.id ?? ""),
-        documentId: d.documentId ?? null,
-        documentTypeId: d.documentTypeId ?? "",
-        status: d.status ?? ("required" as const),
-        refusalReason: d.refusalReason ?? null,
-      })),
-    [data]
-  );
 
   const yearChecks = useMemo(
     () => mapReviewFlagsToChecks(reviewFlags),
@@ -243,17 +235,9 @@ const OfferYearExpandedPanel = ({
           <FileText className="h-4 w-4 text-muted-foreground" />
           <h4 className="text-sm font-semibold">Documents</h4>
         </div>
-        {isLoading ? (
+        {documents.length === 0 ? (
           <div className="rounded-md border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
-            Loading documents…
-          </div>
-        ) : isError ? (
-          <div className="rounded-md border bg-background px-4 py-6 text-center text-sm text-destructive">
-            {error instanceof Error ? error.message : "Failed to load documents"}
-          </div>
-        ) : documents.length === 0 ? (
-          <div className="rounded-md border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
-            No documents on this offer year.
+            No document requirements on this offer.
           </div>
         ) : (
           <div className="grid gap-2">
@@ -288,13 +272,28 @@ const OfferYearExpandedPanel = ({
                           Doc: {d.documentId}
                         </CardDescription>
                       ) : null}
+                      {submissionSourceLabel(d.submissionSource) ? (
+                        <CardDescription className="text-[11px]">
+                          Source: {submissionSourceLabel(d.submissionSource)}
+                        </CardDescription>
+                      ) : null}
+                      {d.submittedOnUtc ? (
+                        <CardDescription className="text-[11px]">
+                          Submitted {formatOfferDateTime(d.submittedOnUtc)}
+                        </CardDescription>
+                      ) : null}
+                      {d.decidedOnUtc ? (
+                        <CardDescription className="text-[11px]">
+                          Decided {formatOfferDateTime(d.decidedOnUtc)}
+                        </CardDescription>
+                      ) : null}
                     </div>
                   </CardHeader>
                   <CardContent className="p-3 pt-0 space-y-2">
-                    {d.refusalReason ? (
+                    {d.waiverReason ? (
                       <p className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">Refusal: </span>
-                        {d.refusalReason}
+                        <span className="font-medium text-foreground">Waiver: </span>
+                        {d.waiverReason}
                       </p>
                     ) : null}
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -348,7 +347,6 @@ const OfferYearExpandedPanel = ({
                         onClick={() =>
                           onSubmit({
                             requirementId: d.id,
-                            year,
                             label,
                           })
                         }
@@ -363,7 +361,6 @@ const OfferYearExpandedPanel = ({
                         onClick={() =>
                           onApprove({
                             requirementId: d.id,
-                            year,
                             label,
                           })
                         }
@@ -378,12 +375,25 @@ const OfferYearExpandedPanel = ({
                         onClick={() =>
                           onReject({
                             requirementId: d.id,
-                            year,
                             label,
                           })
                         }
                       >
                         <XCircle className="h-3.5 w-3.5" /> Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8"
+                        disabled={!canSubmit || docActionPending || !d.id}
+                        onClick={() =>
+                          onWaive({
+                            requirementId: d.id,
+                            label,
+                          })
+                        }
+                      >
+                        Waive
                       </Button>
                     </div>
                   </CardContent>
@@ -420,7 +430,10 @@ const OfferDetail = () => {
 
   const { data: apiOffer, isLoading } = useGetOffer(id ?? "", { enabled: Boolean(id) });
   const { data: countryOptions = [] } = useCountryEnum();
+  const { data: relationshipOptions = [] } = useRelationshipToInsuredEnum();
   const countryLabel = (code?: string) => countryDisplayName(code, countryOptions) ?? code;
+  const relationshipLabel = (value?: string | null) => smartEnumLabel(relationshipOptions, value);
+  const policyPlanTypeLabel = usePolicyPlanTypeLabel();
   const {
     data: premiumPreview,
     isFetching: premiumPreviewLoading,
@@ -429,18 +442,18 @@ const OfferDetail = () => {
     refetch: refetchPremiumPreview,
   } = usePreviewOfferPremium(id ?? "", { enabled: Boolean(id) });
   const cancelOffer = useCancelOffer();
-  const calculateYears = useCalculateOfferYears();
-  const cancelOfferYear = useCancelOfferYear();
-  const requestDiscount = useRequestOfferYearDiscount();
-  const approveDiscount = useApproveOfferYearDiscount();
-  const rejectDiscount = useRejectOfferYearDiscount();
-  const approveYearDocument = useApproveOfferYearDocument();
-  const rejectYearDocument = useRejectOfferYearDocument();
-  const submitYearDocument = useSubmitOfferYearDocument();
-  const approveReviewFlag = useApproveOfferYearReviewFlag();
-  const rejectReviewFlag = useRejectOfferYearReviewFlag();
+  const requestDiscount = useRequestOfferDiscount();
+  const approveDiscount = useApproveOfferDiscount();
+  const rejectDiscount = useRejectOfferDiscount();
+  const acceptDocument = useAcceptOfferDocument();
+  const refuseDocument = useRefuseOfferDocument();
+  const submitDocument = useSubmitOfferDocument();
+  const waiveDocument = useWaiveOfferDocument();
+  const approveReviewFlag = useApproveOfferReviewFlag();
+  const rejectReviewFlag = useRejectOfferReviewFlag();
   const issueOfferPolicy = useIssueOfferPolicy();
-  const renewOffer = useRenewOffer();
+  const rateOffer = useRateOffer();
+  const quoteOffer = useQuoteOffer();
   const { data: coveragesPage } = useListCoverages({ pageNumber: 1, pageSize: 200 });
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
 
@@ -453,58 +466,46 @@ const OfferDetail = () => {
     [premiumPreview],
   );
 
-  const [cancelYear, setCancelYear] = useState<number | null>(null);
-  const [discountDialog, setDiscountDialog] = useState<{ year: number } | null>(null);
+  const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [discountPct, setDiscountPct] = useState("50");
   const [discountReason, setDiscountReason] = useState("");
+  const [discountPeriod, setDiscountPeriod] = useState("");
   const [docRejectDialog, setDocRejectDialog] = useState<{
     requirementId: string;
-    year: number;
     label: string;
   } | null>(null);
   const [docRejectReason, setDocRejectReason] = useState("");
+  const [docWaiveDialog, setDocWaiveDialog] = useState<{
+    requirementId: string;
+    label: string;
+  } | null>(null);
+  const [docWaiveReason, setDocWaiveReason] = useState("");
   const [docSubmitDialog, setDocSubmitDialog] = useState<{
     requirementId: string;
-    year: number;
     label: string;
   } | null>(null);
   const [docSubmitFile, setDocSubmitFile] = useState<File | null>(null);
   const [docSubmitPending, setDocSubmitPending] = useState(false);
   const [pendingDocApprove, setPendingDocApprove] = useState<{
     requirementId: string;
-    year: number;
     label: string;
   } | null>(null);
   const [pendingFlagAction, setPendingFlagAction] = useState<{
     kind: "approve" | "reject";
     flagId: string;
-    year: number;
     label: string;
   } | null>(null);
-  const [expandedYears, setExpandedYears] = useState<Set<number>>(
-    () => new Set()
-  );
-  const [issuancePending, setIssuancePending] = useState<"issue" | "renew" | null>(
+  const [issuancePending, setIssuancePending] = useState<"issue" | "rate" | "quote" | null>(
     null
   );
-  const [confirmAction, setConfirmAction] = useState<"reject" | "renew" | "issue" | null>(
+  const [confirmAction, setConfirmAction] = useState<"reject" | "issue" | "rate" | "quote" | null>(
     null
   );
   const [discountConfirm, setDiscountConfirm] = useState<{
     kind: "approve" | "reject";
-    year: number;
     requestId: string;
     pctLabel: string;
   } | null>(null);
-
-  const toggleYearExpanded = (year: number) => {
-    setExpandedYears((prev) => {
-      const next = new Set(prev);
-      if (next.has(year)) next.delete(year);
-      else next.add(year);
-      return next;
-    });
-  };
 
   const coverageNameById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -524,8 +525,8 @@ const OfferDetail = () => {
 
   const offer = useMemo(() => {
     if (apiOffer) return mapApiOffer(apiOffer);
-    return id ? getOffer(id) : undefined;
-  }, [apiOffer, id]);
+    return undefined;
+  }, [apiOffer]);
 
   const { data: apiProduct } = useGetProduct(offer?.productId ?? "", { enabled: Boolean(offer?.productId) });
   const product = useMemo(() => {
@@ -539,21 +540,17 @@ const OfferDetail = () => {
   });
 
   const paymentMethod =
-    product?.paymentMethods?.find((pm) => pm.currency === offer?.currency) ??
-    product?.paymentMethods?.[0];
+    product?.bankAccounts?.find((entry) => entry.currency === offer?.currency) ??
+    product?.bankAccounts?.[0];
   const paymentBankAccountId = paymentMethod?.bankAccountId?.trim() || "";
   const { data: paymentBankAccount } = useGetBankAccount(paymentBankAccountId, {
     enabled: Boolean(paymentBankAccountId),
   });
 
-  // const [notes, setNotes] = useState("");
-
   if (isLoading) {
     return (
       <AppShell>
-        <div className="text-center py-20">
-          <h1 className="text-xl font-semibold">Loading offer…</h1>
-        </div>
+        <PageLoader label="Loading offer…" />
       </AppShell>
     );
   }
@@ -575,9 +572,7 @@ const OfferDetail = () => {
   const insuredPerson = offer.insuredPersons[0];
   const yearCoverages = offer.offerYears.flatMap((s) => s.coverages);
 
-  const verificationChecks: VerificationCheck[] = offer.offerYears.flatMap((s) =>
-    mapReviewFlagsToChecks(s.reviewFlags)
-  );
+  const verificationChecks: VerificationCheck[] = mapReviewFlagsToChecks(offer.reviewFlags);
   const verifOverall = overallStatus(verificationChecks);
   const reviewCount = verificationChecks.filter((c) => c.result === "Requires Review").length;
   const warnCount = verificationChecks.filter((c) => c.result === "Warning").length;
@@ -591,64 +586,17 @@ const OfferDetail = () => {
     }
   };
 
-  const issuePolicyBody = product?.defaultPrintableTemplateDocumentId
-    ? { printableTemplateDocumentId: product.defaultPrintableTemplateDocumentId }
-    : undefined;
-
-  const issuanceMode = product?.issuanceMode ?? null;
-
-  const orderedYears = [...offer.offerYears]
-    .filter((s) => s.internalStatus !== "cancelled")
-    .sort((a, b) => a.year - b.year);
-
-  const isYearApproved = (s: (typeof orderedYears)[number]) =>
-    Boolean(s.policyId) || s.internalStatus === "active";
-
-  const firstYearApproved = orderedYears[0]
-    ? isYearApproved(orderedYears[0])
-    : false;
-
-  /** wholeOfTerm: issue once only, no renew. annualRenewable: issue then renew. */
-  const isWholeOfTerm = issuanceMode === "wholeOfTerm";
-  const showRenewButton = !isWholeOfTerm;
-  const canIssuePolicy = !firstYearApproved;
-  const canRenew = showRenewButton && firstYearApproved;
-
-  const yearIssueTargets = orderedYears.filter((s) => !s.policyId);
-
-  /**
-   * Pricing is no longer one-shot: products priced per renewal only ever have their next
-   * year priced, so the action stays available. The backend rejects a premature call with
-   * a 422 when the prior year's policy has not been issued yet.
-   */
-  const canCalculateYears =
-    offer.offerYears.length === 0 || product?.scheduleBasis === "perRenewalInfo";
+  const canRate = offer.status === "Draft";
+  const canQuote = offer.status === "Draft";
+  const canIssuePolicy = offer.status === "Quoted" && !offer.policyId;
 
   const handleIssueOfferPolicy = async () => {
     try {
       setIssuancePending("issue");
-      if (issuanceMode === "annualRenewable") {
-        const targets =
-          yearIssueTargets.length > 0 ? yearIssueTargets : [null];
-        let issued = 0;
-        for (const _year of targets) {
-          await issueOfferPolicy.mutateAsync({
-            offerId: offer.id,
-            body: issuePolicyBody,
-          });
-          issued += 1;
-        }
-        toast.success(
-          issued === 1 ? "Policy issued" : `${issued} policies issued`
-        );
-      } else {
-        // wholeOfTerm: single policy issuance only
-        await issueOfferPolicy.mutateAsync({
-          offerId: offer.id,
-          body: issuePolicyBody,
-        });
-        toast.success("Policy issued");
-      }
+      const issued = await issueOfferPolicy.mutateAsync({ offerId: offer.id });
+      const policyId = issued.policy?.id;
+      toast.success(policyId ? `Policy ${policyId} issued` : "Policy issued");
+      if (policyId) navigate(`/policies/${policyId}`);
     } catch (err) {
       toastApiError(err, "Failed to issue policy");
     } finally {
@@ -656,21 +604,26 @@ const OfferDetail = () => {
     }
   };
 
-  const handleRenewOffer = async () => {
+  const handleRateOffer = async () => {
     try {
-      setIssuancePending("renew");
-      const targets =
-        yearIssueTargets.length > 0 ? yearIssueTargets : [null];
-      let renewed = 0;
-      for (const _year of targets) {
-        await renewOffer.mutateAsync(offer.id);
-        renewed += 1;
-      }
-      toast.success(
-        renewed === 1 ? "Renewal issued" : `${renewed} renewals issued`
-      );
+      setIssuancePending("rate");
+      await rateOffer.mutateAsync(offer.id);
+      toast.success("Offer rated");
+      void refetchPremiumPreview();
     } catch (err) {
-      toastApiError(err, "Failed to renew");
+      toastApiError(err, "Failed to rate offer");
+    } finally {
+      setIssuancePending(null);
+    }
+  };
+
+  const handleQuoteOffer = async () => {
+    try {
+      setIssuancePending("quote");
+      await quoteOffer.mutateAsync(offer.id);
+      toast.success("Offer quoted");
+    } catch (err) {
+      toastApiError(err, "Failed to quote offer");
     } finally {
       setIssuancePending(null);
     }
@@ -685,40 +638,8 @@ const OfferDetail = () => {
     }
   };
 
-  const handleCalculateYears = async () => {
-    try {
-      await calculateYears.mutateAsync(offer.id);
-      toast.success("Offer years calculated");
-      void refetchPremiumPreview();
-    } catch (err) {
-      // A 422 here means the prior year's policy is not issued yet — a normal
-      // validation outcome for per-renewal products, not a failure.
-      if (err instanceof ApiError && err.status === 422) {
-        toast.warning(
-          getApiErrorMessage(err, "The next year cannot be priced yet."),
-        );
-        return;
-      }
-      toastApiError(err, "Failed to calculate offer years");
-    }
-  };
-
-  const handleCancelYear = async () => {
-    if (cancelYear == null) return;
-    try {
-      await cancelOfferYear.mutateAsync({
-        offerId: offer.id,
-        year: String(cancelYear),
-      });
-      toast.success(`Offer year ${cancelYear} cancelled`);
-      setCancelYear(null);
-    } catch (err) {
-      toastApiError(err, "Failed to cancel offer year");
-    }
-  };
-
   const handleRequestDiscount = async () => {
-    if (!discountDialog) return;
+    if (!discountDialogOpen) return;
     const pct = Number(discountPct);
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
       toast.error("Enter a discount between 0 and 100%");
@@ -728,29 +649,31 @@ const OfferDetail = () => {
       toast.error("Reason is required");
       return;
     }
+    const reason = discountReason.trim().slice(0, REASON_MAX_LENGTH);
+    const seq = Number(discountPeriod);
     try {
       await requestDiscount.mutateAsync({
         offerId: offer.id,
-        year: String(discountDialog.year),
         body: {
           requestedDiscountPercentage: pct / 100,
-          reason: discountReason.trim(),
+          reason,
+          ...(Number.isInteger(seq) && seq > 0 ? { targetPeriodSequence: seq } : {}),
         },
       });
-      toast.success(`Discount requested for offer year ${discountDialog.year}`);
-      setDiscountDialog(null);
+      toast.success("Discount requested");
+      setDiscountDialogOpen(false);
       setDiscountPct("50");
       setDiscountReason("");
+      setDiscountPeriod("");
     } catch (err) {
       toastApiError(err, "Failed to request discount");
     }
   };
 
-  const handleApproveDiscount = async (year: number, requestId: string) => {
+  const handleApproveDiscount = async (requestId: string) => {
     try {
       await approveDiscount.mutateAsync({
         offerId: offer.id,
-        year: String(year),
         requestId,
       });
       toast.success("Discount request approved");
@@ -759,11 +682,10 @@ const OfferDetail = () => {
     }
   };
 
-  const handleRejectDiscount = async (year: number, requestId: string) => {
+  const handleRejectDiscount = async (requestId: string) => {
     try {
       await rejectDiscount.mutateAsync({
         offerId: offer.id,
-        year: String(year),
         requestId,
       });
       toast.success("Discount request rejected");
@@ -772,12 +694,11 @@ const OfferDetail = () => {
     }
   };
 
-  const handleApproveYearDocument = async () => {
+  const handleApproveDocument = async () => {
     if (!pendingDocApprove) return;
     try {
-      await approveYearDocument.mutateAsync({
+      await acceptDocument.mutateAsync({
         offerId: offer.id,
-        year: String(pendingDocApprove.year),
         requirementId: pendingDocApprove.requirementId,
       });
       toast.success(`Document approved: ${pendingDocApprove.label}`);
@@ -787,18 +708,17 @@ const OfferDetail = () => {
     }
   };
 
-  const handleRejectYearDocument = async () => {
+  const handleRejectDocument = async () => {
     if (!docRejectDialog) return;
     if (!docRejectReason.trim()) {
       toast.error("Rejection reason is required");
       return;
     }
     try {
-      await rejectYearDocument.mutateAsync({
+      await refuseDocument.mutateAsync({
         offerId: offer.id,
-        year: String(docRejectDialog.year),
         requirementId: docRejectDialog.requirementId,
-        body: { reason: docRejectReason.trim() },
+        body: { reason: docRejectReason.trim().slice(0, REASON_MAX_LENGTH) },
       });
       toast.success(`Document rejected: ${docRejectDialog.label}`);
       setDocRejectDialog(null);
@@ -808,7 +728,27 @@ const OfferDetail = () => {
     }
   };
 
-  const handleSubmitYearDocument = async () => {
+  const handleWaiveDocument = async () => {
+    if (!docWaiveDialog) return;
+    if (!docWaiveReason.trim()) {
+      toast.error("Waiver reason is required");
+      return;
+    }
+    try {
+      await waiveDocument.mutateAsync({
+        offerId: offer.id,
+        requirementId: docWaiveDialog.requirementId,
+        body: { reason: docWaiveReason.trim().slice(0, REASON_MAX_LENGTH) },
+      });
+      toast.success(`Document waived: ${docWaiveDialog.label}`);
+      setDocWaiveDialog(null);
+      setDocWaiveReason("");
+    } catch (err) {
+      toastApiError(err, "Failed to waive document");
+    }
+  };
+
+  const handleSubmitDocument = async () => {
     if (!docSubmitDialog) return;
     if (!docSubmitFile) {
       toast.error("Choose a file to upload");
@@ -820,9 +760,8 @@ const OfferDetail = () => {
         buildCreateDocumentFormData(docSubmitFile, docSubmitFile.name)
       );
       if (!uploaded.id) throw new Error("Upload did not return a document id");
-      await submitYearDocument.mutateAsync({
+      await submitDocument.mutateAsync({
         offerId: offer.id,
-        year: String(docSubmitDialog.year),
         requirementId: docSubmitDialog.requirementId,
         body: { documentId: uploaded.id },
       });
@@ -842,14 +781,12 @@ const OfferDetail = () => {
       if (pendingFlagAction.kind === "approve") {
         await approveReviewFlag.mutateAsync({
           offerId: offer.id,
-          year: String(pendingFlagAction.year),
           flagId: pendingFlagAction.flagId,
         });
         toast.success(`Review flag approved: ${pendingFlagAction.label}`);
       } else {
         await rejectReviewFlag.mutateAsync({
           offerId: offer.id,
-          year: String(pendingFlagAction.year),
           flagId: pendingFlagAction.flagId,
         });
         toast.success(`Review flag rejected: ${pendingFlagAction.label}`);
@@ -879,15 +816,17 @@ const OfferDetail = () => {
   const pageBusyLabel =
     issuancePending === "issue"
       ? "Issuing policy…"
-      : issuancePending === "renew"
-        ? "Renewing…"
-        : cancelOffer.isPending
-          ? "Rejecting offer…"
-          : approveDiscount.isPending
-            ? "Approving discount…"
-            : rejectDiscount.isPending
-              ? "Rejecting discount…"
-              : "Working…";
+      : issuancePending === "rate"
+        ? "Rating offer…"
+        : issuancePending === "quote"
+          ? "Quoting offer…"
+          : cancelOffer.isPending
+            ? "Rejecting offer…"
+            : approveDiscount.isPending
+              ? "Approving discount…"
+              : rejectDiscount.isPending
+                ? "Rejecting discount…"
+                : "Working…";
 
   const confirmCopy =
     confirmAction === "reject"
@@ -897,22 +836,24 @@ const OfferDetail = () => {
           confirmLabel: "Reject offer",
           destructive: true,
         }
-      : confirmAction === "renew"
+      : confirmAction === "rate"
         ? {
-            title: "Renew this offer?",
-            description:
-              "This will create a renewal for the next eligible offer year.",
-            confirmLabel: "Renew",
+            title: "Rate this offer?",
+            description: "This will calculate premium and coverages from the current parties and loan balances.",
+            confirmLabel: "Rate offer",
             destructive: false,
           }
+        : confirmAction === "quote"
+          ? {
+              title: "Quote this offer?",
+              description: "This will lock the quotation so the offer can be issued.",
+              confirmLabel: "Quote offer",
+              destructive: false,
+            }
         : confirmAction === "issue"
           ? {
               title: "Issue policy?",
-              description: isWholeOfTerm
-                ? "This will issue the policy for this whole-of-term offer. This can only be done once."
-                : issuanceMode === "annualRenewable"
-                  ? "This will issue a policy for each eligible offer year on this offer."
-                  : "This will issue the initial policy for this offer.",
+              description: "This will convert the quoted offer into a policy.",
               confirmLabel: "Issue policy",
               destructive: false,
             }
@@ -922,13 +863,13 @@ const OfferDetail = () => {
     ? discountConfirm.kind === "approve"
       ? {
           title: "Approve discount request?",
-          description: `Approve the ${discountConfirm.pctLabel} discount for offer year ${discountConfirm.year}.`,
+          description: `Approve the ${discountConfirm.pctLabel} discount.`,
           confirmLabel: "Approve",
           destructive: false,
         }
       : {
           title: "Reject discount request?",
-          description: `Reject the ${discountConfirm.pctLabel} discount for offer year ${discountConfirm.year}.`,
+          description: `Reject the ${discountConfirm.pctLabel} discount.`,
           confirmLabel: "Reject",
           destructive: true,
         }
@@ -938,34 +879,22 @@ const OfferDetail = () => {
     const action = confirmAction;
     setConfirmAction(null);
     if (action === "reject") void handleReject();
-    else if (action === "renew") void handleRenewOffer();
+    else if (action === "rate") void handleRateOffer();
+    else if (action === "quote") void handleQuoteOffer();
     else if (action === "issue") void handleIssueOfferPolicy();
   };
 
   const handleConfirmDiscountAction = () => {
     if (!discountConfirm) return;
-    const { kind, year, requestId } = discountConfirm;
+    const { kind, requestId } = discountConfirm;
     setDiscountConfirm(null);
-    if (kind === "approve") void handleApproveDiscount(year, requestId);
-    else void handleRejectDiscount(year, requestId);
+    if (kind === "approve") void handleApproveDiscount(requestId);
+    else void handleRejectDiscount(requestId);
   };
 
   return (
     <AppShell>
-      {pageBusy ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-[2px]"
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-        >
-          <div className="flex min-w-[14rem] flex-col items-center gap-3 rounded-md border bg-card px-6 py-5 shadow-md">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <div className="text-sm font-medium text-foreground">{pageBusyLabel}</div>
-            <div className="text-xs text-muted-foreground">Please wait…</div>
-          </div>
-        </div>
-      ) : null}
+      {pageBusy ? <OverlayLoader label={pageBusyLabel} /> : null}
 
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/offers")} className="gap-2">
@@ -989,13 +918,11 @@ const OfferDetail = () => {
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             {product?.name ?? offer.productId} · created {offer.createdDate}
+            {offer.quotedOnUtc ? ` · quoted ${formatOfferDateTime(offer.quotedOnUtc)}` : ""}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Open editor (demo)")}>
-            <Edit className="h-4 w-4" /> Edit Offer
-          </Button> */}
           <Button
             variant="outline"
             size="sm"
@@ -1006,27 +933,25 @@ const OfferDetail = () => {
             <RefreshCw className={`h-4 w-4 ${premiumPreviewLoading ? "animate-spin" : ""}`} />
             Preview Premium
           </Button>
-          {canCalculateYears && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => void handleCalculateYears()}
-              disabled={calculateYears.isPending}
-              title={
-                offer.offerYears.length > 0
-                  ? "Prices the next not-yet-priced year. Only available once the prior year's policy has been issued."
-                  : undefined
-              }
-            >
-              <Calculator className="h-4 w-4" />
-              {calculateYears.isPending
-                ? "Calculating…"
-                : offer.offerYears.length > 0
-                  ? "Calculate Next Year"
-                  : "Calculate Offer Years"}
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={!canRate || pageBusy}
+            onClick={() => setConfirmAction("rate")}
+          >
+            <Calculator className="h-4 w-4" />
+            Rate
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={!canQuote || pageBusy}
+            onClick={() => setConfirmAction("quote")}
+          >
+            Quote
+          </Button>
           <Button
             variant="secondary"
             size="sm"
@@ -1036,17 +961,6 @@ const OfferDetail = () => {
           >
             <XCircle className="h-4 w-4" /> Reject
           </Button>
-          {showRenewButton ? (
-            <Button
-              size="sm"
-              className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
-              disabled={!canRenew || pageBusy}
-              onClick={() => setConfirmAction("renew")}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Renew
-            </Button>
-          ) : null}
           <Button
             size="sm"
             className="gap-2"
@@ -1123,20 +1037,17 @@ const OfferDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {offer.status === "Partially Bound" && product?.scheduleBasis === "perRenewalInfo" && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-500/40 bg-sky-500/5 px-4 py-3">
-          <p className="text-sm text-sky-800 dark:text-sky-200">
-            This product prices one year at a time, so the offer stays partially bound
-            until every covered year has been issued. Future years are picked up from the
-            renewals worklist.
-          </p>
-          {/* <Button variant="outline" size="sm" className="gap-2" asChild>
-            <Link to="/offers/renewals-due">
-              <RefreshCw className="h-3.5 w-3.5" /> Renewals Due
+      {offer.policyId ? (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-500/40 bg-emerald-500/5 px-4 py-3">
+          <p className="text-sm">
+            This offer has been issued as policy{" "}
+            <Link to={`/policies/${offer.policyId}`} className="font-mono text-primary hover:underline">
+              {offer.policyId}
             </Link>
-          </Button> */}
+            .
+          </p>
         </div>
-      )}
+      ) : null}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card>
@@ -1173,12 +1084,12 @@ const OfferDetail = () => {
           <CardContent><div className="text-lg font-semibold">{offer.currency}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1.5"><CardDescription>Offer Years</CardDescription></CardHeader>
+          <CardHeader className="pb-1.5"><CardDescription>Periods</CardDescription></CardHeader>
           <CardContent>
             <div className="text-lg font-semibold">
               {offer.offerYears.length}
               <span className="text-sm font-normal text-muted-foreground ml-1">
-                {offer.offerYears.length === 1 ? "year" : "years"}
+                {offer.offerYears.length === 1 ? "period" : "periods"}
               </span>
             </div>
           </CardContent>
@@ -1208,12 +1119,12 @@ const OfferDetail = () => {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full md:w-auto">
+        <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full md:w-auto">
           <TabsTrigger value="summary" className="gap-1.5"><Package className="h-3.5 w-3.5" />Summary</TabsTrigger>
-          <TabsTrigger value="years" className="gap-1.5"><Calendar className="h-3.5 w-3.5" />Years</TabsTrigger>
-          <TabsTrigger value="discounts" className="gap-1.5"><Percent className="h-3.5 w-3.5" />Discount Requests</TabsTrigger>
+          <TabsTrigger value="years" className="gap-1.5"><Calendar className="h-3.5 w-3.5" />Periods</TabsTrigger>
+          <TabsTrigger value="documents" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Documents</TabsTrigger>
+          <TabsTrigger value="discounts" className="gap-1.5"><Percent className="h-3.5 w-3.5" />Discounts</TabsTrigger>
           <TabsTrigger value="people" className="gap-1.5"><Users className="h-3.5 w-3.5" />People</TabsTrigger>
-          {/* <TabsTrigger value="notes" className="gap-1.5"><StickyNote className="h-3.5 w-3.5" />Notes</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="summary" className="mt-4 space-y-4">
@@ -1222,6 +1133,33 @@ const OfferDetail = () => {
               <CardHeader><CardTitle className="text-base">Product & Coverage</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
                 <Field label="Name" value={product?.name} />
+                <Field
+                  label="Policy plan"
+                  value={
+                    offer.policyPlan
+                      ? policyPlanTypeLabel(offer.policyPlan)
+                      : product?.policyPlanType
+                        ? policyPlanTypeLabel(product.policyPlanType)
+                        : undefined
+                  }
+                />
+                <Field
+                  label="Requires loan balances"
+                  value={offer.requiresLoanBalances ? "Yes" : "No"}
+                />
+                {offer.renewedFromPolicyId ? (
+                  <Field
+                    label="Renewed from policy"
+                    value={
+                      <Link
+                        to={`/policies/${offer.renewedFromPolicyId}`}
+                        className="font-mono text-xs text-primary hover:underline"
+                      >
+                        {offer.renewedFromPolicyId}
+                      </Link>
+                    }
+                  />
+                ) : null}
                 <Field
                   label="Printable template"
                   value={
@@ -1289,6 +1227,7 @@ const OfferDetail = () => {
                             <TableHead>Coverage</TableHead>
                             <TableHead className="text-right">Sum Insured</TableHead>
                             <TableHead className="text-right">Rate</TableHead>
+                            <TableHead className="text-right">Multiplier</TableHead>
                             <TableHead className="text-right">Premium</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1305,11 +1244,12 @@ const OfferDetail = () => {
                                 {fmtMoney(c.sumInsured, offer.currency)}
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                                {c.rateUsed?.isFlat
-                                  ? fmtMoney(c.rateUsed.flatValue ?? 0, c.rateUsed.flatValueCurrency || offer.currency)
-                                  : c.rateUsed?.percentageValue != null
-                                    ? `${c.rateUsed.percentageValue}%`
-                                    : "—"}
+                                {formatRate(c.rateUsed, offer.currency)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                                {c.ratingTableMultiplierUsed != null
+                                  ? c.ratingTableMultiplierUsed
+                                  : "—"}
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm font-semibold">
                                 {fmtMoney(c.calculatedPremium, offer.currency)}
@@ -1327,22 +1267,46 @@ const OfferDetail = () => {
             <Card>
               <CardHeader><CardTitle className="text-base">Policy Period</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                <Field label="Start Date" value={<span className="font-mono text-xs">{offer.startDate}</span>} />
-                <Field label="End Date" value={<span className="font-mono text-xs">{offer.endDate}</span>} />
+                <Field label="Start Date" value={<span className="font-mono text-xs">{formatOfferDate(offer.startDate)}</span>} />
+                <Field label="End Date" value={<span className="font-mono text-xs">{formatOfferDate(offer.endDate)}</span>} />
                 <Field label="Term" value={`${offer.termYears} years`} />
-                {offer.loanDisbursements.length > 0 && (
+                {offer.quotedOnUtc ? (
+                  <Field
+                    label="Quoted"
+                    value={<span className="font-mono text-xs">{formatOfferDateTime(offer.quotedOnUtc)}</span>}
+                  />
+                ) : null}
+                {(offer.loanDisbursements.length > 0 || offer.loanSubmissions.length > 0) && (
                   <div className="col-span-2 mt-2 pt-3 border-t space-y-3">
+                    {offer.loanSubmissions.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Loan submissions
+                        </div>
+                        {offer.loanSubmissions.map((sub) => (
+                          <div key={sub.id} className="text-sm">
+                            <span className="font-medium">{sub.sourceSystem || "—"}</span>
+                            {sub.externalReference ? (
+                              <span className="text-muted-foreground"> · {sub.externalReference}</span>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {offer.loanDisbursements.length > 0 && (
+                      <>
                     <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      Loan Disbursements ({offer.loanDisbursements.length})
+                      Loan balances ({offer.loanDisbursements.length} periods)
                     </div>
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Year</TableHead>
+                            <TableHead>#</TableHead>
                             <TableHead>Period start</TableHead>
                             <TableHead>Period end</TableHead>
-                            <TableHead className="text-right">Remaining</TableHead>
+                            <TableHead className="text-right">Opening</TableHead>
+                            <TableHead className="text-right">Closing</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1354,11 +1318,18 @@ const OfferDetail = () => {
                               <TableCell className="text-right">
                                 {fmtMoney(loan.remainingLoanAmount, offer.currency)}
                               </TableCell>
+                              <TableCell className="text-right">
+                                {loan.closingBalance != null
+                                  ? fmtMoney(loan.closingBalance, offer.currency)
+                                  : "—"}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -1402,14 +1373,32 @@ const OfferDetail = () => {
               />
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Sales attribution</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field
+                label="Channel"
+                value={
+                  offer.salesChannel ? (
+                    <Badge variant="outline">{salesChannelLabel(offer.salesChannel)}</Badge>
+                  ) : undefined
+                }
+              />
+              <Field label="Sales party" value={offer.salesPartyName} />
+              <Field label="Agent" value={offer.salesAgentName} />
+              <Field label="Partner" value={offer.salesPartnerName} />
+              <Field label="Office" value={offer.salesOfficeName} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="years" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Offer Years</CardTitle>
+              <CardTitle className="text-base">Coverage periods</CardTitle>
               <CardDescription>
-                Expand an offer-year row to view its documents and verification side by side.
+                Rated periods for this offer. Rate the offer to persist premium amounts.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1417,7 +1406,7 @@ const OfferDetail = () => {
                 premiumPreview && premiumPreview.length > 0 ? (
                   <div className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Premium preview (not committed). Calculate offer years to persist these amounts.
+                      Premium preview (not committed). Rate the offer to persist these amounts.
                     </p>
                     <div className="grid grid-cols-2 gap-3 max-w-md">
                       <div className="rounded-md border p-3">
@@ -1439,8 +1428,8 @@ const OfferDetail = () => {
                     {premiumPreviewLoading
                       ? "Loading premium preview…"
                       : premiumPreviewError
-                        ? "Premium preview unavailable — add loan disbursements and an insured person, then retry."
-                        : "No offer years calculated for this offer yet."}
+                        ? "Premium preview unavailable — add parties and loan balances, then rate the offer."
+                        : "No periods on this offer yet."}
                   </div>
                 )
               ) : (
@@ -1448,170 +1437,55 @@ const OfferDetail = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[44px]" />
-                        <TableHead className="w-[70px]">Year</TableHead>
+                        <TableHead className="w-[70px]">#</TableHead>
                         <TableHead>Start</TableHead>
                         <TableHead>End</TableHead>
-                        <TableHead className="text-right">Insured Amount</TableHead>
+                        <TableHead className="text-right">Opening</TableHead>
+                        <TableHead className="text-right">Closing</TableHead>
                         <TableHead className="text-right">Pay Premium</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Coverages</TableHead>
-                        <TableHead className="text-right">Documents</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {offer.offerYears.map((s) => {
-                        const isCancelled = s.internalStatus === "cancelled";
-                        const isExpanded = expandedYears.has(s.year);
-                        const docActionPending =
-                          approveYearDocument.isPending ||
-                          rejectYearDocument.isPending ||
-                          docSubmitPending;
-
-                        return (
-                          <Fragment key={s.id || s.year}>
-                            <TableRow
-                              className={isExpanded ? "border-b-0" : undefined}
-                              data-state={isExpanded ? "open" : undefined}
-                            >
-                              <TableCell className="pr-0">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground"
-                                  aria-label={
-                                    isExpanded
-                                      ? `Collapse offer year ${s.year}`
-                                      : `Expand offer year ${s.year}`
-                                  }
-                                  aria-expanded={isExpanded}
-                                  onClick={() => toggleYearExpanded(s.year)}
-                                >
-                                  {isExpanded ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </TableCell>
-                              <TableCell className="font-mono">{s.year}</TableCell>
-                              <TableCell className="font-mono text-xs">{s.startDate || "—"}</TableCell>
-                              <TableCell className="font-mono text-xs">{s.endDate || "—"}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {fmtMoney(s.insuredAmount, offer.currency)}
-                              </TableCell>
-                              <TableCell
-                                className="text-right font-mono text-sm font-semibold"
-                                title={`Calculated premium ${fmtMoney(s.premium, offer.currency)}`}
-                              >
-                                {fmtMoney(s.payPremium, offer.currency)}
-                                {s.payPremium !== s.premium && (
-                                  <div className="text-[11px] font-normal text-muted-foreground">
-                                    calc. {fmtMoney(s.premium, offer.currency)}
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    yearStatusColor[s.internalStatus ?? ""] ??
-                                    "bg-muted text-muted-foreground"
-                                  }
-                                >
-                                  {titleCase(s.internalStatus) ?? "—"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {s.coverages.length}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {s.documents.length}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="inline-flex items-center gap-1.5">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                    disabled={isCancelled}
-                                    onClick={() => {
-                                      setDiscountPct("50");
-                                      setDiscountReason("");
-                                      setDiscountDialog({ year: s.year });
-                                    }}
-                                  >
-                                    <Percent className="h-3.5 w-3.5" /> Request Discount
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    className="gap-1.5 h-8 text-destructive hover:text-destructive"
-                                    disabled={isCancelled || cancelOfferYear.isPending}
-                                    onClick={() => setCancelYear(s.year)}
-                                  >
-                                    <XCircle className="h-3.5 w-3.5" /> Cancel
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-
-                            {isExpanded && (
-                              <TableRow className="hover:bg-transparent">
-                                <TableCell colSpan={10} className="p-0">
-                                  <OfferYearExpandedPanel
-                                    offerId={offer.id}
-                                    year={s.year}
-                                    reviewFlags={s.reviewFlags}
-                                    documentTypeNameById={documentTypeNameById}
-                                    docActionPending={docActionPending}
-                                    flagActionPending={flagActionPending}
-                                    onSubmit={(args) => {
-                                      setDocSubmitFile(null);
-                                      setDocSubmitDialog(args);
-                                    }}
-                                    onApprove={setPendingDocApprove}
-                                    onReject={(args) => {
-                                      setDocRejectReason("");
-                                      setDocRejectDialog(args);
-                                    }}
-                                    onApproveFlag={(flagId) => {
-                                      const flag = s.reviewFlags.find((f) => f.id === flagId);
-                                      setPendingFlagAction({
-                                        kind: "approve",
-                                        flagId,
-                                        year: s.year,
-                                        label: flag?.type?.trim() || flagId,
-                                      });
-                                    }}
-                                    onRejectFlag={(flagId) => {
-                                      const flag = s.reviewFlags.find((f) => f.id === flagId);
-                                      setPendingFlagAction({
-                                        kind: "reject",
-                                        flagId,
-                                        year: s.year,
-                                        label: flag?.type?.trim() || flagId,
-                                      });
-                                    }}
-                                  />
-                                </TableCell>
-                              </TableRow>
+                      {offer.offerYears.map((s) => (
+                        <TableRow key={s.id || s.year}>
+                          <TableCell className="font-mono">{s.year}</TableCell>
+                          <TableCell className="font-mono text-xs">{formatOfferDate(s.startDate)}</TableCell>
+                          <TableCell className="font-mono text-xs">{formatOfferDate(s.endDate)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {s.openingBalance != null ? fmtMoney(s.openingBalance, offer.currency) : fmtMoney(s.insuredAmount, offer.currency)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {s.closingBalance != null ? fmtMoney(s.closingBalance, offer.currency) : "—"}
+                          </TableCell>
+                          <TableCell
+                            className="text-right font-mono text-sm font-semibold"
+                            title={`Calculated premium ${fmtMoney(s.premium, offer.currency)}`}
+                          >
+                            {fmtMoney(s.payPremium, offer.currency)}
+                            {s.payPremium !== s.premium && (
+                              <div className="text-[11px] font-normal text-muted-foreground">
+                                calc. {fmtMoney(s.premium, offer.currency)}
+                              </div>
                             )}
-                          </Fragment>
-                        );
-                      })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={periodStatusClass(s.internalStatus)}
+                            >
+                              {periodStatusLabel(s.internalStatus)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {s.coverages.length}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                       <TableRow className="bg-muted/40 font-medium">
-                        <TableCell />
-                        <TableCell colSpan={3} className="text-sm">
+                        <TableCell colSpan={5} className="text-sm">
                           Total
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {fmtMoney(
-                            offer.offerYears.reduce((sum, s) => sum + s.insuredAmount, 0),
-                            offer.currency
-                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm font-semibold text-primary">
                           {fmtMoney(
@@ -1619,7 +1493,7 @@ const OfferDetail = () => {
                             offer.currency
                           )}
                         </TableCell>
-                        <TableCell colSpan={4} />
+                        <TableCell colSpan={2} />
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -1627,49 +1501,78 @@ const OfferDetail = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
 
-          <AlertDialog
-            open={cancelYear != null}
-            onOpenChange={(open) => !open && setCancelYear(null)}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cancel offer year {cancelYear}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will cancel the offer year {cancelYear} on this offer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={cancelOfferYear.isPending}>Keep year</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void handleCancelYear();
-                  }}
-                  disabled={cancelOfferYear.isPending}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  {cancelOfferYear.isPending ? "Cancelling…" : "Cancel schedule"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+        <TabsContent value="documents" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Underwriting</CardTitle>
+              <CardDescription>
+                Document requirements and review flags for this offer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <OfferDocumentsPanel
+                documents={offer.documentRequirements}
+                reviewFlags={offer.reviewFlags}
+                documentTypeNameById={documentTypeNameById}
+                docActionPending={
+                  acceptDocument.isPending ||
+                  refuseDocument.isPending ||
+                  waiveDocument.isPending ||
+                  docSubmitPending
+                }
+                flagActionPending={flagActionPending}
+                onSubmit={(args) => {
+                  setDocSubmitFile(null);
+                  setDocSubmitDialog(args);
+                }}
+                onApprove={setPendingDocApprove}
+                onReject={(args) => {
+                  setDocRejectReason("");
+                  setDocRejectDialog(args);
+                }}
+                onWaive={(args) => {
+                  setDocWaiveReason("");
+                  setDocWaiveDialog(args);
+                }}
+                onApproveFlag={(flagId) => {
+                  const flag = offer.reviewFlags.find((f) => f.id === flagId);
+                  setPendingFlagAction({
+                    kind: "approve",
+                    flagId,
+                    label: flag?.type?.trim() || flagId,
+                  });
+                }}
+                onRejectFlag={(flagId) => {
+                  const flag = offer.reviewFlags.find((f) => f.id === flagId);
+                  setPendingFlagAction({
+                    kind: "reject",
+                    flagId,
+                    label: flag?.type?.trim() || flagId,
+                  });
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
           <Dialog
-            open={!!discountDialog}
+            open={discountDialogOpen}
             onOpenChange={(open) => {
               if (!open) {
-                setDiscountDialog(null);
+                                setDiscountDialogOpen(false);
                 setDiscountPct("50");
                 setDiscountReason("");
+                setDiscountPeriod("");
               }
             }}
           >
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Request discount · Year {discountDialog?.year}</DialogTitle>
+                <DialogTitle>Request discount</DialogTitle>
                 <DialogDescription>
-                  Submit a discount request for this offer year.
+                  Submit a discount request for this offer.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-2">
@@ -1679,7 +1582,7 @@ const OfferDetail = () => {
                     <Input
                       id="discount-pct"
                       type="number"
-                      min={0}
+                      min={0.01}
                       max={100}
                       step="any"
                       className="pr-8"
@@ -1692,20 +1595,36 @@ const OfferDetail = () => {
                   </div>
                 </div>
                 <div className="grid gap-2">
+                  <Label htmlFor="discount-period">Target period sequence</Label>
+                  <Input
+                    id="discount-period"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={discountPeriod}
+                    onChange={(e) => setDiscountPeriod(e.target.value)}
+                    placeholder="Optional"
+                  />
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="discount-reason">Reason</Label>
                   <Textarea
                     id="discount-reason"
                     rows={3}
+                    maxLength={REASON_MAX_LENGTH}
                     value={discountReason}
                     onChange={(e) => setDiscountReason(e.target.value)}
                     placeholder="Why is this discount requested?"
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    {discountReason.length}/{REASON_MAX_LENGTH}
+                  </p>
                 </div>
               </div>
               <DialogFooter>
                 <Button
                   variant="outline"
-                  onClick={() => setDiscountDialog(null)}
+                  onClick={() => setDiscountDialogOpen(false)}
                   disabled={requestDiscount.isPending}
                 >
                   Cancel
@@ -1725,20 +1644,19 @@ const OfferDetail = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Approve document?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Approve <span className="font-medium text-foreground">{pendingDocApprove?.label}</span> for
-                  offer year {pendingDocApprove?.year}.
+                  Approve <span className="font-medium text-foreground">{pendingDocApprove?.label}</span>.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={approveYearDocument.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={acceptDocument.isPending}>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={approveYearDocument.isPending}
+                  disabled={acceptDocument.isPending}
                   onClick={(e) => {
                     e.preventDefault();
-                    void handleApproveYearDocument();
+                    void handleApproveDocument();
                   }}
                 >
-                  {approveYearDocument.isPending ? "Approving…" : "Approve"}
+                  {acceptDocument.isPending ? "Approving…" : "Approve"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -1755,8 +1673,7 @@ const OfferDetail = () => {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   {pendingFlagAction?.kind === "reject" ? "Reject" : "Approve"}{" "}
-                  <span className="font-medium text-foreground">{pendingFlagAction?.label}</span> for
-                  offer year {pendingFlagAction?.year}.
+                  <span className="font-medium text-foreground">{pendingFlagAction?.label}</span>.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1798,7 +1715,7 @@ const OfferDetail = () => {
               <DialogHeader>
                 <DialogTitle>Reject document · {docRejectDialog?.label}</DialogTitle>
                 <DialogDescription>
-                  Provide a reason for rejecting this document requirement (year {docRejectDialog?.year}).
+                  Provide a reason for rejecting this document requirement.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2 py-2">
@@ -1806,6 +1723,7 @@ const OfferDetail = () => {
                 <Textarea
                   id="doc-reject-reason"
                   rows={4}
+                  maxLength={REASON_MAX_LENGTH}
                   value={docRejectReason}
                   onChange={(e) => setDocRejectReason(e.target.value)}
                   placeholder="Why is this document being rejected?"
@@ -1818,16 +1736,16 @@ const OfferDetail = () => {
                     setDocRejectDialog(null);
                     setDocRejectReason("");
                   }}
-                  disabled={rejectYearDocument.isPending}
+                  disabled={refuseDocument.isPending}
                 >
                   Cancel
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => void handleRejectYearDocument()}
-                  disabled={rejectYearDocument.isPending || !docRejectReason.trim()}
+                  onClick={() => void handleRejectDocument()}
+                  disabled={refuseDocument.isPending || !docRejectReason.trim()}
                 >
-                  {rejectYearDocument.isPending ? "Rejecting…" : "Reject"}
+                  {refuseDocument.isPending ? "Rejecting…" : "Reject"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1846,7 +1764,7 @@ const OfferDetail = () => {
               <DialogHeader>
                 <DialogTitle>Submit document · {docSubmitDialog?.label}</DialogTitle>
                 <DialogDescription>
-                  Upload a file to submit for offer year {docSubmitDialog?.year}.
+                  Upload a file to submit for this requirement.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2 py-2">
@@ -1875,7 +1793,7 @@ const OfferDetail = () => {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => void handleSubmitYearDocument()}
+                  onClick={() => void handleSubmitDocument()}
                   disabled={docSubmitPending || !docSubmitFile}
                 >
                   {docSubmitPending ? "Submitting…" : "Submit"}
@@ -1883,27 +1801,88 @@ const OfferDetail = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </TabsContent>
+
+          <Dialog
+            open={!!docWaiveDialog}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDocWaiveDialog(null);
+                setDocWaiveReason("");
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Waive document · {docWaiveDialog?.label}</DialogTitle>
+                <DialogDescription>
+                  Provide a reason for waiving this document requirement.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="doc-waive-reason">Reason</Label>
+                <Textarea
+                  id="doc-waive-reason"
+                  rows={4}
+                  maxLength={REASON_MAX_LENGTH}
+                  value={docWaiveReason}
+                  onChange={(e) => setDocWaiveReason(e.target.value)}
+                  placeholder="Why is this document being waived?"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDocWaiveDialog(null);
+                    setDocWaiveReason("");
+                  }}
+                  disabled={waiveDocument.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleWaiveDocument()}
+                  disabled={waiveDocument.isPending || !docWaiveReason.trim()}
+                >
+                  {waiveDocument.isPending ? "Waiving…" : "Waive"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
         <TabsContent value="discounts" className="mt-4">
           {(() => {
-            const discountRows = offer.offerYears.flatMap((s) =>
-              s.discountRequests.map((r) => ({ ...r, offerYear: s.year }))
-            );
+            const discountRows = offer.discountRequests;
             return (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Discount Requests</CardTitle>
-                  <CardDescription>
-                    Discount requests attached to offer years.
-                  </CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base">Discount Requests</CardTitle>
+                    <CardDescription>
+                      Discount requests on this offer.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    disabled={offer.status === "Bound" || offer.status === "Cancelled"}
+                    onClick={() => {
+                      setDiscountPct("50");
+                      setDiscountReason("");
+                      setDiscountPeriod("");
+                      setDiscountDialogOpen(true);
+                    }}
+                  >
+                    <Percent className="h-3.5 w-3.5" /> Request Discount
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[70px]">Year</TableHead>
+                          <TableHead className="w-[90px]">Period</TableHead>
                           <TableHead className="text-center">Discount</TableHead>
                           <TableHead className="text-center">Reason</TableHead>
                           <TableHead>Status</TableHead>
@@ -1921,10 +1900,12 @@ const OfferDetail = () => {
                           discountRows.map((r) => {
                             const canAct = r.status === "requested";
                             return (
-                              <TableRow key={`${r.offerYear}-${r.id}`}>
-                                <TableCell className="font-mono">{r.offerYear}</TableCell>
+                              <TableRow key={r.id}>
+                                <TableCell className="font-mono">
+                                  {r.targetPeriodSequence ?? "—"}
+                                </TableCell>
                                 <TableCell className="text-center font-mono text-sm font-semibold min-w-[320px]">
-                                  {Math.round(r.requestedDiscountPercentage * 10000) / 100}%
+                                  {formatDiscountPct(r.requestedDiscountPercentage)}
                                 </TableCell>
                                 <TableCell className="text-sm text-center min-w-[320px]">
                                   {r.reason || "—"}
@@ -1932,13 +1913,15 @@ const OfferDetail = () => {
                                 <TableCell>
                                   <Badge
                                     variant="outline"
-                                    className={
-                                      discountRequestStatusColor[r.status] ??
-                                      "bg-muted text-muted-foreground"
-                                    }
+                                    className={discountStatusClass(r.status)}
                                   >
-                                    {titleCase(r.status)}
+                                    {discountStatusLabel(r.status)}
                                   </Badge>
+                                  {r.requestedOnUtc ? (
+                                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                                      {formatOfferDateTime(r.requestedOnUtc)}
+                                    </div>
+                                  ) : null}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="inline-flex items-center gap-1.5">
@@ -1950,9 +1933,8 @@ const OfferDetail = () => {
                                       onClick={() =>
                                         setDiscountConfirm({
                                           kind: "approve",
-                                          year: r.offerYear,
                                           requestId: r.id,
-                                          pctLabel: `${Math.round(r.requestedDiscountPercentage * 10000) / 100}%`,
+                                          pctLabel: formatDiscountPct(r.requestedDiscountPercentage) ?? "",
                                         })
                                       }
                                     >
@@ -1966,9 +1948,8 @@ const OfferDetail = () => {
                                       onClick={() =>
                                         setDiscountConfirm({
                                           kind: "reject",
-                                          year: r.offerYear,
                                           requestId: r.id,
-                                          pctLabel: `${Math.round(r.requestedDiscountPercentage * 10000) / 100}%`,
+                                          pctLabel: formatDiscountPct(r.requestedDiscountPercentage) ?? "",
                                         })
                                       }
                                     >
@@ -2012,6 +1993,7 @@ const OfferDetail = () => {
                     <Field label="Identifier" value={<span className="font-mono text-xs">{holder.uniqueIdentifier}</span>} />
                     <Field label="Party Type" value={titleCase(holder.partyType)} />
                     <Field label="Country" value={countryLabel(holder.countryCode)} />
+                    <Field label="Relationship" value={relationshipLabel(holder.relationshipToInsured)} />
                   </>
                 ) : (
                   <div className="text-sm text-muted-foreground">Not assigned</div>
@@ -2141,13 +2123,14 @@ const OfferDetail = () => {
                       <TableHead>Customer</TableHead>
                       <TableHead>Identifier</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Relationship</TableHead>
                       <TableHead className="text-right">Share</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {offer.beneficiaries.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
+                        <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
                           No beneficiaries assigned to this offer.
                         </TableCell>
                       </TableRow>
@@ -2164,11 +2147,12 @@ const OfferDetail = () => {
                             </TableCell>
                             <TableCell className="font-mono text-xs">{b.uniqueIdentifier ?? "—"}</TableCell>
                             <TableCell>{titleCase(b.partyType) ?? "—"}</TableCell>
+                            <TableCell>{relationshipLabel(b.relationship)}</TableCell>
                             <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="bg-muted/40">
-                          <TableCell colSpan={3} className="font-medium text-sm">Total</TableCell>
+                          <TableCell colSpan={4} className="font-medium text-sm">Total</TableCell>
                           <TableCell className="text-right font-mono font-semibold">
                             {offer.beneficiaries.reduce((s, b) => s + b.percentage, 0)}%
                           </TableCell>
@@ -2181,28 +2165,6 @@ const OfferDetail = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* <TabsContent value="notes" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notes</CardTitle>
-              <CardDescription>Internal notes about this offer. Visible to underwriters and reviewers.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                rows={10}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                maxLength={2000}
-                placeholder="Add internal notes about this offer…"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{notes.length} / 2000</span>
-                <Button size="sm" onClick={() => toast.success("Notes saved")}>Save Notes</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent> */}
       </Tabs>
     </AppShell>
   );

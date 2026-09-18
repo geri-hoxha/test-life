@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/layout/AppShell";
+import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,22 +47,26 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  buildDocumentTypeWriteBody,
+  getDocumentType,
   useCreateDocumentType,
   useDeleteDocumentType,
   useListDocumentTypes,
   useUpdateDocumentType,
+  type DocumentTypeDetail,
 } from "@/api/document-types";
 import {
   buildCreateDocumentFormData,
   createDocument,
   downloadDocumentFile,
+  getDocument,
   useListDocuments,
 } from "@/api/documents";
-import type { DocumentsDocumentTypesDocumentTypeResponse } from "@/api/types";
+import type { DocumentsDocumentResponse, DocumentsDocumentTypesDocumentTypeResponse } from "@/api/types";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toastApiError } from "@/lib/api-error";
-import { Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type HasTemplateFilter = "all" | "yes" | "no";
@@ -70,18 +75,21 @@ type FormState = {
   name: string;
   description: string;
   templateDocumentId: string;
+  templateOriginalFileName: string;
 };
 
 const emptyForm = (): FormState => ({
   name: "",
   description: "",
   templateDocumentId: "",
+  templateOriginalFileName: "",
 });
 
-const formFromRow = (row: DocumentsDocumentTypesDocumentTypeResponse): FormState => ({
+const formFromRow = (row: DocumentTypeDetail): FormState => ({
   name: row.name ?? "",
   description: row.description ?? "",
-  templateDocumentId: row.templateDocumentId ?? "",
+  templateDocumentId: row.templateDocumentId?.trim() ?? "",
+  templateOriginalFileName: row.templateOriginalFileName?.trim() ?? "",
 });
 
 const DocumentTypesList = () => {
@@ -91,10 +99,11 @@ const DocumentTypesList = () => {
   const [pageSize, setPageSize] = useState(10);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<DocumentsDocumentTypesDocumentTypeResponse | null>(null);
+  const [editing, setEditing] = useState<DocumentTypeDetail | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DocumentsDocumentTypesDocumentTypeResponse | null>(
     null,
   );
@@ -103,24 +112,24 @@ const DocumentTypesList = () => {
   const createDocumentType = useCreateDocumentType();
   const updateDocumentType = useUpdateDocumentType();
   const deleteDocumentType = useDeleteDocumentType();
-  const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
-  const templateDocuments = documentsPage?.items ?? [];
-
-  const templateFileName = (templateDocumentId: string) => {
-    const doc = templateDocuments.find((d) => d.id === templateDocumentId);
-    return doc?.originalFileName ?? doc?.storedFileName;
-  };
-
-  const handleDownloadTemplate = async (templateDocumentId: string) => {
-    setDownloadingId(templateDocumentId);
-    try {
-      await downloadDocumentFile(templateDocumentId, templateFileName(templateDocumentId));
-    } catch (err) {
-      toastApiError(err, "Failed to download template");
-    } finally {
-      setDownloadingId(null);
+  const { data: documentsPage } = useListDocuments(
+    { pageNumber: 1, pageSize: 200 },
+    { enabled: dialogOpen },
+  );
+  const templateDocuments = useMemo(() => {
+    const items = [...(documentsPage?.items ?? [])];
+    const selectedId = form.templateDocumentId.trim();
+    if (
+      selectedId &&
+      !items.some((doc) => doc.id === selectedId)
+    ) {
+      items.unshift({
+        id: selectedId,
+        originalFileName: form.templateOriginalFileName || selectedId,
+      } satisfies DocumentsDocumentResponse);
     }
-  };
+    return items;
+  }, [documentsPage?.items, form.templateDocumentId, form.templateOriginalFileName]);
 
   const filters = useMemo(
     () =>
@@ -157,11 +166,22 @@ const DocumentTypesList = () => {
     setDialogOpen(true);
   };
 
-  const openEdit = (row: DocumentsDocumentTypesDocumentTypeResponse) => {
+  const openEdit = async (row: DocumentsDocumentTypesDocumentTypeResponse) => {
+    if (!row.id) return;
     setEditing(row);
     setForm(formFromRow(row));
     setTemplateFile(null);
     setDialogOpen(true);
+    setLoadingDetail(true);
+    try {
+      const detail = await getDocumentType(row.id);
+      setEditing((current) => (current?.id === row.id ? detail : current));
+      setForm(formFromRow(detail));
+    } catch (err) {
+      toastApiError(err, "Failed to load document type");
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   const closeDialog = () => {
@@ -185,7 +205,7 @@ const DocumentTypesList = () => {
     const description = form.description.trim() || name;
     setSaving(true);
     try {
-      let templateDocumentId: string | null = form.templateDocumentId.trim() || null;
+      let templateDocumentId = form.templateDocumentId.trim() || null;
       if (templateFile) {
         const uploaded = await createDocument(
           buildCreateDocumentFormData(templateFile, templateFile.name),
@@ -194,7 +214,7 @@ const DocumentTypesList = () => {
         templateDocumentId = uploaded.id;
       }
 
-      const body = { name, description, templateDocumentId };
+      const body = buildDocumentTypeWriteBody(name, description, templateDocumentId);
 
       if (editing?.id) {
         await updateDocumentType.mutateAsync({ id: editing.id, body });
@@ -214,6 +234,32 @@ const DocumentTypesList = () => {
     }
   };
 
+  const handleDownloadTemplate = async (
+    templateDocumentId?: string | null,
+    fileName?: string | null,
+  ) => {
+    const templateId = templateDocumentId?.trim();
+    if (!templateId) return;
+
+    setDownloadingId(templateId);
+    try {
+      let name = fileName?.trim();
+      if (!name) {
+        const listed = documentsPage?.items?.find((doc) => doc.id === templateId);
+        name = listed?.originalFileName?.trim() || listed?.storedFileName?.trim();
+      }
+      if (!name) {
+        const meta = await getDocument(templateId);
+        name = meta.originalFileName?.trim() || meta.storedFileName?.trim();
+      }
+      await downloadDocumentFile(templateId, name);
+    } catch (err) {
+      toastApiError(err, "Failed to download template");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const handleDelete = () => {
     if (!deleteTarget?.id) return;
     deleteDocumentType.mutate(deleteTarget.id, {
@@ -225,7 +271,8 @@ const DocumentTypesList = () => {
     });
   };
 
-  const busy = saving || createDocumentType.isPending || updateDocumentType.isPending;
+  const busy =
+    saving || loadingDetail || createDocumentType.isPending || updateDocumentType.isPending;
 
   return (
     <AppShell>
@@ -304,20 +351,15 @@ const DocumentTypesList = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Template</TableHead>
-                  <TableHead className="w-[120px] text-right">Actions</TableHead>
+                  <TableHead className="w-[152px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading data, please wait…
-                    </TableCell>
-                  </TableRow>
+                  <TableLoadingRow colSpan={3} />
                 ) : items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={3} className="text-center py-10 text-sm text-muted-foreground">
                       No document types match the current filters.
                     </TableCell>
                   </TableRow>
@@ -328,30 +370,32 @@ const DocumentTypesList = () => {
                       <TableCell className="text-sm text-muted-foreground max-w-[280px] truncate">
                         {row.description ?? "—"}
                       </TableCell>
-                      <TableCell>
-                        {row.templateDocumentId ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            disabled={downloadingId === row.templateDocumentId}
-                            onClick={() => void handleDownloadTemplate(row.templateDocumentId!)}
-                            title="Download template"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {row.templateDocumentId?.trim() ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
+                              disabled={downloadingId === row.templateDocumentId.trim()}
+                              onClick={() =>
+                                void handleDownloadTemplate(row.templateDocumentId)
+                              }
+                              title="Download template"
+                            >
+                              {downloadingId === row.templateDocumentId.trim() ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          ) : null}
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-8"
                             disabled={!row.id}
-                            onClick={() => openEdit(row)}
+                            onClick={() => void openEdit(row)}
                             title="Edit document type"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -398,8 +442,8 @@ const DocumentTypesList = () => {
             <DialogTitle>{editing ? "Edit document type" : "Add document type"}</DialogTitle>
             <DialogDescription>
               {editing
-                ? "Update the name, description, and optional template document."
-                : "Create a document type for the catalog. Template is optional."}
+                ? "Update the name and description. Optionally attach a template document."
+                : "Create a document type. Name and description are required; template is optional."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -420,7 +464,7 @@ const DocumentTypesList = () => {
                 rows={2}
                 value={form.description}
                 onChange={(e) => setField("description", e.target.value)}
-                placeholder="Optional — defaults to name"
+                placeholder="Optional"
               />
             </div>
             <div className="space-y-1.5">
@@ -428,13 +472,27 @@ const DocumentTypesList = () => {
               <Select
                 value={form.templateDocumentId || "none"}
                 onValueChange={(v) => {
-                  setField("templateDocumentId", v === "none" ? "" : v);
+                  if (v === "none") {
+                    setForm((prev) => ({
+                      ...prev,
+                      templateDocumentId: "",
+                      templateOriginalFileName: "",
+                    }));
+                  } else {
+                    const doc = templateDocuments.find((d) => d.id === v);
+                    setForm((prev) => ({
+                      ...prev,
+                      templateDocumentId: v,
+                      templateOriginalFileName:
+                        doc?.originalFileName?.trim() || doc?.storedFileName?.trim() || "",
+                    }));
+                  }
                   setTemplateFile(null);
                 }}
-                disabled={Boolean(templateFile)}
+                disabled={Boolean(templateFile) || loadingDetail}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select existing document…" />
+                  <SelectValue placeholder={loadingDetail ? "Loading template…" : "Select existing document…"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
@@ -445,6 +503,40 @@ const DocumentTypesList = () => {
                   ))}
                 </SelectContent>
               </Select>
+              {editing && !templateFile && form.templateDocumentId ? (
+                <div className="flex items-center gap-2">
+                  {form.templateOriginalFileName ? (
+                    <p
+                      className="text-xs text-muted-foreground truncate flex-1"
+                      title={form.templateOriginalFileName}
+                    >
+                      Current file: {form.templateOriginalFileName}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground flex-1">Template attached</p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 gap-1.5"
+                    disabled={downloadingId === form.templateDocumentId || loadingDetail}
+                    onClick={() =>
+                      void handleDownloadTemplate(
+                        form.templateDocumentId,
+                        form.templateOriginalFileName,
+                      )
+                    }
+                  >
+                    {downloadingId === form.templateDocumentId ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                    Download
+                  </Button>
+                </div>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label>Or upload template</Label>
@@ -453,7 +545,13 @@ const DocumentTypesList = () => {
                 onChange={(e) => {
                   const file = e.target.files?.[0] ?? null;
                   setTemplateFile(file);
-                  if (file) setField("templateDocumentId", "");
+                  if (file) {
+                    setForm((prev) => ({
+                      ...prev,
+                      templateDocumentId: "",
+                      templateOriginalFileName: "",
+                    }));
+                  }
                 }}
               />
               {templateFile && (

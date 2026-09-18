@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
+import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { Button } from "@/components/ui/button";
 import {
@@ -217,11 +218,7 @@ const RatingTablesList = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading data, please wait…
-                    </TableCell>
-                  </TableRow>
+                  <TableLoadingRow colSpan={4} />
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">
@@ -324,6 +321,7 @@ const RatingTablesList = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Standard life rates"
+              maxLength={512}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSave();
               }}

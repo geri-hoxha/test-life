@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, FileText, ShieldCheck /* , CreditCard, Globe2 */ } from "lucide-react";
+import { Plus, UserPlus, Building2, Package, FileText, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,13 +8,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const actions = [
-  { icon: UserPlus, title: "New Customer", desc: "Onboard an individual or business client", color: "bg-accent-soft text-accent", to: "/customers/new" },
-  { icon: Package, title: "Create Product", desc: "Define a new life-insurance product", color: "bg-accent-soft text-accent", to: "/products/new" },
+  { icon: UserPlus, title: "New Person", desc: "Onboard an individual client", color: "bg-accent-soft text-accent", to: "/people/new" },
+  { icon: Building2, title: "New Company", desc: "Onboard a business client", color: "bg-accent-soft text-accent", to: "/companies/new" },
+  { icon: Package, title: "Create Product", desc: "Open a product family, then define a new product", color: "bg-accent-soft text-accent", to: "/products" },
   { icon: FileText, title: "New Offer", desc: "Build a quote based on a product", color: "bg-accent-soft text-accent", to: "/offers/new" },
   { icon: ShieldCheck, title: "Issue Policy", desc: "Convert an accepted offer into a policy", color: "bg-accent-soft text-accent", to: "/offers" },
-  // API not ready — hide until backend is available
-  // { icon: CreditCard, title: "Record Payment", desc: "Log a premium or one-off payment", color: "bg-accent-soft text-accent", to: "/payments/new" },
-  // { icon: Globe2, title: "Manual FX Rate", desc: "Override today's exchange rate", color: "bg-accent-soft text-accent", to: "/administration/currency-exchange" },
 ];
 
 const QuickActions = () => {

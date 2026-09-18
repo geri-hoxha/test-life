@@ -9,6 +9,7 @@ import type {
   PeopleUpdatePersonRequest,
 } from "../types";
 import type { Customer, Gender } from "@/data/customers";
+import { toIso3166Alpha2, toIso3166Alpha3 } from "@/lib/iso3166";
 
 const NA = "N/A";
 
@@ -18,13 +19,34 @@ export const toCountryCode = (value?: string) => {
   return value.trim();
 };
 
+/** Company/address `countryCode` is ISO 3166-1 alpha-2 (max 2 chars). */
+export const toCompanyCountryCode = (value?: string) => {
+  const raw = toCountryCode(value);
+  return raw ? toIso3166Alpha2(raw) : "";
+};
+
+/** Map a company `countryCode` back to the Country smart-enum value for selects. */
+export const fromCompanyCountryCode = (value?: string) => {
+  const raw = value?.trim();
+  if (!raw) return "";
+  return toIso3166Alpha3(raw);
+};
+
 /** Look up Country enum `text` for a stored `value` (`ALB` → `Albania`). */
 export const countryDisplayName = (
   code?: string,
   options?: { value: string; text: string }[],
 ) => {
   if (!code || code === NA) return undefined;
-  return options?.find((o) => o.value === code)?.text ?? code;
+  const raw = code.trim();
+  const candidates = new Set(
+    [raw, raw.toUpperCase(), toIso3166Alpha3(raw), toIso3166Alpha2(raw)].filter(Boolean),
+  );
+  return (
+    options?.find(
+      (o) => candidates.has(o.value) || candidates.has(o.value.toUpperCase()),
+    )?.text ?? code
+  );
 };
 
 export const toApiGender = (g?: Gender | string) => {
@@ -44,17 +66,19 @@ export const mapPersonToCustomer = (p: PeoplePersonResponse): Customer => ({
   customerType: "Individual",
   firstName: p.firstName ?? "",
   lastName: p.lastName ?? "",
-  fatherName: "",
+  fatherName: p.fatherName ?? "",
   personalId: p.personalIdentifier ?? "",
-  ssnIssuingCountry: p.countryCode ?? "",
   dateOfBirth: p.dateOfBirth?.slice(0, 10) ?? "",
   gender: fromApiGender(p.gender),
   nationality: p.nationality ?? "",
-  placeOfBirth: "",
+  placeOfBirth: p.birthPlace ?? "",
+  addressDistrict: p.addressDistrict ?? "",
+  profession: p.profession ?? "",
+  position: p.position ?? "",
   f5Location: NA,
   address: "",
   city: "",
-  country: p.countryCode ?? "",
+  country: "",
   phone: "",
   email: "",
   occupation: "",
@@ -74,7 +98,7 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
     personalId: "",
     dateOfBirth: "",
     gender: "Other",
-    nationality: c.nationality ?? "",
+    nationality: "",
     companyName: c.legalName ?? c.tradeName ?? "",
     tradeName: c.tradeName ?? "",
     nipt: c.registrationNumber ?? "",
@@ -85,7 +109,7 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
     address: main?.street ?? "",
     city: main?.city ?? "",
     postalCode: main?.postalCode ?? "",
-    country: c.countryCode ?? main?.countryCode ?? "",
+    country: fromCompanyCountryCode(c.countryCode ?? main?.countryCode),
     phone: "",
     email: "",
     occupation: "",
@@ -96,14 +120,23 @@ export const mapCompanyToCustomer = (c: CompaniesCompanyResponse): Customer => {
   };
 };
 
+const optionalPersonText = (value?: string) => {
+  const trimmed = (value ?? "").trim();
+  return trimmed ? trimmed : null;
+};
+
 /** POST/PUT /api/people body — only fields accepted by the API. */
 export const customerToCreatePerson = (c: Customer): PeopleCreatePersonRequest => {
   const body: PeopleCreatePersonRequest = {
     firstName: c.firstName.trim(),
     lastName: c.lastName.trim(),
     personalIdentifier: c.personalId.trim(),
-    countryCode: toCountryCode(c.ssnIssuingCountry || c.country),
     nationality: (c.nationality ?? "").trim(),
+    fatherName: optionalPersonText(c.fatherName),
+    birthPlace: optionalPersonText(c.placeOfBirth),
+    addressDistrict: optionalPersonText(c.addressDistrict),
+    profession: optionalPersonText(c.profession),
+    position: optionalPersonText(c.position),
   };
   if (c.dateOfBirth) body.dateOfBirth = c.dateOfBirth;
   const gender = toApiGender(c.gender);
@@ -116,15 +149,18 @@ export const customerToUpdatePerson = (c: Customer): PeopleUpdatePersonRequest =
 
 export const customerToCreateCompany = (c: Customer): CompaniesCreateCompanyRequest => ({
   legalName: (c.companyName ?? "").trim(),
-  tradeName: (c.tradeName ?? "").trim() || null,
   registrationNumber: (c.nipt ?? "").trim(),
-  countryCode: toCountryCode(c.country),
-  nationality: (c.nationality ?? "").trim(),
+  countryCode: toCompanyCountryCode(c.country),
   companyType: c.companyType,
 });
 
-export const customerToUpdateCompany = (c: Customer): CompaniesUpdateCompanyRequest =>
-  customerToCreateCompany(c);
+export const customerToUpdateCompany = (c: Customer): CompaniesUpdateCompanyRequest => ({
+  legalName: (c.companyName ?? "").trim(),
+  tradeName: (c.tradeName ?? "").trim() || null,
+  registrationNumber: (c.nipt ?? "").trim(),
+  countryCode: toCompanyCountryCode(c.country),
+  companyType: c.companyType,
+});
 
 export const mergeCustomers = (
   people: PeoplePersonResponse[] = [],
@@ -134,7 +170,7 @@ export const mergeCustomers = (
   ...companies.map(mapCompanyToCustomer),
 ];
 
-/** API party type used in customer detail/edit URLs (`?type=`). */
+/** API party type used to choose `/people` vs `/companies` routes. */
 export type CustomerPartyType = "person" | "company";
 
 export const toCustomerPartyType = (
@@ -147,14 +183,14 @@ export const parseCustomerPartyType = (value: string | null | undefined): Custom
   return null;
 };
 
-/** `/customers/:id` or `/customers/:id/edit` with `?type=person|company`. */
+/** `/people/:id` or `/companies/:id` (append `/edit` when requested). */
 export const customerPath = (
   id: string,
   type: Customer["customerType"] | CustomerPartyType,
   opts?: { edit?: boolean }
 ) => {
-  const base = opts?.edit ? `/customers/${id}/edit` : `/customers/${id}`;
-  return `${base}?type=${toCustomerPartyType(type)}`;
+  const prefix = toCustomerPartyType(type) === "company" ? "/companies" : "/people";
+  return opts?.edit ? `${prefix}/${id}/edit` : `${prefix}/${id}`;
 };
 
 /** `/offers/new` prefilled with a customer as participant (and insured when person). */

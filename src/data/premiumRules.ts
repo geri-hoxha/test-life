@@ -54,7 +54,7 @@ const seed: PremiumRule[] = [
   },
 ];
 
-let rules: PremiumRule[] = [...seed];
+const rules: PremiumRule[] = [...seed];
 
 const blankRule = (productId: string, versionId: string): PremiumRule => ({
   productId,
@@ -65,21 +65,9 @@ const blankRule = (productId: string, versionId: string): PremiumRule => ({
 });
 
 export const getPremiumRule = (productId: string, versionId: string): PremiumRule => {
-  let r = rules.find((x) => x.productId === productId && x.versionId === versionId);
-  if (!r) {
-    r = blankRule(productId, versionId);
-    rules = [r, ...rules];
-  }
-  return r;
+  return rules.find((x) => x.productId === productId && x.versionId === versionId)
+    ?? blankRule(productId, versionId);
 };
-
-export const savePremiumRule = (rule: PremiumRule) => {
-  const i = rules.findIndex((x) => x.productId === rule.productId && x.versionId === rule.versionId);
-  if (i >= 0) rules[i] = rule;
-  else rules = [rule, ...rules];
-};
-
-export const newRowId = () => `RR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`;
 
 export const calculatePremium = (
   rule: PremiumRule,

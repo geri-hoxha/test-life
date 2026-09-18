@@ -10,7 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useCreateDocumentType } from "@/api/document-types";
+import { buildDocumentTypeWriteBody, useCreateDocumentType } from "@/api/document-types";
 import {
   useListDocuments,
   createDocument,
@@ -59,11 +59,13 @@ const CreateDocumentTypeModal = ({ open, onOpenChange, onCreated }: Props) => {
         if (!uploaded.id) throw new Error("Failed to upload template document");
         templateId = uploaded.id;
       }
-      const created = await createDocumentType.mutateAsync({
-        name: name.trim(),
-        description: description.trim() || name.trim(),
-        templateDocumentId: templateId,
-      });
+      const created = await createDocumentType.mutateAsync(
+        buildDocumentTypeWriteBody(
+          name.trim(),
+          description.trim() || name.trim(),
+          templateId,
+        ),
+      );
       toast.success(`Document type created: ${created.name ?? name}`);
       onCreated?.(created);
       onOpenChange(false);

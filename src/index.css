@@ -58,15 +58,6 @@
     --gradient-accent: linear-gradient(135deg, hsl(214 90% 52%), hsl(222 80% 42%));
     --shadow-card: 0 1px 2px 0 hsl(222 47% 11% / 0.04), 0 1px 3px 0 hsl(222 47% 11% / 0.06);
     --shadow-elevated: 0 10px 30px -10px hsl(222 65% 18% / 0.18);
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
@@ -97,5 +88,13 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-loader-spin,
+  .animate-loader-spin-reverse,
+  .animate-loader-pulse {
+    animation: none !important;
   }
 }

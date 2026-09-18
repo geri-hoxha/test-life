@@ -2,48 +2,85 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
+import { FilterGrid } from "@/components/FilterGrid";
+import { Loader, PageLoader } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, FolderOpen, ArrowLeft, ChevronRight, Trash2, Download, Eye,
+  Plus,
+  Search,
+  FolderOpen,
+  ArrowLeft,
+  ArrowUpRight,
+  Trash2,
+  Eye,
+  Package,
 } from "lucide-react";
 import {
-  useListProductGroups, useCreateProductGroup, useDeleteProductGroup,
+  useListProductGroups,
+  useCreateProductGroup,
+  useDeleteProductGroup,
 } from "@/api/product-groups";
 import {
-  useListProducts, mapApiProduct, useDeleteProduct,
+  useListProducts,
+  mapApiProduct,
+  useDeleteProduct,
 } from "@/api/products";
-import { downloadDocumentFile } from "@/api/documents";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useActuarialCodeOptions } from "@/hooks/useActuarialCodeOptions";
+import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 
-const ISSUANCE_MODE_LABELS: Record<string, string> = {
-  wholeOfTerm: "Whole of term",
-  annualRenewable: "Annual renewable",
-};
+const groupRouteKey = (g: { id?: string; legacyCode?: string | null }) =>
+  g.legacyCode?.trim() || g.id || "";
 
-const formatMaxCoveredYears = (years?: number | null): string => {
-  if (years == null) return "—";
-  return years === 1 ? "1 year" : `${years} years`;
+const groupInitials = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "PG";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 };
 
 const ProductsList = () => {
   const navigate = useNavigate();
+  const policyPlanTypeLabel = usePolicyPlanTypeLabel();
+  const actuarialCodeOptions = useActuarialCodeOptions();
   const { code: activeCode } = useParams<{ code: string }>();
 
   const [groupNameFilter, setGroupNameFilter] = useState("");
@@ -54,14 +91,19 @@ const ProductsList = () => {
   const [pageSize, setPageSize] = useState(10);
 
   const [newGroupOpen, setNewGroupOpen] = useState(false);
-  const [ngEnglish, setNgEnglish] = useState("");
-  const [ngLabel, setNgLabel] = useState("");
-  const [ngCode, setNgCode] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [ngName, setNgName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [deleteGroupTarget, setDeleteGroupTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const groupFilters = useMemo(
     () => compactQuery({ name: groupNameFilter.trim() || undefined }),
-    [groupNameFilter]
+    [groupNameFilter],
   );
   const debouncedGroupFilters = useDebouncedValue(groupFilters);
 
@@ -70,7 +112,7 @@ const ProductsList = () => {
       compactQuery({
         name: productName.trim() || undefined,
       }),
-    [productName]
+    [productName],
   );
   const debouncedProductFilters = useDebouncedValue(productFilters);
 
@@ -84,32 +126,37 @@ const ProductsList = () => {
     ...debouncedGroupFilters,
   });
 
-  const { data: groupsPage, isLoading: groupsLoading } = useListProductGroups(groupsQuery);
+  const { data: groupsPage, isLoading: groupsLoading } =
+    useListProductGroups(groupsQuery);
 
   // Resolve active group from the full groups list when a group route is open.
   const { data: allGroupsPage } = useListProductGroups(
     { pageNumber: 1, pageSize: 200 },
-    { enabled: Boolean(activeCode) }
+    { enabled: Boolean(activeCode) },
   );
 
-  const groupsForLookup = activeCode ? (allGroupsPage?.items ?? []) : (groupsPage?.items ?? []);
+  const groupsForLookup = activeCode
+    ? (allGroupsPage?.items ?? [])
+    : (groupsPage?.items ?? []);
 
   const activeGroupMeta = useMemo(() => {
     if (!activeCode) return null;
-    const g = groupsForLookup.find((x) => (x.code?.trim() || x.id) === activeCode || x.id === activeCode);
+    const g = groupsForLookup.find(
+      (x) => groupRouteKey(x) === activeCode || x.id === activeCode,
+    );
     if (!g) return null;
     const id = g.id ?? "";
     const name = g.name ?? "—";
     return {
       id,
-      code: g.code?.trim() || id,
-      label: g.label?.trim() || name,
-      english: g.english?.trim() || name,
+      name,
+      legacyCode: g.legacyCode?.trim() || "",
     };
   }, [activeCode, groupsForLookup]);
 
   // When inside a group, productGroupId comes from the route; otherwise optional filter.
-  const effectiveProductGroupId = activeGroupMeta?.id || productGroupIdFilter || undefined;
+  const effectiveProductGroupId =
+    activeGroupMeta?.id || productGroupIdFilter || undefined;
 
   const productsQuery = compactQuery({
     pageNumber: page,
@@ -118,9 +165,30 @@ const ProductsList = () => {
     productGroupId: effectiveProductGroupId,
   });
 
-  const { data: productsPage, isLoading: productsLoading } = useListProducts(productsQuery, {
-    enabled: Boolean(activeCode) ? Boolean(activeGroupMeta?.id) : false,
-  });
+  const { data: productsPage, isLoading: productsLoading } = useListProducts(
+    productsQuery,
+    {
+      enabled: Boolean(activeCode) ? Boolean(activeGroupMeta?.id) : false,
+    },
+  );
+
+  const { data: catalogPage, isLoading: catalogLoading } = useListProducts(
+    { pageNumber: 1, pageSize: 200 },
+    { enabled: !activeCode },
+  );
+
+  const productCountByGroupId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of catalogPage?.items ?? []) {
+      const gid = item.productGroupId;
+      if (!gid) continue;
+      map.set(gid, (map.get(gid) ?? 0) + 1);
+    }
+    return map;
+  }, [catalogPage?.items]);
+
+  const productCountsComplete =
+    (catalogPage?.totalCount ?? 0) <= (catalogPage?.items?.length ?? 0);
 
   const createGroup = useCreateProductGroup();
   const deleteGroup = useDeleteProductGroup();
@@ -131,10 +199,8 @@ const ProductsList = () => {
     return defs.map((g) => {
       const id = g.id ?? "";
       const name = g.name ?? "—";
-      const english = g.english?.trim() || name;
-      const label = g.label?.trim() || name;
-      const code = g.code?.trim() || id;
-      return { id, value: id, code, label, english };
+      const legacyCode = g.legacyCode?.trim() || "";
+      return { id, value: id, name, legacyCode };
     });
   }, [groupsPage?.items]);
 
@@ -142,28 +208,33 @@ const ProductsList = () => {
 
   const products = useMemo(
     () => (productsPage?.items ?? []).map(mapApiProduct),
-    [productsPage?.items]
+    [productsPage?.items],
   );
 
   const productTotalCount = productsPage?.totalCount ?? 0;
-  const productTotalPages = Math.max(1, productsPage?.totalPages ?? productsPage?.pageCount ?? 1);
+  const productTotalPages = Math.max(
+    1,
+    productsPage?.totalPages ?? productsPage?.pageCount ?? 1,
+  );
 
   // All groups for the productGroupId filter select (when viewing products — already have allGroupsPage).
   const groupOptions = useMemo(() => {
-    return (allGroupsPage?.items ?? groupsPage?.items ?? []).map((g) => ({
-      id: g.id ?? "",
-      label: g.english?.trim() || g.label?.trim() || g.name || g.id || "—",
-    })).filter((g) => g.id);
+    return (allGroupsPage?.items ?? groupsPage?.items ?? [])
+      .map((g) => ({
+        id: g.id ?? "",
+        label: g.name?.trim() || g.id || "—",
+        routeKey: groupRouteKey(g),
+      }))
+      .filter((g) => g.id);
   }, [allGroupsPage?.items, groupsPage?.items]);
 
-  if (activeCode && (groupsLoading || (!activeGroupMeta && allGroupsPage === undefined))) {
+  if (
+    activeCode &&
+    (groupsLoading || (!activeGroupMeta && allGroupsPage === undefined))
+  ) {
     return (
       <AppShell>
-        <PageHeader
-          breadcrumbs={[{ label: "Products", to: "/products" }, { label: "…" }]}
-          title="Loading…"
-          description="Fetching product group."
-        />
+        <PageLoader label="Loading product group…" />
       </AppShell>
     );
   }
@@ -172,11 +243,19 @@ const ProductsList = () => {
     return (
       <AppShell>
         <PageHeader
-          breadcrumbs={[{ label: "Products", to: "/products" }, { label: "Not found" }]}
+          breadcrumbs={[
+            { label: "Products", to: "/products" },
+            { label: "Not found" },
+          ]}
           title="Product group not found"
           description={`No group matches “${activeCode}”.`}
           actions={
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/products")}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => navigate("/products")}
+            >
               <ArrowLeft className="h-4 w-4" /> All groups
             </Button>
           }
@@ -186,27 +265,37 @@ const ProductsList = () => {
   }
 
   const handleCreateGroup = () => {
-    if (!ngEnglish.trim()) {
-      toast.error("English name is required.");
+    if (!ngName.trim()) {
+      toast.error("Name is required.");
       return;
     }
     createGroup.mutate(
-      { name: ngEnglish.trim() },
+      { name: ngName.trim() },
       {
         onSuccess: () => {
-          toast.success(
-            ngCode.trim()
-              ? `${ngEnglish} (${ngCode}) — code/label will sync when the API supports them.`
-              : `Product group created: ${ngEnglish}`
-          );
-          setNgEnglish(""); setNgLabel(""); setNgCode("");
+          toast.success(`Product group created: ${ngName.trim()}`);
+          setNgName("");
           setNewGroupOpen(false);
         },
         onError: (err) => {
-          toast.error(err instanceof Error ? err.message : "Failed to create group");
+          toast.error(
+            err instanceof Error ? err.message : "Failed to create group",
+          );
         },
-      }
+      },
     );
+  };
+
+  const handleDeleteGroup = () => {
+    if (!deleteGroupTarget?.id) return;
+    deleteGroup.mutate(deleteGroupTarget.id, {
+      onSuccess: () => {
+        toast.success(`Product group deleted: ${deleteGroupTarget.name}`);
+        setDeleteGroupTarget(null);
+      },
+      onError: (err) =>
+        toast.error(err instanceof Error ? err.message : "Failed to delete"),
+    });
   };
 
   // ---- Group grid view ----
@@ -255,64 +344,126 @@ const ProductsList = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {groupsLoading && (
-            <p className="text-sm text-muted-foreground col-span-full">Loading product groups…</p>
-          )}
-          {!groupsLoading && groups.length === 0 && (
-            <p className="text-sm text-muted-foreground col-span-full">No product groups match the current filters.</p>
-          )}
-          {groups.map((g) => (
-            <Card
-              key={g.id || g.code}
-              className="shadow-card border-border hover:shadow-md hover:border-accent/40 transition-all cursor-pointer group"
-              onClick={() => navigate(`/products/groups/${encodeURIComponent(g.code)}`)}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
-                      <FolderOpen className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-base leading-tight truncate group-hover:text-accent transition-colors">
-                        {g.label}
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{g.english}</p>
-                    </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {groupsLoading &&
+            Array.from({ length: 6 }).map((_, i) => (
+              <Card
+                key={`group-skel-${i}`}
+                className="shadow-card border-border overflow-hidden"
+              >
+                <div className="p-5 flex gap-3">
+                  <Skeleton className="h-11 w-11 rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-2 pt-0.5">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/3" />
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Badge variant="outline" className="font-mono text-[10px]">{g.code}</Badge>
+                </div>
+                <div className="px-5 pb-5 pt-2">
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </Card>
+            ))}
+          {!groupsLoading && groups.length === 0 && (
+            <Card className="col-span-full border-dashed shadow-none p-12 text-center">
+              <div className="mx-auto mb-3 h-11 w-11 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
+                <FolderOpen className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium text-foreground">
+                No product groups match
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Try a different name, or create a new product family.
+              </p>
+              <Button
+                className="mt-4 gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+                onClick={() => setNewGroupOpen(true)}
+              >
+                <Plus className="h-4 w-4" /> Create product group
+              </Button>
+            </Card>
+          )}
+          {groups.map((g) => {
+            const count = g.id ? (productCountByGroupId.get(g.id) ?? 0) : 0;
+            const href = `/products/groups/${encodeURIComponent(groupRouteKey(g))}`;
+            return (
+              <div key={g.id || g.legacyCode} className="relative group h-full">
+                <Link
+                  to={href}
+                  className="block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <Card className="relative h-full min-h-[156px] overflow-hidden shadow-card border-border transition-all group-hover:shadow-elevated group-hover:border-accent/40">
+                    <div
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 w-1 bg-accent/50 group-hover:bg-accent transition-colors"
+                    />
+                    <div className="flex h-full flex-col">
+                      <div className="flex items-start gap-3 p-5 pl-6 pr-12">
+                        <div className="h-11 w-11 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0 text-sm font-semibold tracking-tight">
+                          {groupInitials(g.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-base font-semibold leading-snug text-foreground group-hover:text-accent transition-colors line-clamp-2">
+                            {g.name}
+                          </h3>
+                          <div className="mt-1.5 h-5">
+                            {g.legacyCode ? (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] font-medium px-1.5 py-0 h-5 rounded-sm text-muted-foreground"
+                              >
+                                {g.legacyCode}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/70 bg-muted/30 px-5 pl-6 py-3">
+                        <div className="inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs text-muted-foreground border border-border/70 min-h-[1.5rem]">
+                          {catalogLoading ? (
+                            <Skeleton className="h-3 w-16" />
+                          ) : productCountsComplete ? (
+                            <>
+                              <Package className="h-3.5 w-3.5 text-accent" />
+                              <span className="tabular-nums font-semibold text-foreground">
+                                {count}
+                              </span>
+                              <span>
+                                {count === 1 ? "product" : "products"}
+                              </span>
+                            </>
+                          ) : (
+                            <span>View products</span>
+                          )}
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
+                          Browse
+                          <ArrowUpRight className="h-3.5 w-3.5 opacity-60 -translate-y-0.5 translate-x-0.5 transition-all group-hover:opacity-100 group-hover:translate-x-0 group-hover:translate-y-0" />
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      disabled={deleteGroup.isPending}
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      className="absolute top-3 right-3 z-10 h-8 w-8 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 group-hover:text-muted-foreground"
+                      disabled={deleteGroup.isPending || !g.id}
+                      onClick={() => {
                         if (!g.id) return;
-                        deleteGroup.mutate(g.id, {
-                          onSuccess: () => toast.success(`Product group deleted: ${g.english}`),
-                          onError: (err) =>
-                            toast.error(err instanceof Error ? err.message : "Failed to delete"),
-                        });
+                        setDeleteGroupTarget({ id: g.id, name: g.name });
                       }}
-                      title="Delete group"
+                      aria-label={`Delete ${g.name}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-end text-sm">
-                  <span className="text-accent inline-flex items-center gap-1 text-xs font-medium">
-                    View <ChevronRight className="h-3.5 w-3.5" />
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Delete group</TooltipContent>
+                </Tooltip>
+              </div>
+            );
+          })}
         </div>
 
         <Dialog open={newGroupOpen} onOpenChange={setNewGroupOpen}>
@@ -320,25 +471,24 @@ const ProductsList = () => {
             <DialogHeader>
               <DialogTitle>Create product group</DialogTitle>
               <DialogDescription>
-                Groups organise products by insurance family. Code and Albanian label will be stored by the API in a later release.
+                Groups organise products by insurance family.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label htmlFor="ng-english">English name *</Label>
-                <Input id="ng-english" value={ngEnglish} onChange={(e) => setNgEnglish(e.target.value)} placeholder="e.g. Term Life" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="ng-label">Albanian label</Label>
-                <Input id="ng-label" value={ngLabel} onChange={(e) => setNgLabel(e.target.value)} placeholder="e.g. Sigurim i Jetes (coming soon)" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="ng-code">Insurance product code</Label>
-                <Input id="ng-code" value={ngCode} onChange={(e) => setNgCode(e.target.value)} placeholder="e.g. 11 (coming soon)" />
+                <Label htmlFor="ng-name">Name *</Label>
+                <Input
+                  id="ng-name"
+                  value={ngName}
+                  onChange={(e) => setNgName(e.target.value)}
+                  placeholder="e.g. Term Life"
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setNewGroupOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setNewGroupOpen(false)}>
+                Cancel
+              </Button>
               <Button
                 onClick={handleCreateGroup}
                 disabled={createGroup.isPending}
@@ -349,6 +499,34 @@ const ProductsList = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog
+          open={Boolean(deleteGroupTarget)}
+          onOpenChange={(open) => !open && setDeleteGroupTarget(null)}
+        >
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete product group?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteGroupTarget
+                  ? `This will permanently delete “${deleteGroupTarget.name}”. This action cannot be undone. Products in this group may also become unavailable.`
+                  : "This will permanently delete this product group. This action cannot be undone. Products in this group may also become unavailable."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteGroup.isPending}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={deleteGroup.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={handleDeleteGroup}
+              >
+                {deleteGroup.isPending ? "Deleting…" : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </AppShell>
     );
   }
@@ -359,17 +537,32 @@ const ProductsList = () => {
       <PageHeader
         breadcrumbs={[
           { label: "Products", to: "/products" },
-          { label: activeGroupMeta.english },
+          { label: activeGroupMeta.name },
         ]}
-        title={activeGroupMeta.english}
-        description={`${activeGroupMeta.label} · Code ${activeGroupMeta.code}`}
+        title={activeGroupMeta.name}
+        description={
+          activeGroupMeta.legacyCode
+            ? `Legacy code ${activeGroupMeta.legacyCode}`
+            : undefined
+        }
         actions={
           <>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/products")}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => navigate("/products")}
+            >
               <ArrowLeft className="h-4 w-4" /> All groups
             </Button>
-            <Button asChild size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link to={`/products/new?groupId=${encodeURIComponent(activeGroupMeta.id)}`}>
+            <Button
+              asChild
+              size="sm"
+              className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              <Link
+                to={`/products/new?groupId=${encodeURIComponent(activeGroupMeta.id)}`}
+              >
                 <Plus className="h-4 w-4" /> Create Product
               </Link>
             </Button>
@@ -378,7 +571,7 @@ const ProductsList = () => {
       />
 
       <div className="flex flex-col gap-3 mb-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <FilterGrid>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Name</Label>
             <div className="relative">
@@ -392,22 +585,29 @@ const ProductsList = () => {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Product group</Label>
+            <Label className="text-xs text-muted-foreground">
+              Product group
+            </Label>
             <Select
               value={productGroupIdFilter || activeGroupMeta.id}
               onValueChange={(v) => {
                 setProductGroupIdFilter(v);
                 const opt = groupOptions.find((g) => g.id === v);
-                const match = (allGroupsPage?.items ?? []).find((g) => g.id === v);
-                const code = match?.code?.trim() || v;
-                if (code) navigate(`/products/groups/${encodeURIComponent(code)}`);
+                if (opt?.routeKey)
+                  navigate(
+                    `/products/groups/${encodeURIComponent(opt.routeKey)}`,
+                  );
                 void opt;
               }}
             >
-              <SelectTrigger className="h-9 bg-white"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 bg-white">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {groupOptions.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -424,88 +624,73 @@ const ProductsList = () => {
               </Button>
             )}
             <div className="text-xs text-muted-foreground pb-2 sm:ml-auto">
-              {productsLoading ? "Loading products…" : `${productTotalCount} product(s)`}
+              {productsLoading
+                ? "Loading products…"
+                : `${productTotalCount} product(s)`}
             </div>
           </div>
-        </div>
+        </FilterGrid>
       </div>
 
       <Card className="shadow-card border-border overflow-hidden">
         <div className="w-full overflow-x-auto">
-          <table className="min-w-[1200px] w-full text-sm">
+          <table className="min-w-[1100px] w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
-                <th className="h-11 px-4 text-left font-medium w-[250px] min-w-[250px]">Name</th>
-                <th className="h-11 px-4 text-left font-medium">Coverage text</th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Other informations</th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Template</th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Issuance</th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">Max years</th>
+                <th className="h-11 px-4 text-left font-medium w-[220px] min-w-[220px]">
+                  Name
+                </th>
+                <th className="h-11 px-4 text-left font-medium">
+                  Coverage text
+                </th>
                 <th className="h-11 px-4 text-left font-medium">Currencies</th>
-                <th className="h-11 px-2 text-center font-medium w-14 sticky right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">Actions</th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                  Policy plan type
+                </th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                  Actuarial code
+                </th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                  SAP channel code
+                </th>
+                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                  SAP product code
+                </th>
+                {/* <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                  Requires loan balances
+                </th> */}
+                <th className="h-11 px-2 text-center font-medium w-14 sticky right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {products.map((p) => {
-                const templateId = p.defaultPrintableTemplateDocumentId?.trim() || "";
+                const actuarialLabel = p.actuarialCode
+                  ? (actuarialCodeOptions.find(
+                      (o) => o.value === p.actuarialCode,
+                    )?.text ?? p.actuarialCode)
+                  : "—";
                 return (
                   <tr
                     key={p.id}
                     className="border-b hover:bg-muted/40 cursor-pointer"
                     onClick={() => navigate(`/products/${p.id}`)}
                   >
-                    <td className="px-4 py-3.5 w-[250px] min-w-[250px] max-w-[250px]">
-                      <div className="font-semibold text-base text-foreground leading-snug">{p.name}</div>
+                    <td className="px-4 py-3.5 w-[220px] min-w-[220px] max-w-[220px]">
+                      <div className="font-semibold text-base text-foreground leading-snug">
+                        {p.name}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 max-w-[280px]">
-                      <div className="text-xs text-muted-foreground line-clamp-2 leading-snug" title={p.coverageText}>
+                      <div
+                        className="text-xs text-muted-foreground line-clamp-2 leading-snug"
+                        title={p.coverageText}
+                      >
                         {p.coverageText?.trim() || "—"}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <div className="rounded-md bg-muted/50 border border-border/60 px-3 py-2 flex items-center gap-4 whitespace-nowrap">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Coverages</span>
-                          <span className="text-sm font-semibold tabular-nums">{p.coverages?.length ?? 0}</span>
-                        </div>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Payments</span>
-                          <span className="text-sm font-semibold tabular-nums">{p.paymentMethods?.length ?? 0}</span>
-                        </div>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Documents</span>
-                          <span className="text-sm font-semibold tabular-nums">{p.productDocumentTypes?.length ?? 0}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                      {templateId ? (
-                        <Button
-                          type="button"
-                          size="icon"
-                          className="h-8 w-8 bg-emerald-600 text-white hover:bg-emerald-700"
-                          title="Download printable template"
-                          onClick={() => {
-                            void downloadDocumentFile(templateId).catch((err) =>
-                              toast.error(err instanceof Error ? err.message : "Failed to download template"),
-                            );
-                          }}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      {p.issuanceMode
-                        ? (ISSUANCE_MODE_LABELS[p.issuanceMode] ?? p.issuanceMode)
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      {formatMaxCoveredYears(p.maxCoveredYears)}
-                    </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5 min-w-40">
                       <div className="flex gap-1.5 flex-wrap">
                         {p.currencies.length ? (
                           p.currencies.map((c) => (
@@ -522,7 +707,27 @@ const ProductsList = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-2 py-3.5 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      {p.policyPlanType
+                        ? policyPlanTypeLabel(p.policyPlanType)
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs">
+                      {actuarialLabel}
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs">
+                      {p.sapChannelCode?.trim() || "—"}
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs">
+                      {p.sapProductCode?.trim() || "—"}
+                    </td>
+                    {/* <td className="px-4 py-3.5 whitespace-nowrap">
+                      {p.requiresLoanBalances ? "Yes" : "No"}
+                    </td> */}
+                    <td
+                      className="px-2 py-3.5 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center justify-center gap-1">
                         <Button
                           variant="secondary"
@@ -538,7 +743,9 @@ const ProductsList = () => {
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           title="Delete"
-                          onClick={() => setDeleteTarget({ id: p.id, name: p.name })}
+                          onClick={() =>
+                            setDeleteTarget({ id: p.id, name: p.name })
+                          }
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -549,15 +756,18 @@ const ProductsList = () => {
               })}
               {!productsLoading && products.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-muted-foreground text-sm">
+                  <td
+                    colSpan={9}
+                    className="p-10 text-center text-muted-foreground text-sm"
+                  >
                     No products match your filters.
                   </td>
                 </tr>
               )}
               {productsLoading && (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-muted-foreground text-sm">
-                    Loading products…
+                  <td colSpan={9} className="p-12">
+                    <Loader label="Loading products…" />
                   </td>
                 </tr>
               )}
@@ -575,18 +785,26 @@ const ProductsList = () => {
         />
       </Card>
 
-      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete product?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete{deleteTarget ? ` “${deleteTarget.name}”` : " this product"}. This action cannot be undone.
+              {deleteTarget
+                ? `This will permanently delete “${deleteTarget.name}”. This action cannot be undone.`
+                : "This will permanently delete this product. This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteProduct.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteProduct.isPending}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleteProduct.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (!deleteTarget) return;
                 deleteProduct.mutate(deleteTarget.id, {
@@ -595,7 +813,11 @@ const ProductsList = () => {
                     setDeleteTarget(null);
                   },
                   onError: (err) =>
-                    toast.error(err instanceof Error ? err.message : "Failed to delete product"),
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to delete product",
+                    ),
                 });
               }}
             >
@@ -604,7 +826,6 @@ const ProductsList = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </AppShell>
   );
 };

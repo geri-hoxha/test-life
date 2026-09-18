@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQueries } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
+import { FilterGrid } from "@/components/FilterGrid";
+import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { ProductCombobox } from "@/components/ProductCombobox";
 import { PersonCombobox } from "@/components/PersonCombobox";
@@ -33,31 +34,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Eye, Plus, RefreshCw } from "lucide-react";
-import { statusColor, OfferStatus, offerStatusToApi, type Offer } from "@/data/offers";
 import { getCurrencies } from "@/config/currencies";
-import { listOffers, offersKeys, useListOffers } from "@/api/offers";
-import { mapApiOffer } from "@/api/adapters/offers";
-import { useListProducts, mapApiProduct } from "@/api/products";
+import { useListOffers } from "@/api/offers";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import type { DomainOffersOfferStatus } from "@/api/types";
+import {
+  OFFER_STATUSES,
+  formatCoverageTerm,
+  formatOfferMoney,
+  offerStatusClass,
+  offerStatusLabel,
+} from "./offer-ui";
 
-const STATUSES: OfferStatus[] = [
-  "Draft",
-  "Quoted",
-  "Partially Bound",
-  "Bound",
-  "Cancelled",
-  "Expired",
-];
-
-const insuredName = (o: Offer) => {
-  const person = o.insuredPersons[0];
-  if (!person) return null;
-  const name = [person.firstName, person.lastName].filter(Boolean).join(" ").trim();
-  return name || person.personalIdentifier || null;
-};
-
-const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
+const COL_COUNT = 8;
 
 const toDate = (isoDay: string) => {
   if (!isoDay) return undefined;
@@ -82,14 +72,14 @@ const OffersList = () => {
   const filters = useMemo(
     () =>
       compactQuery({
-        ...(statusFilter !== "ALL" ? { status: offerStatusToApi[statusFilter as OfferStatus] } : {}),
+        ...(statusFilter !== "ALL" ? { status: statusFilter as DomainOffersOfferStatus } : {}),
         productId: productId.trim() || undefined,
         ...(currency !== "__all__" ? { currency } : {}),
         createdFromUtc: dateToUtcStart(createdFrom),
         createdToUtc: dateToUtcEnd(createdTo),
         personId: personId.trim() || undefined,
       }),
-    [statusFilter, productId, currency, createdFrom, createdTo, personId]
+    [statusFilter, productId, currency, createdFrom, createdTo, personId],
   );
   const debouncedFilters = useDebouncedValue(filters);
 
@@ -99,42 +89,12 @@ const OffersList = () => {
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
 
-  const { data: offersPage, isLoading, isFetching } = useListOffers(listQuery);
-  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
+  const { data: offersPage, isLoading, isFetching, isError } = useListOffers(listQuery);
 
-  const statusCountQueries = useQueries({
-    queries: STATUSES.map((s) => {
-      const params = { pageNumber: 1, pageSize: 1, status: offerStatusToApi[s] };
-      return {
-        queryKey: offersKeys.list(params),
-        queryFn: ({ signal }: { signal?: AbortSignal }) => listOffers(params, signal),
-        staleTime: 30_000,
-      };
-    }),
-  });
-
-  const offers = useMemo(
-    () => (offersPage?.items ?? []).map(mapApiOffer),
-    [offersPage?.items]
-  );
-
-  const products = useMemo(
-    () => (productsPage?.items ?? []).map(mapApiProduct),
-    [productsPage?.items]
-  );
-
-  const productMap = useMemo(
-    () => Object.fromEntries(products.map((p) => [p.id, p])),
-    [products]
-  );
+  const items = offersPage?.items ?? [];
 
   const totalCount = offersPage?.totalCount ?? 0;
   const totalPages = Math.max(1, offersPage?.totalPages ?? offersPage?.pageCount ?? 1);
-
-  const counts = STATUSES.reduce((acc, s, i) => {
-    acc[s] = statusCountQueries[i]?.data?.totalCount ?? 0;
-    return acc;
-  }, {} as Record<OfferStatus, number>);
 
   const clearFilters = () => {
     setStatusFilter("ALL");
@@ -166,32 +126,19 @@ const OffersList = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* <Button
+          <Button
             variant="outline"
-            onClick={() => navigate("/offers/renewals-due")}
+            onClick={() => navigate("/renewals")}
             className="gap-2"
           >
             <RefreshCw className="h-4 w-4" />
-            Renewals Due
-          </Button> */}
+            Renewals
+          </Button>
           <Button onClick={() => navigate("/offers/new")} className="gap-2">
             <Plus className="h-4 w-4" />
             New Offer
           </Button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-        {STATUSES.map((s) => (
-          <Card key={s}>
-            <CardHeader className="pb-1.5">
-              <CardDescription className="text-[11px] uppercase tracking-wider">{s}</CardDescription>
-            </CardHeader>
-            <CardContent className="pb-3">
-              <div className="text-xl font-semibold">{counts[s]}</div>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
       <Card>
@@ -212,21 +159,24 @@ const OffersList = () => {
                 </Button>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterGrid>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All statuses</SelectItem>
-                    {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {OFFER_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {offerStatusLabel(status)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Product</Label>
                 <ProductCombobox
-                  products={products}
                   value={productId}
                   onValueChange={setProductId}
                   placeholder="All products"
@@ -272,7 +222,7 @@ const OffersList = () => {
                   buttonClassName="h-9"
                 />
               </div>
-            </div>
+            </FilterGrid>
           </div>
         </CardHeader>
         <CardContent>
@@ -280,90 +230,94 @@ const OffersList = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Offer #</TableHead>
-                  <TableHead>Policy Holder</TableHead>
-                  <TableHead>Insured</TableHead>
                   <TableHead>Product</TableHead>
+                  <TableHead>Insured</TableHead>
+                  <TableHead className="text-right">Sum Insured</TableHead>
+                  <TableHead className="text-right">Premium</TableHead>
                   <TableHead>Currency</TableHead>
-                  <TableHead className="text-right">Pay Premium</TableHead>
+                  <TableHead>Coverage</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-[140px] text-right">Actions</TableHead>
+                  <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
+                  <TableLoadingRow colSpan={COL_COUNT} label="Loading offers…" />
+                ) : isError ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading data, please wait…
+                    <TableCell colSpan={COL_COUNT} className="text-center py-10 text-sm text-muted-foreground">
+                      Offers could not be loaded.
                     </TableCell>
                   </TableRow>
-                ) : offers.length === 0 ? (
+                ) : items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={COL_COUNT} className="text-center py-10 text-sm text-muted-foreground">
                       No offers match the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  offers.map((o) => {
-                    const holderParticipant = o.participants.find((p) => p.role === "policyHolder");
-                    const holder = holderParticipant?.displayName?.trim() || null;
-                    const insured = insuredName(o);
-                    const product = productMap[o.productId];
-                    const hasOfferYears = o.offerYears.length > 0;
+                  items.map((o) => {
+                    const productName = o.productName?.trim() || "—";
+                    const productCell = o.id ? (
+                      <Link
+                        to={`/offers/${o.id}`}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        {productName}
+                      </Link>
+                    ) : (
+                      <span className="text-sm">{productName}</span>
+                    );
                     return (
-                      <TableRow key={o.id}>
-                        <TableCell>
-                          <Link
-                            to={`/offers/${o.id}`}
-                            className="font-mono text-xs font-medium text-primary hover:underline"
-                            title={o.id}
-                          >
-                            {shortId(o.id)}
-                          </Link>
+                      <TableRow
+                        key={o.id}
+                        className={o.id ? "cursor-pointer" : undefined}
+                        onClick={() => o.id && navigate(`/offers/${o.id}`)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          {productCell}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {o.insuredName?.trim() || (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {formatOfferMoney(o.sumInsured, o.currency)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-bold text-success">
+                          {formatOfferMoney(o.firstPeriodChargePremium, o.currency)}
                         </TableCell>
                         <TableCell>
-                          {holder ? (
-                            <div className="min-w-0">
-                              <div className="text-sm truncate">{holder}</div>
-                              {holderParticipant?.uniqueIdentifier && (
-                                <div className="text-[11px] text-muted-foreground font-mono">
-                                  {holderParticipant.uniqueIdentifier}
-                                </div>
-                              )}
-                            </div>
+                          {o.currency ? (
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-xs px-2 py-0.5 !rounded-sm border-sky-200 bg-sky-100 text-sky-800 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300"
+                            >
+                              {o.currency}
+                            </Badge>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {insured ?? <span className="text-muted-foreground">—</span>}
-                        </TableCell>
-                        <TableCell className="text-sm">{product?.name ?? o.productId}</TableCell>
-                        <TableCell><Badge variant="outline">{o.currency}</Badge></TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {hasOfferYears
-                            ? new Intl.NumberFormat("en-US", {
-                                style: "currency",
-                                currency: o.currency,
-                              }).format(o.premium)
-                            : "—"}
+                        <TableCell className="text-xs text-muted-foreground font-mono">
+                          {formatCoverageTerm(o.coverageTerm)}
                         </TableCell>
                         <TableCell>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColor[o.status]}`}>
-                            {o.status}
-                          </span>
+                          <Badge variant="secondary" className={`border-0 ${offerStatusClass(o.status)}`}>
+                            {offerStatusLabel(o.status)}
+                          </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-mono">{o.createdDate}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="h-8 gap-1.5"
-                            onClick={() => navigate(`/offers/${o.id}`)}
+                            className="h-8 w-8 p-0"
+                            onClick={() => o.id && navigate(`/offers/${o.id}`)}
+                            disabled={!o.id}
+                            title="View offer"
                           >
                             <Eye className="h-3.5 w-3.5" />
-                            View
                           </Button>
                         </TableCell>
                       </TableRow>

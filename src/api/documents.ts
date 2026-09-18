@@ -8,7 +8,10 @@ import type {
   PaginationPagedListOfDocumentResponse,
 } from "./types";
 
-export type ListDocumentsQuery = DocumentsListDocumentsRequest;
+export type ListDocumentsQuery = DocumentsListDocumentsRequest & {
+  pageNumber?: number;
+  pageSize?: number;
+};
 
 export const documentsKeys = {
   all: [...apiKeys.all, "documents"] as const,
@@ -33,7 +36,10 @@ export const useCreateDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: FormData) => createDocument(body),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data.id) {
+        queryClient.setQueryData(documentsKeys.detail(data.id), data);
+      }
       void queryClient.invalidateQueries({ queryKey: documentsKeys.all });
     },
   });
@@ -74,7 +80,8 @@ export const useDeleteDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteDocument(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: documentsKeys.detail(id) });
       void queryClient.invalidateQueries({ queryKey: documentsKeys.all });
     },
   });
@@ -115,7 +122,8 @@ export const useUpdateDocument = () => {
       id: string;
       body: DocumentsUpdateDocumentRequest;
     }) => updateDocument(vars.id, vars.body),
-    onSuccess: () => {
+    onSuccess: (data, vars) => {
+      queryClient.setQueryData(documentsKeys.detail(vars.id), data);
       void queryClient.invalidateQueries({ queryKey: documentsKeys.all });
     },
   });

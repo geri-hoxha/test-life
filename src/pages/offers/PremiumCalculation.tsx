@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Calculator } from "lucide-react";
+import { Loader } from "@/components/Loader";
 import { listCoverages, Coverage } from "@/data/coverages";
 import { getPremiumRule, calculatePremium, Gender } from "@/data/premiumRules";
 import { listTemplates, Template } from "@/data/templates";
@@ -376,9 +377,9 @@ const PremiumCalculation = ({
               <CardDescription>Insured Amount</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-lg font-semibold">
+              <div className="text-lg font-semibold min-h-[1.75rem] flex items-center">
                 {serverPreview.loading
-                  ? "…"
+                  ? <Loader size="sm" className="items-start" />
                   : fmt(serverPreview.insuredAmount, currency)}
               </div>
               <div className="text-[10px] text-muted-foreground">From API</div>

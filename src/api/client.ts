@@ -1,4 +1,13 @@
-/** HTTP client for ESIG Life API. Auth can be wired later via `setAccessToken`. */
+/** HTTP client for ESIG Life API. Bearer token is restored from localStorage. */
+
+import {
+  clearAuthSession,
+  isAuthExpired,
+  LOGIN_PATH,
+  persistAuthSession,
+  readAuthSession,
+  type AuthSession,
+} from "@/lib/auth";
 
 export type { Ulid } from "./types";
 
@@ -12,18 +21,45 @@ const DEFAULT_BASE_URL =
 let baseUrl = DEFAULT_BASE_URL.replace(/\/$/, "");
 let accessToken: string | null = null;
 
+const hydrateAccessToken = () => {
+  const session = readAuthSession();
+  if (!session || isAuthExpired(session.expiresOnUtc)) {
+    if (session) clearAuthSession();
+    accessToken = null;
+    return;
+  }
+  accessToken = session.accessToken;
+};
+
+hydrateAccessToken();
+
 export const setApiBaseUrl = (url: string) => {
   baseUrl = url.replace(/\/$/, "");
 };
 
 export const getApiBaseUrl = () => baseUrl || REMOTE_BASE_URL;
 
-/** Call later when auth is added (e.g. from MSAL / cookie session). */
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
 };
 
 export const getAccessToken = () => accessToken;
+
+export const applyAuthSession = (session: AuthSession) => {
+  persistAuthSession(session);
+  accessToken = session.accessToken;
+};
+
+export const clearSession = () => {
+  clearAuthSession();
+  accessToken = null;
+};
+
+const redirectToLogin = () => {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === LOGIN_PATH) return;
+  window.location.assign(LOGIN_PATH);
+};
 
 type ProblemDetails = {
   title?: string;
@@ -39,7 +75,12 @@ const parseProblemDetails = (body: unknown): ProblemDetails => {
   const o = body as Record<string, unknown>;
   return {
     title: typeof o.title === "string" ? o.title : undefined,
-    detail: typeof o.detail === "string" ? o.detail : undefined,
+    detail:
+      typeof o.detail === "string"
+        ? o.detail
+        : typeof o.message === "string"
+          ? o.message
+          : undefined,
     status: typeof o.status === "number" ? o.status : undefined,
   };
 };
@@ -69,6 +110,8 @@ export type RequestOptions = {
   multipart?: boolean;
   /** When true, returns response as Blob (e.g. file download). */
   binary?: boolean;
+  /** When true, omit Authorization (login / public endpoints). */
+  skipAuth?: boolean;
   signal?: AbortSignal;
 };
 
@@ -98,8 +141,16 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
     Accept: options.binary ? "*/*" : "application/json",
   };
 
-  // Auth placeholder — attach bearer token when available.
-  if (accessToken) {
+  if (!options.skipAuth) {
+    hydrateAccessToken();
+    if (!accessToken) {
+      redirectToLogin();
+      throw new ApiError(401, "Session expired", null, {
+        title: "Session expired",
+        detail: "Please sign in again.",
+        status: 401,
+      });
+    }
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
@@ -125,6 +176,10 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && !options.skipAuth) {
+      clearSession();
+      redirectToLogin();
+    }
     let errorBody: unknown = null;
     const contentType = response.headers.get("content-type") ?? "";
     try {
