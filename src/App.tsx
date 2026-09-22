@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ApiError } from "./api/client";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ProductsList from "./pages/products/ProductsList.tsx";
@@ -44,9 +45,22 @@ import PartnerDetail from "./pages/partners/PartnerDetail.tsx";
 import PartnerCommissionsList from "./pages/partner-commissions/PartnerCommissionsList.tsx";
 import PartnerCommissionDetail from "./pages/partner-commissions/PartnerCommissionDetail.tsx";
 import Login from "./pages/Login.tsx";
+import UsersList from "./pages/users/UsersList.tsx";
+import UserDetail from "./pages/users/UserDetail.tsx";
 import RequireAuth from "./components/auth/RequireAuth.tsx";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -103,6 +117,8 @@ const App = () => (
             <Route path="/administration/rating-tables/:id" element={<RatingTableDetail />} />
             <Route path="/administration/document-types" element={<DocumentTypesList />} />
             <Route path="/administration/documents" element={<DocumentsList />} />
+            <Route path="/administration/users" element={<UsersList />} />
+            <Route path="/administration/users/:authUserId" element={<UserDetail />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

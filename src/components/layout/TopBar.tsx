@@ -6,6 +6,26 @@ import {
   LogOut,
   User,
   Shield,
+  LayoutDashboard,
+  Package,
+  FileText,
+  ShieldCheck,
+  RefreshCw,
+  Receipt,
+  Users,
+  Building2,
+  ShieldAlert,
+  Wallet,
+  Briefcase,
+  Percent,
+  Handshake,
+  Landmark,
+  Table2,
+  ArrowLeftRight,
+  FileType,
+  Files,
+  UserCog,
+  type LucideIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,48 +44,52 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { useListCurrencyRates } from "@/api/currency-rates";
 import { clearSession } from "@/api/client";
-import { LOGIN_PATH } from "@/lib/auth";
+import { LOGIN_PATH, readDisplayUsername } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Loader } from "@/components/Loader";
 
-type NavLink = { label: string; to: string };
-type NavGroup = { label: string; items: NavLink[] };
+type NavLink = { label: string; to: string; icon: LucideIcon };
+type NavGroup = { label: string; icon: LucideIcon; items: NavLink[] };
 type NavEntry = NavLink | NavGroup;
 
 const isNavGroup = (entry: NavEntry): entry is NavGroup => "items" in entry;
 
 const navEntries: NavEntry[] = [
-  { label: "Dashboard", to: "/" },
-  { label: "Products", to: "/products" },
-  { label: "Offers", to: "/offers" },
-  { label: "Policies", to: "/policies" },
-  { label: "Invoices", to: "/invoices" },
+  { label: "Dashboard", to: "/", icon: LayoutDashboard },
+  { label: "Products", to: "/products", icon: Package },
+  { label: "Offers", to: "/offers", icon: FileText },
+  { label: "Policies", to: "/policies", icon: ShieldCheck },
+  { label: "Renewals", to: "/renewals", icon: RefreshCw },
+  { label: "Invoices", to: "/invoices", icon: Receipt },
   {
     label: "Clients",
+    icon: Users,
     items: [
-      { label: "People", to: "/people" },
-      { label: "Companies", to: "/companies" },
-      { label: "Risk list", to: "/risk-list" },
+      { label: "People", to: "/people", icon: User },
+      { label: "Companies", to: "/companies", icon: Building2 },
+      { label: "Risk list", to: "/risk-list", icon: ShieldAlert },
     ],
   },
   {
     label: "Finance",
+    icon: Wallet,
     items: [
-      { label: "Renewals", to: "/renewals" },
-      { label: "Agents", to: "/agents" },
-      { label: "Agent commissions", to: "/agent-commissions" },
-      { label: "Partners", to: "/partners" },
-      { label: "Partner commissions", to: "/partner-commissions" },
-      { label: "Bank accounts", to: "/bank-accounts" },
+      { label: "Agents", to: "/agents", icon: Briefcase },
+      { label: "Agent commissions", to: "/agent-commissions", icon: Percent },
+      { label: "Partners", to: "/partners", icon: Handshake },
+      { label: "Partner commissions", to: "/partner-commissions", icon: Percent },
+      { label: "Bank accounts", to: "/bank-accounts", icon: Landmark },
     ],
   },
   {
     label: "Administration",
+    icon: Settings,
     items: [
-      { label: "Rating tables", to: "/administration/rating-tables" },
-      { label: "Currency rates", to: "/administration/currency-exchange" },
-      { label: "Document types", to: "/administration/document-types" },
-      { label: "Documents", to: "/administration/documents" },
+      { label: "Rating tables", to: "/administration/rating-tables", icon: Table2 },
+      { label: "Currency rates", to: "/administration/currency-exchange", icon: ArrowLeftRight },
+      { label: "Document types", to: "/administration/document-types", icon: FileType },
+      { label: "Documents", to: "/administration/documents", icon: Files },
+      { label: "Users", to: "/administration/users", icon: UserCog },
     ],
   },
 ];
@@ -77,7 +101,7 @@ const isPathActive = (pathname: string, to: string) =>
 
 const navTriggerClass = (active: boolean) =>
   cn(
-    "group relative flex h-11 cursor-pointer items-center gap-1 px-3.5 text-[13px] font-medium rounded-none transition-colors whitespace-nowrap outline-none",
+    "group relative flex h-11 cursor-pointer items-center gap-1.5 px-3 text-[13px] font-medium rounded-none transition-colors whitespace-nowrap outline-none",
     "data-[state=open]:text-topbar-foreground data-[state=open]:bg-topbar-hover",
     active
       ? "text-topbar-foreground bg-topbar-hover"
@@ -126,6 +150,17 @@ const formatFetchedAt = (fetchedAtUtc?: string): string | null => {
   }
 };
 
+const initialsFromUsername = (username: string): string => {
+  const parts = username
+    .trim()
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return username.slice(0, 2).toUpperCase();
+};
+
 const TopBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -151,6 +186,8 @@ const TopBar = () => {
     rateItems.find((r) => r.fetchedAtUtc)?.fetchedAtUtc,
   );
   const ratesLoading = eurRates.isLoading || usdRates.isLoading;
+  const username = readDisplayUsername() ?? "User";
+  const usernameInitials = initialsFromUsername(username);
 
   return (
     <header className="bg-gradient-topbar text-topbar-foreground border-b border-topbar-border sticky top-0 z-40 shadow-elevated">
@@ -203,14 +240,11 @@ const TopBar = () => {
               >
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
-                    AK
+                    {usernameInitials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden md:block text-left leading-tight">
-                  <div className="text-xs font-medium">Erin Hoxha</div>
-                  <div className="text-[10px] text-topbar-muted">
-                    Underwriter
-                  </div>
+                  <div className="text-xs font-medium">{username}</div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-topbar-muted" />
               </Button>
@@ -218,10 +252,7 @@ const TopBar = () => {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span>Erin Hoxha</span>
-                  <span className="text-xs text-muted-foreground font-normal">
-                    erin.h@esiglife.demo
-                  </span>
+                  <span>{username}</span>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -253,6 +284,7 @@ const TopBar = () => {
       <nav className="border-t border-topbar-border/60">
         <div className="container flex items-center gap-0.5 h-11 overflow-x-auto overflow-y-hidden">
           {navEntries.map((entry) => {
+            const EntryIcon = entry.icon;
             if (!isNavGroup(entry)) {
               const active = isPathActive(location.pathname, entry.to);
               return (
@@ -262,6 +294,9 @@ const TopBar = () => {
                   aria-current={active ? "page" : undefined}
                   className={navTriggerClass(active)}
                 >
+                  <EntryIcon
+                    className={cn("h-3.5 w-3.5 shrink-0", active ? "opacity-100" : "opacity-80")}
+                  />
                   {entry.label}
                   {active && (
                     <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-accent" />
@@ -280,6 +315,12 @@ const TopBar = () => {
                     type="button"
                     className={navTriggerClass(groupActive)}
                   >
+                    <EntryIcon
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        groupActive ? "opacity-100" : "opacity-80",
+                      )}
+                    />
                     {entry.label}
                     <ChevronDown className="h-3.5 w-3.5 opacity-70 transition-transform group-data-[state=open]:rotate-180" />
                     {groupActive && (
@@ -290,12 +331,14 @@ const TopBar = () => {
                 <DropdownMenuContent align="start" className="min-w-[220px]">
                   {entry.items.map((item) => {
                     const active = isPathActive(location.pathname, item.to);
+                    const ItemIcon = item.icon;
                     return (
                       <DropdownMenuItem key={item.to} asChild>
                         <Link
                           to={item.to}
-                          className={cn(active && "bg-accent-soft font-medium")}
+                          className={cn("gap-2", active && "bg-accent-soft font-medium")}
                         >
+                          <ItemIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                           {item.label}
                         </Link>
                       </DropdownMenuItem>
@@ -311,9 +354,6 @@ const TopBar = () => {
             aria-label="Currency rates"
             className="ml-auto hidden h-11 shrink-0 items-center gap-4 whitespace-nowrap pl-6 text-topbar-muted transition-colors hover:text-topbar-foreground focus-visible:text-topbar-foreground focus-visible:outline-none lg:flex"
           >
-            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-topbar-muted/60">
-              FX
-            </span>
             {ratesLoading ? (
               <Loader size="sm" tone="inverse" className="gap-0" />
             ) : fxRates.length === 0 ? (

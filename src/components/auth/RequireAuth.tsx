@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useMySalesAccess } from "@/api/auth";
 import { clearSession } from "@/api/client";
 import { isAuthenticated, LOGIN_PATH, msUntilExpiry, readAuthSession } from "@/lib/auth";
 
@@ -7,6 +8,8 @@ import { isAuthenticated, LOGIN_PATH, msUntilExpiry, readAuthSession } from "@/l
 const RequireAuth = () => {
   const location = useLocation();
   const [tick, setTick] = useState(0);
+  const authenticated = isAuthenticated();
+  useMySalesAccess({ enabled: authenticated });
 
   useEffect(() => {
     const session = readAuthSession();
@@ -25,7 +28,7 @@ const RequireAuth = () => {
     return () => window.clearTimeout(id);
   }, [location.pathname, tick]);
 
-  if (!isAuthenticated()) {
+  if (!authenticated) {
     return <Navigate to={LOGIN_PATH} replace state={{ from: location }} />;
   }
 

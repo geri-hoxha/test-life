@@ -1,17 +1,18 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiKeys, apiRequest } from "./client";
 import type {
-  DomainCommissionsBusinessType,
   PaginationPagedListOfPartnerResponse,
-  PartnersCreatePartnerCommissionRuleRequest,
-  PartnersCreatePartnerProductAuthorizationRequest,
+  PartnersCreatePartnerOfficeRequest,
+  PartnersCreatePartnerProductConfigurationRequest,
   PartnersCreatePartnerRequest,
+  PartnersListPartnerOfficesRequest,
+  PartnersListPartnerProductConfigurationsRequest,
   PartnersListPartnersRequest,
-  PartnersPartnerCommissionRuleResponse,
-  PartnersPartnerProductAuthorizationResponse,
+  PartnersPartnerOfficeResponse,
+  PartnersPartnerProductConfigurationResponse,
   PartnersPartnerResponse,
-  PartnersUpdatePartnerCommissionRuleRequest,
-  PartnersUpdatePartnerProductAuthorizationRequest,
+  PartnersUpdatePartnerOfficeRequest,
+  PartnersUpdatePartnerProductConfigurationRequest,
   PartnersUpdatePartnerRequest,
 } from "./types";
 
@@ -21,10 +22,10 @@ export const partnersKeys = {
   list: (params?: Record<string, unknown>) => [...partnersKeys.lists(), params ?? {}] as const,
   details: () => [...partnersKeys.all, "detail"] as const,
   detail: (id: string) => [...partnersKeys.details(), id] as const,
-  authorizations: (partnerId: string, params?: Record<string, unknown>) =>
-    [...partnersKeys.detail(partnerId), "authorizations", params ?? {}] as const,
-  commissionRules: (partnerId: string, authorizationId: string, params?: Record<string, unknown>) =>
-    [...partnersKeys.detail(partnerId), "authorizations", authorizationId, "commission-rules", params ?? {}] as const,
+  offices: (partnerId: string, params?: Record<string, unknown>) =>
+    [...partnersKeys.detail(partnerId), "offices", params ?? {}] as const,
+  configurations: (partnerId: string, params?: Record<string, unknown>) =>
+    [...partnersKeys.detail(partnerId), "product-configurations", params ?? {}] as const,
 };
 
 export type ListPartnersQuery = PartnersListPartnersRequest & {
@@ -62,6 +63,10 @@ export const useListPartners = (query?: ListPartnersQuery, options?: { enabled?:
     },
     enabled: options?.enabled ?? true,
     placeholderData: keepPreviousData,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return false;
+      return failureCount < 3;
+    },
   });
 };
 
@@ -99,6 +104,12 @@ export const useGetPartner = (id: string, options?: { enabled?: boolean }) => {
       return partner;
     },
     enabled: Boolean(id) && (options?.enabled ?? true),
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 };
 
@@ -150,224 +161,177 @@ export const useUpdatePartner = () => {
   });
 };
 
-export type ListPartnerProductAuthorizationsQuery = {
-  productId?: string;
-  partnerOfficeId?: string;
-  effectiveOn?: string;
-};
+export type ListPartnerOfficesQuery = PartnersListPartnerOfficesRequest;
 
-/** GET /api/partners/{partnerId}/product-authorizations */
-export const listPartnerProductAuthorizations = async (
+/** GET /api/partners/{partnerId}/offices */
+export const listPartnerOffices = async (
   partnerId: string,
-  query?: ListPartnerProductAuthorizationsQuery,
+  query?: ListPartnerOfficesQuery,
   signal?: AbortSignal,
-): Promise<PartnersPartnerProductAuthorizationResponse[]> =>
-  apiRequest<PartnersPartnerProductAuthorizationResponse[]>({
+): Promise<PartnersPartnerOfficeResponse[]> =>
+  apiRequest<PartnersPartnerOfficeResponse[]>({
     method: "GET",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations`,
+    path: `/api/partners/${encodeURIComponent(partnerId)}/offices`,
     query: query as Record<string, string | number | boolean | null | undefined>,
     signal,
   });
 
-export const useListPartnerProductAuthorizations = (
+export const useListPartnerOffices = (
   partnerId: string,
-  query?: ListPartnerProductAuthorizationsQuery,
+  query?: ListPartnerOfficesQuery,
   options?: { enabled?: boolean },
 ) =>
   useQuery({
-    queryKey: partnersKeys.authorizations(partnerId, query as Record<string, unknown> | undefined),
-    queryFn: ({ signal }) => listPartnerProductAuthorizations(partnerId, query, signal),
+    queryKey: partnersKeys.offices(partnerId, query as Record<string, unknown> | undefined),
+    queryFn: ({ signal }) => listPartnerOffices(partnerId, query, signal),
     enabled: Boolean(partnerId) && (options?.enabled ?? true),
   });
 
-/** POST /api/partners/{partnerId}/product-authorizations */
-export const createPartnerProductAuthorization = async (
+/** POST /api/partners/{partnerId}/offices */
+export const createPartnerOffice = async (
   partnerId: string,
-  body: PartnersCreatePartnerProductAuthorizationRequest,
+  body: PartnersCreatePartnerOfficeRequest,
   signal?: AbortSignal,
-): Promise<PartnersPartnerProductAuthorizationResponse> =>
-  apiRequest<PartnersPartnerProductAuthorizationResponse>({
+): Promise<PartnersPartnerOfficeResponse> =>
+  apiRequest<PartnersPartnerOfficeResponse>({
     method: "POST",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations`,
+    path: `/api/partners/${encodeURIComponent(partnerId)}/offices`,
     body,
     signal,
   });
 
-export const useCreatePartnerProductAuthorization = () => {
+export const useCreatePartnerOffice = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { partnerId: string; body: PartnersCreatePartnerProductAuthorizationRequest }) =>
-      createPartnerProductAuthorization(vars.partnerId, vars.body),
+    mutationFn: (vars: { partnerId: string; body: PartnersCreatePartnerOfficeRequest }) =>
+      createPartnerOffice(vars.partnerId, vars.body),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: partnersKeys.detail(vars.partnerId) });
     },
   });
 };
 
-/** PUT /api/partners/{partnerId}/product-authorizations/{authorizationId} */
-export const updatePartnerProductAuthorization = async (
+/** PUT /api/partners/{partnerId}/offices/{officeId} */
+export const updatePartnerOffice = async (
   partnerId: string,
-  authorizationId: string,
-  body: PartnersUpdatePartnerProductAuthorizationRequest,
+  officeId: string,
+  body: PartnersUpdatePartnerOfficeRequest,
   signal?: AbortSignal,
-): Promise<PartnersPartnerProductAuthorizationResponse> =>
-  apiRequest<PartnersPartnerProductAuthorizationResponse>({
+): Promise<PartnersPartnerOfficeResponse> =>
+  apiRequest<PartnersPartnerOfficeResponse>({
     method: "PUT",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations/${encodeURIComponent(authorizationId)}`,
+    path: `/api/partners/${encodeURIComponent(partnerId)}/offices/${encodeURIComponent(officeId)}`,
     body,
     signal,
   });
 
-export const useUpdatePartnerProductAuthorization = () => {
+export const useUpdatePartnerOffice = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: {
-      partnerId: string;
-      authorizationId: string;
-      body: PartnersUpdatePartnerProductAuthorizationRequest;
-    }) => updatePartnerProductAuthorization(vars.partnerId, vars.authorizationId, vars.body),
+    mutationFn: (vars: { partnerId: string; officeId: string; body: PartnersUpdatePartnerOfficeRequest }) =>
+      updatePartnerOffice(vars.partnerId, vars.officeId, vars.body),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: partnersKeys.detail(vars.partnerId) });
     },
   });
 };
 
-/** DELETE /api/partners/{partnerId}/product-authorizations/{authorizationId} */
-export const deletePartnerProductAuthorization = async (
+export type ListPartnerProductConfigurationsQuery = PartnersListPartnerProductConfigurationsRequest;
+
+/** GET /api/partners/{partnerId}/product-configurations */
+export const listPartnerProductConfigurations = async (
   partnerId: string,
-  authorizationId: string,
+  query?: ListPartnerProductConfigurationsQuery,
   signal?: AbortSignal,
-): Promise<void> =>
-  apiRequest<void>({
-    method: "DELETE",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations/${encodeURIComponent(authorizationId)}`,
-    signal,
-  });
-
-export const useDeletePartnerProductAuthorization = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: { partnerId: string; authorizationId: string }) =>
-      deletePartnerProductAuthorization(vars.partnerId, vars.authorizationId),
-    onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({ queryKey: partnersKeys.detail(vars.partnerId) });
-    },
-  });
-};
-
-export type ListPartnerCommissionRulesQuery = {
-  businessType?: DomainCommissionsBusinessType;
-  effectiveOn?: string;
-};
-
-/** GET /api/partners/{partnerId}/product-authorizations/{authorizationId}/commission-rules */
-export const listPartnerCommissionRules = async (
-  partnerId: string,
-  authorizationId: string,
-  query?: ListPartnerCommissionRulesQuery,
-  signal?: AbortSignal,
-): Promise<PartnersPartnerCommissionRuleResponse[]> =>
-  apiRequest<PartnersPartnerCommissionRuleResponse[]>({
+): Promise<PartnersPartnerProductConfigurationResponse[]> =>
+  apiRequest<PartnersPartnerProductConfigurationResponse[]>({
     method: "GET",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules`,
+    path: `/api/partners/${encodeURIComponent(partnerId)}/product-configurations`,
     query: query as Record<string, string | number | boolean | null | undefined>,
     signal,
   });
 
-export const useListPartnerCommissionRules = (
+export const useListPartnerProductConfigurations = (
   partnerId: string,
-  authorizationId: string,
-  query?: ListPartnerCommissionRulesQuery,
+  query?: ListPartnerProductConfigurationsQuery,
   options?: { enabled?: boolean },
 ) =>
   useQuery({
-    queryKey: partnersKeys.commissionRules(
-      partnerId,
-      authorizationId,
-      query as Record<string, unknown> | undefined,
-    ),
-    queryFn: ({ signal }) => listPartnerCommissionRules(partnerId, authorizationId, query, signal),
-    enabled: Boolean(partnerId) && Boolean(authorizationId) && (options?.enabled ?? true),
+    queryKey: partnersKeys.configurations(partnerId, query as Record<string, unknown> | undefined),
+    queryFn: ({ signal }) => listPartnerProductConfigurations(partnerId, query, signal),
+    enabled: Boolean(partnerId) && (options?.enabled ?? true),
+    placeholderData: keepPreviousData,
   });
 
-/** POST /api/partners/{partnerId}/product-authorizations/{authorizationId}/commission-rules */
-export const createPartnerCommissionRule = async (
+/** POST /api/partners/{partnerId}/product-configurations */
+export const createPartnerProductConfiguration = async (
   partnerId: string,
-  authorizationId: string,
-  body: PartnersCreatePartnerCommissionRuleRequest,
+  body: PartnersCreatePartnerProductConfigurationRequest,
   signal?: AbortSignal,
-): Promise<PartnersPartnerCommissionRuleResponse> =>
-  apiRequest<PartnersPartnerCommissionRuleResponse>({
+): Promise<PartnersPartnerProductConfigurationResponse> =>
+  apiRequest<PartnersPartnerProductConfigurationResponse>({
     method: "POST",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules`,
+    path: `/api/partners/${encodeURIComponent(partnerId)}/product-configurations`,
     body,
     signal,
   });
 
-export const useCreatePartnerCommissionRule = () => {
+export const useCreatePartnerProductConfiguration = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: {
-      partnerId: string;
-      authorizationId: string;
-      body: PartnersCreatePartnerCommissionRuleRequest;
-    }) => createPartnerCommissionRule(vars.partnerId, vars.authorizationId, vars.body),
-    onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({
-        queryKey: partnersKeys.detail(vars.partnerId),
-      });
-    },
-  });
-};
-
-/** PUT /api/partners/{partnerId}/product-authorizations/{authorizationId}/commission-rules/{ruleId} */
-export const updatePartnerCommissionRule = async (
-  partnerId: string,
-  authorizationId: string,
-  ruleId: string,
-  body: PartnersUpdatePartnerCommissionRuleRequest,
-  signal?: AbortSignal,
-): Promise<PartnersPartnerCommissionRuleResponse> =>
-  apiRequest<PartnersPartnerCommissionRuleResponse>({
-    method: "PUT",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules/${encodeURIComponent(ruleId)}`,
-    body,
-    signal,
-  });
-
-export const useUpdatePartnerCommissionRule = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: {
-      partnerId: string;
-      authorizationId: string;
-      ruleId: string;
-      body: PartnersUpdatePartnerCommissionRuleRequest;
-    }) => updatePartnerCommissionRule(vars.partnerId, vars.authorizationId, vars.ruleId, vars.body),
+    mutationFn: (vars: { partnerId: string; body: PartnersCreatePartnerProductConfigurationRequest }) =>
+      createPartnerProductConfiguration(vars.partnerId, vars.body),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: partnersKeys.detail(vars.partnerId) });
     },
   });
 };
 
-/** DELETE /api/partners/{partnerId}/product-authorizations/{authorizationId}/commission-rules/{ruleId} */
-export const deletePartnerCommissionRule = async (
+/** PUT /api/partners/{partnerId}/product-configurations/{configurationId} */
+export const updatePartnerProductConfiguration = async (
   partnerId: string,
-  authorizationId: string,
-  ruleId: string,
+  configurationId: string,
+  body: PartnersUpdatePartnerProductConfigurationRequest,
+  signal?: AbortSignal,
+): Promise<PartnersPartnerProductConfigurationResponse> =>
+  apiRequest<PartnersPartnerProductConfigurationResponse>({
+    method: "PUT",
+    path: `/api/partners/${encodeURIComponent(partnerId)}/product-configurations/${encodeURIComponent(configurationId)}`,
+    body,
+    signal,
+  });
+
+export const useUpdatePartnerProductConfiguration = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      partnerId: string;
+      configurationId: string;
+      body: PartnersUpdatePartnerProductConfigurationRequest;
+    }) => updatePartnerProductConfiguration(vars.partnerId, vars.configurationId, vars.body),
+    onSuccess: (_data, vars) => {
+      void queryClient.invalidateQueries({ queryKey: partnersKeys.detail(vars.partnerId) });
+    },
+  });
+};
+
+/** DELETE /api/partners/{partnerId}/product-configurations/{configurationId} */
+export const deletePartnerProductConfiguration = async (
+  partnerId: string,
+  configurationId: string,
   signal?: AbortSignal,
 ): Promise<void> =>
   apiRequest<void>({
     method: "DELETE",
-    path: `/api/partners/${encodeURIComponent(partnerId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules/${encodeURIComponent(ruleId)}`,
+    path: `/api/partners/${encodeURIComponent(partnerId)}/product-configurations/${encodeURIComponent(configurationId)}`,
     signal,
   });
 
-export const useDeletePartnerCommissionRule = () => {
+export const useDeletePartnerProductConfiguration = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { partnerId: string; authorizationId: string; ruleId: string }) =>
-      deletePartnerCommissionRule(vars.partnerId, vars.authorizationId, vars.ruleId),
+    mutationFn: (vars: { partnerId: string; configurationId: string }) =>
+      deletePartnerProductConfiguration(vars.partnerId, vars.configurationId),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: partnersKeys.detail(vars.partnerId) });
     },

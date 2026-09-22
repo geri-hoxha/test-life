@@ -6,6 +6,7 @@ import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { AgentCombobox } from "@/components/AgentCombobox";
 import { ProductCombobox } from "@/components/ProductCombobox";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useListAgentCommissions } from "@/api/agent-commissions";
+import { useListAgents } from "@/api/agents";
 import type {
   DomainCommissionsBusinessType,
   DomainCommissionsEntryType,
@@ -139,13 +142,25 @@ const AgentCommissionsList = () => {
     isLoading,
     isFetching,
     isError,
+    error,
   } = useListAgentCommissions(listQuery);
+  const { data: agentsPage } = useListAgents({ pageNumber: 1, pageSize: 200 });
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? items.length;
   const totalPages = Math.max(
     1,
     pageData?.totalPages ?? pageData?.pageCount ?? 1,
+  );
+
+  const agentNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        (agentsPage?.items ?? [])
+          .filter((agent) => agent.id)
+          .map((agent) => [agent.id as string, agent.displayName?.trim() || agent.id || ""]),
+      ),
+    [agentsPage?.items],
   );
 
   const hasFilters =
@@ -183,6 +198,7 @@ const AgentCommissionsList = () => {
         </div>
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -217,6 +233,15 @@ const AgentCommissionsList = () => {
                   placeholder="All agents"
                   allowClear
                   triggerClassName="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Policy ID</Label>
+                <Input
+                  className="h-9 font-mono text-xs"
+                  value={policyId}
+                  onChange={(e) => setPolicyId(e.target.value)}
+                  placeholder="Filter by policy ID"
                 />
               </div>
               <div className="space-y-1.5">
@@ -352,6 +377,7 @@ const AgentCommissionsList = () => {
                   </TableRow>
                 ) : (
                   items.map((row) => {
+                    const agentName = row.agentId ? agentNameById[row.agentId] : undefined;
                     return (
                       <TableRow
                         key={row.id ?? `${row.policyId}-${row.postedOnUtc}`}
@@ -379,6 +405,43 @@ const AgentCommissionsList = () => {
                           )}
                         </TableCell>
                         <TableCell>
+                          {row.productId ? (
+                            <Link
+                              to={`/products/${row.productId}`}
+                              className="text-sm text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {row.productName?.trim() ||
+                                shortCommissionId(row.productId)}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell
+                          className="text-sm max-w-[180px] truncate"
+                          title={agentName || row.agentId}
+                        >
+                          {row.agentId ? (
+                            <Link
+                              to={`/agents/${row.agentId}`}
+                              className="hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {agentName || (
+                                <span className="font-mono text-xs">
+                                  {shortCommissionId(row.agentId)}
+                                </span>
+                              )}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {businessTypeLabel(row.businessType)}
+                        </TableCell>
+                        <TableCell>
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${entryTypeClass(row.entryType)}`}
                           >
@@ -401,42 +464,6 @@ const AgentCommissionsList = () => {
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm font-medium">
                           {formatCommissionMoney(row.amount, row.currency)}
-                        </TableCell>
-
-                        <TableCell>
-                          {row.productId ? (
-                            <Link
-                              to={`/products/${row.productId}`}
-                              className="text-sm text-primary hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {row.productName?.trim() ||
-                                shortCommissionId(row.productId)}
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell
-                          className="text-sm max-w-[180px] truncate"
-                          title={row.agentId}
-                        >
-                          {row.agentId ? (
-                            <Link
-                              to={`/agents/${row.agentId}`}
-                              className="hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span className="font-mono text-xs">
-                                {shortCommissionId(row.agentId)}
-                              </span>
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {businessTypeLabel(row.businessType)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -472,6 +499,7 @@ const AgentCommissionsList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
     </AppShell>
   );
 };

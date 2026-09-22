@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -74,6 +75,7 @@ const CurrencyExchange = () => {
     data: pageData,
     isLoading,
     isFetching,
+    error,
   } = useListCurrencyRates(listQuery);
 
   const items = pageData?.items ?? [];
@@ -100,6 +102,7 @@ const CurrencyExchange = () => {
         </div>
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -206,6 +209,7 @@ const CurrencyExchange = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
     </AppShell>
   );
 };

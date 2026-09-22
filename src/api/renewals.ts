@@ -1,4 +1,9 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import { policiesKeys } from "./policies";
 import { invoicesKeys } from "./invoices";
@@ -18,14 +23,14 @@ import type {
 export const renewalsKeys = {
   all: [...apiKeys.all, "renewals"] as const,
   lists: () => [...renewalsKeys.all, "list"] as const,
-  list: (params?: Record<string, unknown>) => [...renewalsKeys.lists(), params ?? {}] as const,
+  list: (params?: Record<string, unknown>) =>
+    [...renewalsKeys.lists(), params ?? {}] as const,
   details: () => [...renewalsKeys.all, "detail"] as const,
   detail: (policyId: string, renewalId: string) =>
     [...renewalsKeys.details(), policyId, renewalId] as const,
 };
 
 export type ListRenewalsQuery = PoliciesListRenewalsRequest & {
-  due: boolean;
   pageNumber?: number;
   pageSize?: number;
 };
@@ -35,7 +40,10 @@ const cacheRenewal = (
   renewal: PoliciesPolicyRenewalResponse | undefined,
 ) => {
   if (renewal?.id && renewal.policyId) {
-    queryClient.setQueryData(renewalsKeys.detail(renewal.policyId, renewal.id), renewal);
+    queryClient.setQueryData(
+      renewalsKeys.detail(renewal.policyId, renewal.id),
+      renewal,
+    );
   }
 };
 
@@ -51,11 +59,17 @@ export const listRenewals = async (
   apiRequest<PaginationPagedListOfRenewalListItemResponse>({
     method: "GET",
     path: `/api/renewals`,
-    query: query as Record<string, string | number | boolean | null | undefined>,
+    query: query as Record<
+      string,
+      string | number | boolean | null | undefined
+    >,
     signal,
   });
 
-export const useListRenewals = (query: ListRenewalsQuery, options?: { enabled?: boolean }) =>
+export const useListRenewals = (
+  query: ListRenewalsQuery,
+  options?: { enabled?: boolean },
+) =>
   useQuery({
     queryKey: renewalsKeys.list(query as Record<string, unknown>),
     queryFn: ({ signal }) => listRenewals(query, signal),
@@ -83,7 +97,8 @@ export const useGetPolicyRenewal = (
   useQuery({
     queryKey: renewalsKeys.detail(policyId, renewalId),
     queryFn: ({ signal }) => getPolicyRenewal(policyId, renewalId, signal),
-    enabled: Boolean(policyId) && Boolean(renewalId) && (options?.enabled ?? true),
+    enabled:
+      Boolean(policyId) && Boolean(renewalId) && (options?.enabled ?? true),
   });
 
 /** POST /api/policies/{policyId}/renewals/{renewalId}/start */
@@ -158,7 +173,9 @@ export const useApplyPolicyRenewal = () => {
       applyPolicyRenewal(vars.policyId, vars.renewalId),
     onSuccess: (_data, vars) => {
       invalidateRenewals(queryClient);
-      void queryClient.invalidateQueries({ queryKey: policiesKeys.detail(vars.policyId) });
+      void queryClient.invalidateQueries({
+        queryKey: policiesKeys.detail(vars.policyId),
+      });
       void queryClient.invalidateQueries({ queryKey: policiesKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: invoicesKeys.lists() });
     },
@@ -188,7 +205,8 @@ export const useApproveRenewalFlag = () => {
       renewalId: string;
       flagId: string;
       body: PoliciesResolveRenewalFlagRequest;
-    }) => approveRenewalFlag(vars.policyId, vars.renewalId, vars.flagId, vars.body),
+    }) =>
+      approveRenewalFlag(vars.policyId, vars.renewalId, vars.flagId, vars.body),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
       invalidateRenewals(queryClient);
@@ -219,7 +237,8 @@ export const useRejectRenewalFlag = () => {
       renewalId: string;
       flagId: string;
       body: PoliciesResolveRenewalFlagRequest;
-    }) => rejectRenewalFlag(vars.policyId, vars.renewalId, vars.flagId, vars.body),
+    }) =>
+      rejectRenewalFlag(vars.policyId, vars.renewalId, vars.flagId, vars.body),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
       invalidateRenewals(queryClient);
@@ -243,7 +262,11 @@ export const acceptRenewalDocument = async (
 export const useAcceptRenewalDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { policyId: string; renewalId: string; requirementId: string }) =>
+    mutationFn: (vars: {
+      policyId: string;
+      renewalId: string;
+      requirementId: string;
+    }) =>
       acceptRenewalDocument(vars.policyId, vars.renewalId, vars.requirementId),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
@@ -275,7 +298,13 @@ export const useRefuseRenewalDocument = () => {
       renewalId: string;
       requirementId: string;
       body: PoliciesResolveRenewalDocumentRequest;
-    }) => refuseRenewalDocument(vars.policyId, vars.renewalId, vars.requirementId, vars.body),
+    }) =>
+      refuseRenewalDocument(
+        vars.policyId,
+        vars.renewalId,
+        vars.requirementId,
+        vars.body,
+      ),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
       invalidateRenewals(queryClient);
@@ -306,7 +335,13 @@ export const useSubmitRenewalDocument = () => {
       renewalId: string;
       requirementId: string;
       body: PoliciesSubmitRenewalDocumentRequest;
-    }) => submitRenewalDocument(vars.policyId, vars.renewalId, vars.requirementId, vars.body),
+    }) =>
+      submitRenewalDocument(
+        vars.policyId,
+        vars.renewalId,
+        vars.requirementId,
+        vars.body,
+      ),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
       invalidateRenewals(queryClient);
@@ -337,7 +372,13 @@ export const useWaiveRenewalDocument = () => {
       renewalId: string;
       requirementId: string;
       body: PoliciesResolveRenewalDocumentRequest;
-    }) => waiveRenewalDocument(vars.policyId, vars.renewalId, vars.requirementId, vars.body),
+    }) =>
+      waiveRenewalDocument(
+        vars.policyId,
+        vars.renewalId,
+        vars.requirementId,
+        vars.body,
+      ),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
       invalidateRenewals(queryClient);
@@ -390,8 +431,11 @@ export const approveRenewalDiscount = async (
 export const useApproveRenewalDiscount = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { policyId: string; renewalId: string; requestId: string }) =>
-      approveRenewalDiscount(vars.policyId, vars.renewalId, vars.requestId),
+    mutationFn: (vars: {
+      policyId: string;
+      renewalId: string;
+      requestId: string;
+    }) => approveRenewalDiscount(vars.policyId, vars.renewalId, vars.requestId),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
       invalidateRenewals(queryClient);
@@ -415,8 +459,11 @@ export const rejectRenewalDiscount = async (
 export const useRejectRenewalDiscount = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { policyId: string; renewalId: string; requestId: string }) =>
-      rejectRenewalDiscount(vars.policyId, vars.renewalId, vars.requestId),
+    mutationFn: (vars: {
+      policyId: string;
+      renewalId: string;
+      requestId: string;
+    }) => rejectRenewalDiscount(vars.policyId, vars.renewalId, vars.requestId),
     onSuccess: (data) => {
       cacheRenewal(queryClient, data);
       invalidateRenewals(queryClient);
@@ -424,5 +471,10 @@ export const useRejectRenewalDiscount = () => {
   });
 };
 
-export const isRenewalStatus = (value: string | null): value is DomainPoliciesPolicyRenewalStatus =>
-  value === "planned" || value === "draft" || value === "priced" || value === "applied";
+export const isRenewalStatus = (
+  value: string | null,
+): value is DomainPoliciesPolicyRenewalStatus =>
+  value === "planned" ||
+  value === "draft" ||
+  value === "priced" ||
+  value === "applied";

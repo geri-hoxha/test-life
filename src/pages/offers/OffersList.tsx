@@ -7,6 +7,7 @@ import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { ProductCombobox } from "@/components/ProductCombobox";
 import { PersonCombobox } from "@/components/PersonCombobox";
+import { CustomerCombobox } from "@/components/CustomerCombobox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,8 @@ import { useListOffers } from "@/api/offers";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { DomainOffersOfferStatus } from "@/api/types";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
+import { isApiForbidden } from "@/lib/api-error";
 import {
   OFFER_STATUSES,
   formatCoverageTerm,
@@ -66,6 +69,7 @@ const OffersList = () => {
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
   const [personId, setPersonId] = useState("");
+  const [partyId, setPartyId] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -77,9 +81,10 @@ const OffersList = () => {
         ...(currency !== "__all__" ? { currency } : {}),
         createdFromUtc: dateToUtcStart(createdFrom),
         createdToUtc: dateToUtcEnd(createdTo),
+        partyId: partyId.trim() || undefined,
         personId: personId.trim() || undefined,
       }),
-    [statusFilter, productId, currency, createdFrom, createdTo, personId],
+    [statusFilter, productId, currency, createdFrom, createdTo, partyId, personId],
   );
   const debouncedFilters = useDebouncedValue(filters);
 
@@ -89,7 +94,8 @@ const OffersList = () => {
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
 
-  const { data: offersPage, isLoading, isFetching, isError } = useListOffers(listQuery);
+  const { data: offersPage, isLoading, isFetching, isError, error } = useListOffers(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = offersPage?.items ?? [];
 
@@ -103,6 +109,7 @@ const OffersList = () => {
     setCreatedFrom("");
     setCreatedTo("");
     setPersonId("");
+    setPartyId("");
   };
 
   const hasFilters =
@@ -111,6 +118,7 @@ const OffersList = () => {
     currency !== "__all__" ||
     createdFrom ||
     createdTo ||
+    partyId ||
     personId;
 
   return (
@@ -134,13 +142,16 @@ const OffersList = () => {
             <RefreshCw className="h-4 w-4" />
             Renewals
           </Button>
-          <Button onClick={() => navigate("/offers/new")} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Offer
-          </Button>
+          {!accessDenied && (
+            <Button onClick={() => navigate("/offers/new")} className="gap-2">
+              <Plus className="h-4 w-4" />
+              New Offer
+            </Button>
+          )}
         </div>
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -193,6 +204,16 @@ const OffersList = () => {
                     {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Party</Label>
+                <CustomerCombobox
+                  value={partyId}
+                  onValueChange={setPartyId}
+                  placeholder="All parties"
+                  allowClear
+                  triggerClassName="h-9"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Person</Label>
@@ -338,6 +359,7 @@ const OffersList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
     </AppShell>
   );
 };

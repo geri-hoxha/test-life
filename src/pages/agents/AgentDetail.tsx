@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
-import { Loader, PageLoader } from "@/components/Loader";
+import { PageLoader } from "@/components/Loader";
+import TablePagination from "@/components/TablePagination";
 import { ProductCombobox } from "@/components/ProductCombobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,33 +52,26 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  useCreateAgentCommissionRule,
-  useCreateAgentProductAuthorization,
-  useDeleteAgentCommissionRule,
-  useDeleteAgentProductAuthorization,
+  useCreateAgentProductConfiguration,
+  useDeleteAgentProductConfiguration,
   useGetAgent,
-  useListAgentCommissionRules,
-  useListAgentProductAuthorizations,
+  useListAgentProductConfigurations,
   useUpdateAgent,
-  useUpdateAgentCommissionRule,
-  useUpdateAgentProductAuthorization,
+  useUpdateAgentProductConfiguration,
 } from "@/api/agents";
 import { mapApiProduct, useListProducts } from "@/api/products";
 import type {
-  AgentsAgentCommissionRuleResponse,
-  AgentsAgentProductAuthorizationResponse,
+  AgentsAgentProductConfigurationResponse,
   DomainCommissionsBasis,
-  DomainCommissionsBusinessType,
 } from "@/api/types";
-import { toastApiError } from "@/lib/api-error";
-import { cn } from "@/lib/utils";
-import { ArrowLeft, ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import AccessDeniedNotice from "@/components/AccessDeniedNotice";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
+import { compactQuery } from "@/lib/list-query";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   COMMISSION_BASES,
-  COMMISSION_BUSINESS_TYPES,
   basisLabel,
-  businessTypeLabel,
   formatCommissionRate,
 } from "@/pages/agent-commissions/commission-ui";
 
@@ -107,130 +101,71 @@ const parseRatePercent = (raw: string): number | null => {
   return value / 100;
 };
 
+const rateToPercent = (rate?: number | null) =>
+  rate != null && Number.isFinite(rate) ? String(rate * 100) : "";
+
 type AgentForm = {
   displayName: string;
-  internalOfficeId: string;
   isActive: boolean;
 };
 
-type AuthForm = {
+type ConfigForm = {
   productId: string;
+  newBusinessCommissionBasis: DomainCommissionsBasis;
+  newBusinessRatePercent: string;
+  renewalCommissionBasis: DomainCommissionsBasis;
+  renewalRatePercent: string;
   effectiveFrom: string;
   effectiveToExclusive: string;
 };
 
-type RuleForm = {
-  businessType: DomainCommissionsBusinessType;
-  basis: DomainCommissionsBasis;
-  ratePercent: string;
-  effectiveFrom: string;
-  effectiveToExclusive: string;
-};
-
-const emptyAuthForm = (): AuthForm => ({
+const emptyConfigForm = (): ConfigForm => ({
   productId: "",
+  newBusinessCommissionBasis: "premium",
+  newBusinessRatePercent: "",
+  renewalCommissionBasis: "premium",
+  renewalRatePercent: "",
   effectiveFrom: format(new Date(), "yyyy-MM-dd"),
   effectiveToExclusive: "",
 });
 
-const emptyRuleForm = (): RuleForm => ({
-  businessType: "newBusiness",
-  basis: "premium",
-  ratePercent: "",
-  effectiveFrom: format(new Date(), "yyyy-MM-dd"),
-  effectiveToExclusive: "",
+const formFromConfig = (row: AgentsAgentProductConfigurationResponse): ConfigForm => ({
+  productId: row.productId ?? "",
+  newBusinessCommissionBasis: row.newBusinessCommissionBasis ?? "premium",
+  newBusinessRatePercent: rateToPercent(row.newBusinessCommissionRate),
+  renewalCommissionBasis: row.renewalCommissionBasis ?? "premium",
+  renewalRatePercent: rateToPercent(row.renewalCommissionRate),
+  effectiveFrom: row.effectiveFrom ?? "",
+  effectiveToExclusive: row.effectiveToExclusive ?? "",
 });
-
-type AuthorizationRulesPanelProps = {
-  agentId: string;
-  authorizationId: string;
-  onAddRule: () => void;
-  onEditRule: (row: AgentsAgentCommissionRuleResponse) => void;
-  onDeleteRule: (row: AgentsAgentCommissionRuleResponse) => void;
-};
-
-const AuthorizationRulesPanel = ({
-  agentId,
-  authorizationId,
-  onAddRule,
-  onEditRule,
-  onDeleteRule,
-}: AuthorizationRulesPanelProps) => {
-  const { data: rules, isLoading } = useListAgentCommissionRules(agentId, authorizationId);
-  const items = rules ?? [];
-
-  return (
-    <div className="ml-11 mr-3 mb-3 border-l-2 border-accent/30 pl-4 py-1">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Commission rules
-        </div>
-        <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={onAddRule}>
-          <Plus className="h-3.5 w-3.5" />
-          Add rule
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <Loader size="sm" label="Loading commission rules…" className="py-4" />
-      ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">No commission rules for this authorization.</p>
-      ) : (
-        <div className="space-y-0.5">
-          {items.map((row) => (
-            <div
-              key={row.id}
-              className="grid grid-cols-[8.75rem_6rem_4.25rem_minmax(0,1fr)_auto] items-center gap-x-4 py-1.5"
-            >
-              <span className="text-sm truncate">{businessTypeLabel(row.businessType)}</span>
-              <span className="text-sm text-muted-foreground truncate">{basisLabel(row.basis)}</span>
-              <span className="font-mono text-sm font-semibold tabular-nums">
-                {formatCommissionRate(row.rate)}
-              </span>
-              <span className="font-mono text-xs text-foreground/70 truncate">
-                {formatDay(row.effectiveFrom)} to {formatDay(row.effectiveToExclusive, "Open")}
-              </span>
-              <div className="flex items-center shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  disabled={!row.id}
-                  onClick={() => onEditRule(row)}
-                  title="Edit commission rule"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                  disabled={!row.id}
-                  onClick={() => onDeleteRule(row)}
-                  title="Delete commission rule"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const AgentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const agentId = id?.trim() ?? "";
 
-  const { data: agent, isLoading, isError } = useGetAgent(agentId, { enabled: Boolean(agentId) });
-  const { data: authorizations, isLoading: authsLoading } = useListAgentProductAuthorizations(
-    agentId,
-    undefined,
-    { enabled: Boolean(agentId) },
+  const [productFilter, setProductFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const configQuery = useMemo(
+    () => compactQuery({ productId: productFilter.trim() || undefined }),
+    [productFilter],
   );
+
+  useEffect(() => {
+    setPage(1);
+  }, [configQuery, pageSize]);
+
+  const { data: agent, isLoading, isError, error } = useGetAgent(agentId, { enabled: Boolean(agentId) });
+  const {
+    data: configurations,
+    isLoading: configsLoading,
+    isFetching: configsFetching,
+    isError: configsFailed,
+  } = useListAgentProductConfigurations(agentId, configQuery, {
+    enabled: Boolean(agentId) && !isError,
+  });
   const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 200 });
   const products = useMemo(
     () => (productsPage?.items ?? []).map(mapApiProduct).filter((p) => p.id),
@@ -242,64 +177,31 @@ const AgentDetail = () => {
   );
 
   const updateAgent = useUpdateAgent();
-  const createAuth = useCreateAgentProductAuthorization();
-  const updateAuth = useUpdateAgentProductAuthorization();
-  const deleteAuth = useDeleteAgentProductAuthorization();
-  const createRule = useCreateAgentCommissionRule();
-  const updateRule = useUpdateAgentCommissionRule();
-  const deleteRule = useDeleteAgentCommissionRule();
+  const createConfig = useCreateAgentProductConfiguration();
+  const updateConfig = useUpdateAgentProductConfiguration();
+  const deleteConfig = useDeleteAgentProductConfiguration();
 
-  const [expandedAuthIds, setExpandedAuthIds] = useState<Set<string>>(new Set());
-  const didAutoExpand = useRef(false);
-  const [ruleAuthId, setRuleAuthId] = useState("");
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
   const [agentForm, setAgentForm] = useState<AgentForm>({
     displayName: "",
-    internalOfficeId: "",
     isActive: true,
   });
 
-  const [authDialogOpen, setAuthDialogOpen] = useState(false);
-  const [editingAuth, setEditingAuth] = useState<AgentsAgentProductAuthorizationResponse | null>(null);
-  const [authForm, setAuthForm] = useState<AuthForm>(emptyAuthForm);
-  const [deleteAuthTarget, setDeleteAuthTarget] = useState<AgentsAgentProductAuthorizationResponse | null>(null);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<AgentsAgentProductConfigurationResponse | null>(null);
+  const [configForm, setConfigForm] = useState<ConfigForm>(emptyConfigForm);
+  const [deleteTarget, setDeleteTarget] = useState<AgentsAgentProductConfigurationResponse | null>(null);
 
-  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<AgentsAgentCommissionRuleResponse | null>(null);
-  const [ruleForm, setRuleForm] = useState<RuleForm>(emptyRuleForm);
-  const [deleteRuleTarget, setDeleteRuleTarget] = useState<{
-    authorizationId: string;
-    rule: AgentsAgentCommissionRuleResponse;
-  } | null>(null);
-
-  const authItems = authorizations ?? [];
-  useEffect(() => {
-    const items = authorizations ?? [];
-    const validIds = new Set(items.map((a) => a.id).filter((id): id is string => Boolean(id)));
-    setExpandedAuthIds((prev) => {
-      const next = new Set([...prev].filter((id) => validIds.has(id)));
-      if (!didAutoExpand.current && items[0]?.id) {
-        didAutoExpand.current = true;
-        next.add(items[0].id);
-      }
-      if (next.size === prev.size && [...next].every((id) => prev.has(id))) return prev;
-      return next;
-    });
-  }, [authorizations]);
-
-  const toggleAuthExpanded = (authorizationId: string) => {
-    setExpandedAuthIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(authorizationId)) next.delete(authorizationId);
-      else next.add(authorizationId);
-      return next;
-    });
-  };
+  const allConfigItems = configurations ?? [];
+  const totalCount = allConfigItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const configItems = allConfigItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const hasProductFilter = Boolean(productFilter.trim());
 
   const openEditAgent = () => {
     setAgentForm({
       displayName: agent?.displayName ?? "",
-      internalOfficeId: agent?.internalOfficeId ?? "",
       isActive: agent?.isActive ?? true,
     });
     setAgentDialogOpen(true);
@@ -316,7 +218,6 @@ const AgentDetail = () => {
         agentId,
         body: {
           displayName,
-          internalOfficeId: agentForm.internalOfficeId.trim() || undefined,
           isActive: agentForm.isActive,
         },
       },
@@ -330,171 +231,98 @@ const AgentDetail = () => {
     );
   };
 
-  const openCreateAuth = () => {
-    setEditingAuth(null);
-    setAuthForm(emptyAuthForm());
-    setAuthDialogOpen(true);
+  const openCreateConfig = () => {
+    setEditingConfig(null);
+    setConfigForm(emptyConfigForm());
+    setConfigDialogOpen(true);
   };
 
-  const openEditAuth = (row: AgentsAgentProductAuthorizationResponse) => {
-    setEditingAuth(row);
-    setAuthForm({
-      productId: row.productId ?? "",
-      effectiveFrom: row.effectiveFrom ?? "",
-      effectiveToExclusive: row.effectiveToExclusive ?? "",
-    });
-    setAuthDialogOpen(true);
+  const openEditConfig = (row: AgentsAgentProductConfigurationResponse) => {
+    setEditingConfig(row);
+    setConfigForm(formFromConfig(row));
+    setConfigDialogOpen(true);
   };
 
-  const handleSaveAuth = () => {
+  const handleSaveConfig = () => {
     if (!agentId) return;
-    const effectiveFrom = authForm.effectiveFrom.trim();
+    const effectiveFrom = configForm.effectiveFrom.trim();
     if (!effectiveFrom) {
       toast.error("Effective from is required");
       return;
     }
-    const effectiveToExclusive = authForm.effectiveToExclusive.trim() || null;
+    const effectiveToExclusive = configForm.effectiveToExclusive.trim() || null;
 
-    if (editingAuth?.id) {
-      updateAuth.mutate(
+    if (editingConfig?.id) {
+      updateConfig.mutate(
         {
           agentId,
-          authorizationId: editingAuth.id,
+          configurationId: editingConfig.id,
           body: { effectiveFrom, effectiveToExclusive },
         },
         {
           onSuccess: () => {
-            toast.success("Authorization updated");
-            setAuthDialogOpen(false);
+            toast.success("Product configuration updated");
+            setConfigDialogOpen(false);
           },
-          onError: (err) => toastApiError(err, "Failed to update authorization"),
+          onError: (err) => toastApiError(err, "Failed to update product configuration"),
         },
       );
       return;
     }
 
-    const productId = authForm.productId.trim();
+    const productId = configForm.productId.trim();
     if (!productId) {
       toast.error("Product is required");
       return;
     }
-    createAuth.mutate(
+    const newBusinessCommissionRate = parseRatePercent(configForm.newBusinessRatePercent);
+    const renewalCommissionRate = parseRatePercent(configForm.renewalRatePercent);
+    if (
+      newBusinessCommissionRate == null ||
+      newBusinessCommissionRate <= 0 ||
+      newBusinessCommissionRate > 1
+    ) {
+      toast.error("New business rate must be greater than 0 and at most 100");
+      return;
+    }
+    if (renewalCommissionRate == null || renewalCommissionRate <= 0 || renewalCommissionRate > 1) {
+      toast.error("Renewal rate must be greater than 0 and at most 100");
+      return;
+    }
+
+    createConfig.mutate(
       {
         agentId,
-        body: { productId, effectiveFrom, effectiveToExclusive },
-      },
-      {
-        onSuccess: (created) => {
-          toast.success("Authorization created");
-          if (created.id) {
-            setExpandedAuthIds((prev) => new Set(prev).add(created.id!));
-          }
-          setAuthDialogOpen(false);
-        },
-        onError: (err) => toastApiError(err, "Failed to create authorization"),
-      },
-    );
-  };
-
-  const handleDeleteAuth = () => {
-    if (!agentId || !deleteAuthTarget?.id) return;
-    deleteAuth.mutate(
-      { agentId, authorizationId: deleteAuthTarget.id },
-      {
-        onSuccess: () => {
-          toast.success("Authorization deleted");
-          setDeleteAuthTarget(null);
-        },
-        onError: (err) => toastApiError(err, "Failed to delete authorization"),
-      },
-    );
-  };
-
-  const openCreateRule = (authorizationId: string) => {
-    setRuleAuthId(authorizationId);
-    setEditingRule(null);
-    setRuleForm(emptyRuleForm());
-    setRuleDialogOpen(true);
-  };
-
-  const openEditRule = (authorizationId: string, row: AgentsAgentCommissionRuleResponse) => {
-    setRuleAuthId(authorizationId);
-    setEditingRule(row);
-    setRuleForm({
-      businessType: row.businessType ?? "newBusiness",
-      basis: row.basis ?? "premium",
-      ratePercent: row.rate != null ? String(row.rate * 100) : "",
-      effectiveFrom: row.effectiveFrom ?? "",
-      effectiveToExclusive: row.effectiveToExclusive ?? "",
-    });
-    setRuleDialogOpen(true);
-  };
-
-  const handleSaveRule = () => {
-    if (!agentId || !ruleAuthId) return;
-    const effectiveFrom = ruleForm.effectiveFrom.trim();
-    if (!effectiveFrom) {
-      toast.error("Effective from is required");
-      return;
-    }
-    const effectiveToExclusive = ruleForm.effectiveToExclusive.trim() || null;
-
-    if (editingRule?.id) {
-      updateRule.mutate(
-        {
-          agentId,
-          authorizationId: ruleAuthId,
-          ruleId: editingRule.id,
-          body: { effectiveFrom, effectiveToExclusive },
-        },
-        {
-          onSuccess: () => {
-            toast.success("Commission rule updated");
-            setRuleDialogOpen(false);
-          },
-          onError: (err) => toastApiError(err, "Failed to update commission rule"),
-        },
-      );
-      return;
-    }
-
-    const rate = parseRatePercent(ruleForm.ratePercent);
-    if (rate == null) {
-      toast.error("Rate is required");
-      return;
-    }
-    createRule.mutate(
-      {
-        agentId,
-        authorizationId: ruleAuthId,
         body: {
-          businessType: ruleForm.businessType,
-          basis: ruleForm.basis,
-          rate,
+          productId,
+          newBusinessCommissionBasis: configForm.newBusinessCommissionBasis,
+          newBusinessCommissionRate,
+          renewalCommissionBasis: configForm.renewalCommissionBasis,
+          renewalCommissionRate,
           effectiveFrom,
           effectiveToExclusive,
         },
       },
       {
         onSuccess: () => {
-          toast.success("Commission rule created");
-          setRuleDialogOpen(false);
+          toast.success("Product configuration created");
+          setConfigDialogOpen(false);
         },
-        onError: (err) => toastApiError(err, "Failed to create commission rule"),
+        onError: (err) => toastApiError(err, "Failed to create product configuration"),
       },
     );
   };
 
-  const handleDeleteRule = () => {
-    if (!agentId || !deleteRuleTarget?.authorizationId || !deleteRuleTarget.rule.id) return;
-    deleteRule.mutate(
-      { agentId, authorizationId: deleteRuleTarget.authorizationId, ruleId: deleteRuleTarget.rule.id },
+  const handleDeleteConfig = () => {
+    if (!agentId || !deleteTarget?.id) return;
+    deleteConfig.mutate(
+      { agentId, configurationId: deleteTarget.id },
       {
         onSuccess: () => {
-          toast.success("Commission rule deleted");
-          setDeleteRuleTarget(null);
+          toast.success("Product configuration deleted");
+          setDeleteTarget(null);
         },
-        onError: (err) => toastApiError(err, "Failed to delete commission rule"),
+        onError: (err) => toastApiError(err, "Failed to delete product configuration"),
       },
     );
   };
@@ -516,23 +344,22 @@ const AgentDetail = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate("/agents")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Agents
         </Button>
-        <Card className="p-10 text-center">
-          <p className="text-muted-foreground text-sm">This agent could not be loaded.</p>
-          <Button asChild className="mt-4">
-            <Link to="/agents">Back to agents</Link>
-          </Button>
-        </Card>
+        {isApiForbidden(error) ? (
+          <AccessDeniedNotice />
+        ) : (
+          <Card className="p-10 text-center">
+            <p className="text-muted-foreground text-sm">This agent could not be loaded.</p>
+            <Button asChild className="mt-4">
+              <Link to="/agents">Back to agents</Link>
+            </Button>
+          </Card>
+        )}
       </AppShell>
     );
   }
 
-  const authSaving = createAuth.isPending || updateAuth.isPending;
-  const ruleSaving = createRule.isPending || updateRule.isPending;
-  const ruleProductLabel = (() => {
-    const auth = authItems.find((a) => a.id === ruleAuthId);
-    if (!auth?.productId) return "this product";
-    return productNameById[auth.productId] || auth.productId;
-  })();
+  const configSaving = createConfig.isPending || updateConfig.isPending;
+  const editing = Boolean(editingConfig);
 
   return (
     <AppShell>
@@ -560,9 +387,7 @@ const AgentDetail = () => {
               {agent.isActive ? "Active" : "Inactive"}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1 font-mono">
-            {agent.id}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1 font-mono">{agent.id}</p>
         </div>
         <Button variant="outline" className="gap-2" onClick={openEditAgent}>
           <Pencil className="h-4 w-4" />
@@ -570,42 +395,48 @@ const AgentDetail = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Card className="p-4">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Auth user</div>
-          <div className="text-sm font-medium mt-1 font-mono">
-            {agent.authUserId != null ? String(agent.authUserId) : "—"}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Office ID</div>
-          <div className="text-sm font-medium mt-1 font-mono truncate" title={agent.internalOfficeId}>
-            {agent.internalOfficeId?.trim() || "—"}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Fiscal TCR</div>
-          <div className="text-sm font-medium mt-1 font-mono">{agent.fiscTcr?.trim() || "—"}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Fiscal operator</div>
-          <div className="text-sm font-medium mt-1 font-mono">{agent.fiscOperatorCode?.trim() || "—"}</div>
-        </Card>
-      </div>
-
       <Card className="mb-6">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">Product authorizations</CardTitle>
-              <CardDescription>
-                Products this agent is allowed to sell. Expand a row to manage its commission rules.
-              </CardDescription>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Product configurations</CardTitle>
+                <CardDescription>
+                  Commission basis and rate for new business and renewals.
+                  {configsLoading
+                    ? " Loading…"
+                    : ` ${totalCount} total${configsFetching && !configsLoading ? " · updating…" : ""}.`}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasProductFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 text-muted-foreground"
+                    onClick={() => setProductFilter("")}
+                  >
+                    Clear filter
+                  </Button>
+                )}
+                <Button className="gap-2" onClick={openCreateConfig}>
+                  <Plus className="h-4 w-4" />
+                  Add configuration
+                </Button>
+              </div>
             </div>
-            <Button className="gap-2" onClick={openCreateAuth}>
-              <Plus className="h-4 w-4" />
-              Add authorization
-            </Button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Product</Label>
+                <ProductCombobox
+                  value={productFilter}
+                  onValueChange={setProductFilter}
+                  placeholder="All products"
+                  allowClear
+                  triggerClassName="h-9"
+                />
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -613,134 +444,103 @@ const AgentDetail = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[44px]">
-                    <span className="sr-only">Expand</span>
-                  </TableHead>
                   <TableHead>Product</TableHead>
+                  <TableHead>New business</TableHead>
+                  <TableHead>Renewal</TableHead>
                   <TableHead>Effective from</TableHead>
                   <TableHead>Effective to</TableHead>
                   <TableHead className="w-[100px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {authsLoading ? (
+                {configsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading authorizations…
+                    <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
+                      Loading product configurations…
                     </TableCell>
                   </TableRow>
-                ) : authItems.length === 0 ? (
+                ) : configsFailed ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10 text-sm text-muted-foreground">
-                      No product authorizations yet.
+                    <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
+                      Product configurations could not be loaded.
+                    </TableCell>
+                  </TableRow>
+                ) : configItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
+                      {hasProductFilter
+                        ? "No product configurations for this product."
+                        : "No product configurations yet."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  authItems.map((row) => {
-                    const authId = row.id ?? "";
-                    const isExpanded = Boolean(authId) && expandedAuthIds.has(authId);
-                    return (
-                      <Fragment key={row.id}>
-                        <TableRow
-                          className={cn(
-                            "cursor-pointer hover:bg-accent-soft/70",
-                            isExpanded && "border-b-0 bg-transparent hover:bg-transparent",
-                          )}
-                          data-state={isExpanded ? "open" : undefined}
-                          onClick={() => authId && toggleAuthExpanded(authId)}
-                        >
-                          <TableCell className="pr-0">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground"
-                              disabled={!authId}
-                              aria-label={
-                                isExpanded
-                                  ? `Collapse commission rules for ${productNameById[row.productId ?? ""] || row.productId || "authorization"}`
-                                  : `Expand commission rules for ${productNameById[row.productId ?? ""] || row.productId || "authorization"}`
-                              }
-                              aria-expanded={isExpanded}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                authId && toggleAuthExpanded(authId);
-                              }}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {row.productId ? (
-                              <Link
-                                to={`/products/${row.productId}`}
-                                className="hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {productNameById[row.productId] || row.productId}
-                              </Link>
-                            ) : (
-                              "—"
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{formatDay(row.effectiveFrom)}</TableCell>
-                          <TableCell className="font-mono text-xs">{formatDay(row.effectiveToExclusive, "Open")}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8"
-                                disabled={!row.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditAuth(row);
-                                }}
-                                title="Edit authorization"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 text-destructive hover:text-destructive"
-                                disabled={!row.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteAuthTarget(row);
-                                }}
-                                title="Delete authorization"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {isExpanded && (
-                          <TableRow className="hover:bg-transparent border-0">
-                            <TableCell colSpan={5} className="p-0">
-                              <AuthorizationRulesPanel
-                                agentId={agentId}
-                                authorizationId={authId}
-                                onAddRule={() => openCreateRule(authId)}
-                                onEditRule={(rule) => openEditRule(authId, rule)}
-                                onDeleteRule={(rule) =>
-                                  setDeleteRuleTarget({ authorizationId: authId, rule })
-                                }
-                              />
-                            </TableCell>
-                          </TableRow>
+                  configItems.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium">
+                        {row.productId ? (
+                          <Link to={`/products/${row.productId}`} className="hover:underline">
+                            {productNameById[row.productId] || row.productId}
+                          </Link>
+                        ) : (
+                          "—"
                         )}
-                      </Fragment>
-                    );
-                  })
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {basisLabel(row.newBusinessCommissionBasis)}
+                        <span className="text-muted-foreground"> · </span>
+                        <span className="font-mono tabular-nums">
+                          {formatCommissionRate(row.newBusinessCommissionRate)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {basisLabel(row.renewalCommissionBasis)}
+                        <span className="text-muted-foreground"> · </span>
+                        <span className="font-mono tabular-nums">
+                          {formatCommissionRate(row.renewalCommissionRate)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{formatDay(row.effectiveFrom)}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {formatDay(row.effectiveToExclusive, "Open")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            disabled={!row.id}
+                            onClick={() => openEditConfig(row)}
+                            title="Edit configuration"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-destructive hover:text-destructive"
+                            disabled={!row.id}
+                            onClick={() => setDeleteTarget(row)}
+                            title="Delete configuration"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
+            <TablePagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              disabled={configsLoading}
+            />
           </div>
         </CardContent>
       </Card>
@@ -749,7 +549,7 @@ const AgentDetail = () => {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit agent</DialogTitle>
-            <DialogDescription>Update the agent profile. Login credentials cannot be changed here.</DialogDescription>
+            <DialogDescription>Update the agent name and status.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-1.5">
@@ -758,16 +558,6 @@ const AgentDetail = () => {
                 id="edit-display-name"
                 value={agentForm.displayName}
                 onChange={(e) => setAgentForm((prev) => ({ ...prev, displayName: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-office">Internal office ID</Label>
-              <Input
-                id="edit-office"
-                className="font-mono"
-                value={agentForm.internalOfficeId}
-                onChange={(e) => setAgentForm((prev) => ({ ...prev, internalOfficeId: e.target.value }))}
-                placeholder="Optional office ULID"
               />
             </div>
             <div className="flex items-center justify-between rounded-md border px-3 py-2">
@@ -790,14 +580,14 @@ const AgentDetail = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingAuth ? "Edit authorization" : "Add authorization"}</DialogTitle>
+            <DialogTitle>{editing ? "Edit product configuration" : "Add product configuration"}</DialogTitle>
             <DialogDescription>
-              {editingAuth
-                ? "Update the effective period. Product cannot be changed after creation."
-                : "Authorize this agent to sell a product."}
+              {editing
+                ? "Only the effective period can be updated. Rates stay as they were created."
+                : "Set commission basis and rate for new business and renewals."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -805,164 +595,132 @@ const AgentDetail = () => {
               <Label>Product</Label>
               <ProductCombobox
                 products={products.map((p) => ({ id: p.id, name: p.name }))}
-                value={authForm.productId}
-                onValueChange={(productId) => setAuthForm((prev) => ({ ...prev, productId }))}
-                disabled={Boolean(editingAuth)}
+                value={configForm.productId}
+                onValueChange={(productId) => setConfigForm((prev) => ({ ...prev, productId }))}
+                disabled={editing}
                 placeholder="Select product"
               />
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
+                <Label>New business basis</Label>
+                <Select
+                  value={configForm.newBusinessCommissionBasis}
+                  onValueChange={(v) =>
+                    setConfigForm((prev) => ({
+                      ...prev,
+                      newBusinessCommissionBasis: v as DomainCommissionsBasis,
+                    }))
+                  }
+                  disabled={editing}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMISSION_BASES.map((basis) => (
+                      <SelectItem key={basis} value={basis}>
+                        {basisLabel(basis)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nb-rate">New business rate (%)</Label>
+                <Input
+                  id="nb-rate"
+                  value={configForm.newBusinessRatePercent}
+                  onChange={(e) =>
+                    setConfigForm((prev) => ({ ...prev, newBusinessRatePercent: e.target.value }))
+                  }
+                  placeholder="e.g. 10"
+                  disabled={editing}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Renewal basis</Label>
+                <Select
+                  value={configForm.renewalCommissionBasis}
+                  onValueChange={(v) =>
+                    setConfigForm((prev) => ({
+                      ...prev,
+                      renewalCommissionBasis: v as DomainCommissionsBasis,
+                    }))
+                  }
+                  disabled={editing}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMISSION_BASES.map((basis) => (
+                      <SelectItem key={basis} value={basis}>
+                        {basisLabel(basis)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="renewal-rate">Renewal rate (%)</Label>
+                <Input
+                  id="renewal-rate"
+                  value={configForm.renewalRatePercent}
+                  onChange={(e) =>
+                    setConfigForm((prev) => ({ ...prev, renewalRatePercent: e.target.value }))
+                  }
+                  placeholder="e.g. 5"
+                  disabled={editing}
+                />
+              </div>
+              <div className="space-y-1.5">
                 <Label>Effective from</Label>
                 <DatePicker
-                  value={toDate(authForm.effectiveFrom)}
-                  onChange={(d) => setAuthForm((prev) => ({ ...prev, effectiveFrom: toIsoDay(d) }))}
+                  value={toDate(configForm.effectiveFrom)}
+                  onChange={(d) => setConfigForm((prev) => ({ ...prev, effectiveFrom: toIsoDay(d) }))}
                   placeholder="From date"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>Effective to (exclusive)</Label>
                 <DatePicker
-                  value={toDate(authForm.effectiveToExclusive)}
-                  onChange={(d) => setAuthForm((prev) => ({ ...prev, effectiveToExclusive: toIsoDay(d) }))}
+                  value={toDate(configForm.effectiveToExclusive)}
+                  onChange={(d) =>
+                    setConfigForm((prev) => ({ ...prev, effectiveToExclusive: toIsoDay(d) }))
+                  }
                   placeholder="Open-ended"
                 />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAuthDialogOpen(false)} disabled={authSaving}>
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)} disabled={configSaving}>
               Cancel
             </Button>
-            <Button onClick={handleSaveAuth} disabled={authSaving}>
-              {authSaving ? "Saving…" : editingAuth ? "Save changes" : "Create"}
+            <Button onClick={handleSaveConfig} disabled={configSaving}>
+              {configSaving ? "Saving…" : editing ? "Save changes" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={ruleDialogOpen} onOpenChange={setRuleDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingRule ? "Edit commission rule" : "Add commission rule"}</DialogTitle>
-            <DialogDescription>
-              {editingRule
-                ? "Only the effective period can be updated after creation."
-                : `Define how this agent is paid for ${ruleProductLabel}.`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-2 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Business type</Label>
-              <Select
-                value={ruleForm.businessType}
-                onValueChange={(v) =>
-                  setRuleForm((prev) => ({ ...prev, businessType: v as DomainCommissionsBusinessType }))
-                }
-                disabled={Boolean(editingRule)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMMISSION_BUSINESS_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {businessTypeLabel(type)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Basis</Label>
-              <Select
-                value={ruleForm.basis}
-                onValueChange={(v) => setRuleForm((prev) => ({ ...prev, basis: v as DomainCommissionsBasis }))}
-                disabled={Boolean(editingRule)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMMISSION_BASES.map((basis) => (
-                    <SelectItem key={basis} value={basis}>
-                      {basisLabel(basis)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="rule-rate">Rate (%)</Label>
-              <Input
-                id="rule-rate"
-                value={ruleForm.ratePercent}
-                onChange={(e) => setRuleForm((prev) => ({ ...prev, ratePercent: e.target.value }))}
-                placeholder="e.g. 7.5"
-                disabled={Boolean(editingRule)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Effective from</Label>
-              <DatePicker
-                value={toDate(ruleForm.effectiveFrom)}
-                onChange={(d) => setRuleForm((prev) => ({ ...prev, effectiveFrom: toIsoDay(d) }))}
-                placeholder="From date"
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Effective to (exclusive)</Label>
-              <DatePicker
-                value={toDate(ruleForm.effectiveToExclusive)}
-                onChange={(d) => setRuleForm((prev) => ({ ...prev, effectiveToExclusive: toIsoDay(d) }))}
-                placeholder="Open-ended"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRuleDialogOpen(false)} disabled={ruleSaving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveRule} disabled={ruleSaving}>
-              {ruleSaving ? "Saving…" : editingRule ? "Save changes" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={Boolean(deleteAuthTarget)} onOpenChange={(open) => !open && setDeleteAuthTarget(null)}>
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete authorization?</AlertDialogTitle>
+            <AlertDialogTitle>Delete product configuration?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the product authorization
-              {deleteAuthTarget?.productId
-                ? ` for ${productNameById[deleteAuthTarget.productId] || deleteAuthTarget.productId}`
+              This will permanently remove the configuration
+              {deleteTarget?.productId
+                ? ` for ${productNameById[deleteTarget.productId] || deleteTarget.productId}`
                 : ""}
-              . Commission rules on it will also become inaccessible.
+              .
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteAuth.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={deleteAuth.isPending} onClick={handleDeleteAuth}>
-              {deleteAuth.isPending ? "Deleting…" : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={Boolean(deleteRuleTarget)} onOpenChange={(open) => !open && setDeleteRuleTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete commission rule?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this commission rule. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteRule.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={deleteRule.isPending} onClick={handleDeleteRule}>
-              {deleteRule.isPending ? "Deleting…" : "Delete"}
+            <AlertDialogCancel disabled={deleteConfig.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={deleteConfig.isPending} onClick={handleDeleteConfig}>
+              {deleteConfig.isPending ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

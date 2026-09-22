@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -60,7 +61,7 @@ import { useDocumentPreview } from "@/components/documents/DocumentPreview";
 import type { DocumentsDocumentResponse } from "@/api/types";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Download, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -131,7 +132,8 @@ const DocumentsList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListDocuments(listQuery);
+  const { data: pageData, isLoading, isFetching, error } = useListDocuments(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
@@ -252,12 +254,15 @@ const DocumentsList = () => {
             Upload, rename, download, and manage stored files.
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setUploadOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Upload document
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={() => setUploadOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Upload document
+          </Button>
+        )}
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -433,6 +438,7 @@ const DocumentsList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
 
       <Dialog
         open={uploadOpen}

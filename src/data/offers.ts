@@ -187,20 +187,27 @@ export type Offer = {
   premium: number;
   status: OfferStatus;
   createdDate: string;
+  createdOnUtc?: string | null;
   quotedOnUtc?: string | null;
+  createdByAuthUserId?: number | null;
+  createdByUserName?: string | null;
   salesChannel?: string | null;
   salesPartyName?: string | null;
+  agentId?: string | null;
+  agentSelectionMethod?: string | null;
   salesAgentName?: string | null;
+  partnerId?: string | null;
   salesPartnerName?: string | null;
+  partnerOfficeId?: string | null;
   salesOfficeName?: string | null;
 };
 
 export const statusColor: Record<OfferStatus, string> = {
-  Draft: "bg-muted text-muted-foreground",
+  Draft: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
   Quoted: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  Bound: "bg-primary/15 text-primary",
+  Bound: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   Cancelled: "bg-destructive/15 text-destructive",
-  Expired: "bg-muted text-muted-foreground",
+  Expired: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 };
 
 /** API query value ↔ UI label */

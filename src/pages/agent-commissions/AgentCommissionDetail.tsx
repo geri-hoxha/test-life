@@ -190,26 +190,13 @@ const AgentCommissionDetail = () => {
               label="Calculation version"
               value={commission.calculationVersion != null ? String(commission.calculationVersion) : undefined}
             />
-            <Field
-              label="Reversal of"
-              value={
-                commission.reversalOfCommissionId ? (
-                  <Link
-                    to={`/agent-commissions/${commission.reversalOfCommissionId}`}
-                    className="text-primary hover:underline font-mono text-xs"
-                  >
-                    {shortCommissionId(commission.reversalOfCommissionId)}
-                  </Link>
-                ) : undefined
-              }
-            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-base">References</CardTitle>
-            <CardDescription>Agent, product, policy, and rule used for this entry.</CardDescription>
+            <CardDescription>Agent, product, policy, and configuration used for this entry.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <Field
@@ -255,14 +242,6 @@ const AgentCommissionDetail = () => {
               }
             />
             <Field
-              label="Policy renewal"
-              value={
-                commission.policyRenewalId ? (
-                  <span className="font-mono text-xs">{commission.policyRenewalId}</span>
-                ) : undefined
-              }
-            />
-            <Field
               label="Premium installment"
               value={
                 commission.premiumInstallmentId ? (
@@ -271,10 +250,12 @@ const AgentCommissionDetail = () => {
               }
             />
             <Field
-              label="Commission rule"
+              label="Product configuration"
               value={
-                commission.agentCommissionRuleId ? (
-                  <span className="font-mono text-xs">{commission.agentCommissionRuleId}</span>
+                commission.agentProductConfigurationId ? (
+                  <span className="font-mono text-xs" title={commission.agentProductConfigurationId}>
+                    {commission.agentProductConfigurationId}
+                  </span>
                 ) : undefined
               }
             />

@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,7 +58,7 @@ import {
 import type { DomainComplianceRiskListType, RiskListsRiskListEntryResponse } from "@/api/types";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -128,7 +129,8 @@ const RiskList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListRiskListEntries(listQuery);
+  const { data: pageData, isLoading, isFetching, error } = useListRiskListEntries(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
@@ -204,12 +206,15 @@ const RiskList = () => {
             Manage PEP and blacklist entries used for compliance screening.
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Add entry
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add entry
+          </Button>
+        )}
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -350,6 +355,7 @@ const RiskList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
 
       <Dialog
         open={addOpen}

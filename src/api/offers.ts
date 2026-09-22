@@ -22,8 +22,10 @@ import type {
   OffersUnderwritingReviewFlagResponse,
   OffersWaiveOfferDocumentRequest,
   PaginationPagedListOfOfferListItemResponse,
+  PoliciesIssuePolicyRequest,
   PoliciesIssuePolicyResponse,
 } from "./types";
+import { makeLoanPeriodsAdjacent } from "@/lib/loan-periods";
 
 export const offersKeys = {
   all: [...apiKeys.all, "offers"] as const,
@@ -64,7 +66,7 @@ export const issueOfferPolicy = async (
   apiRequest<PoliciesIssuePolicyResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/policy`,
-    body: {},
+    body: {} satisfies PoliciesIssuePolicyRequest,
     signal,
   });
 
@@ -144,7 +146,6 @@ export const previewOfferPremium = async (
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/premium`,
     signal,
-    body: {},
   });
   return mapPremiumPreviewRows(rows);
 };
@@ -166,7 +167,6 @@ export const cancelOffer = async (
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/cancellations`,
     signal,
-    body: {},
   });
 
 export const useCancelOffer = () => {
@@ -248,13 +248,22 @@ export const submitOfferLoan = async (
   offerId: string,
   body: OffersSubmitOfferLoanRequest,
   signal?: AbortSignal,
-): Promise<OffersSubmitOfferLoanResponse> =>
-  apiRequest<OffersSubmitOfferLoanResponse>({
+): Promise<OffersSubmitOfferLoanResponse> => {
+  const request = {
+    sourceSystem: body.sourceSystem,
+    externalReference: body.externalReference ?? null,
+    periods: makeLoanPeriodsAdjacent(body.periods),
+  };
+  return apiRequest<OffersSubmitOfferLoanResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/loan-submissions`,
-    body,
+    body: {
+      ...request,
+      rawPayload: body.rawPayload ?? request,
+    },
     signal,
   });
+};
 
 export const useSubmitOfferLoan = () => {
   const queryClient = useQueryClient();
@@ -276,7 +285,6 @@ export const quoteOffer = async (
   apiRequest<OffersOfferResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/quotation`,
-    body: {},
     signal,
   });
 
@@ -299,7 +307,6 @@ export const rateOffer = async (
   apiRequest<OffersOfferResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/rating`,
-    body: {},
     signal,
   });
 
@@ -366,13 +373,13 @@ export const useRemoveOfferParticipant = () => {
 export const approveOfferReviewFlag = async (
   offerId: string,
   flagId: string,
-  body?: OffersResolveOfferReviewFlagRequest,
+  body: OffersResolveOfferReviewFlagRequest,
   signal?: AbortSignal,
 ): Promise<OffersUnderwritingReviewFlagResponse> =>
   apiRequest<OffersUnderwritingReviewFlagResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/review-flags/${encodeURIComponent(flagId)}/approval`,
-    body: body ?? {},
+    body,
     signal,
   });
 
@@ -382,7 +389,7 @@ export const useApproveOfferReviewFlag = () => {
     mutationFn: (vars: {
       offerId: string;
       flagId: string;
-      body?: OffersResolveOfferReviewFlagRequest;
+      body: OffersResolveOfferReviewFlagRequest;
     }) => approveOfferReviewFlag(vars.offerId, vars.flagId, vars.body),
     onSuccess: (_data, vars) => {
       invalidateOffers(queryClient);
@@ -395,13 +402,13 @@ export const useApproveOfferReviewFlag = () => {
 export const rejectOfferReviewFlag = async (
   offerId: string,
   flagId: string,
-  body?: OffersResolveOfferReviewFlagRequest,
+  body: OffersResolveOfferReviewFlagRequest,
   signal?: AbortSignal,
 ): Promise<OffersUnderwritingReviewFlagResponse> =>
   apiRequest<OffersUnderwritingReviewFlagResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/review-flags/${encodeURIComponent(flagId)}/rejection`,
-    body: body ?? {},
+    body,
     signal,
   });
 
@@ -411,7 +418,7 @@ export const useRejectOfferReviewFlag = () => {
     mutationFn: (vars: {
       offerId: string;
       flagId: string;
-      body?: OffersResolveOfferReviewFlagRequest;
+      body: OffersResolveOfferReviewFlagRequest;
     }) => rejectOfferReviewFlag(vars.offerId, vars.flagId, vars.body),
     onSuccess: (_data, vars) => {
       invalidateOffers(queryClient);
@@ -429,7 +436,6 @@ export const acceptOfferDocument = async (
   apiRequest<OffersUnderwritingDocumentRequirementResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/document-requirements/${encodeURIComponent(requirementId)}/acceptance`,
-    body: {},
     signal,
   });
 
@@ -541,7 +547,6 @@ export const approveOfferDiscount = async (
   apiRequest<OffersUnderwritingDiscountRequestResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/discount-requests/${encodeURIComponent(requestId)}/approval`,
-    body: {},
     signal,
   });
 
@@ -566,7 +571,6 @@ export const rejectOfferDiscount = async (
   apiRequest<OffersUnderwritingDiscountRequestResponse>({
     method: "POST",
     path: `/api/offers/${encodeURIComponent(offerId)}/discount-requests/${encodeURIComponent(requestId)}/rejection`,
-    body: {},
     signal,
   });
 

@@ -38,49 +38,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import AccessDeniedNotice from "@/components/AccessDeniedNotice";
 import { useCreateAgent, useListAgents, useUpdateAgent } from "@/api/agents";
 import type { AgentsAgentResponse } from "@/api/types";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Eye, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
 type FormState = {
-  username: string;
-  email: string;
-  password: string;
   displayName: string;
-  internalOfficeId: string;
   isActive: boolean;
 };
 
 const emptyForm = (): FormState => ({
-  username: "",
-  email: "",
-  password: "",
   displayName: "",
-  internalOfficeId: "",
   isActive: true,
 });
 
 const formFromAgent = (row: AgentsAgentResponse): FormState => ({
-  username: "",
-  email: "",
-  password: "",
   displayName: row.displayName ?? "",
-  internalOfficeId: row.internalOfficeId ?? "",
   isActive: row.isActive ?? true,
 });
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const AgentsList = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
-  const [internalOfficeId, setInternalOfficeId] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -95,10 +81,9 @@ const AgentsList = () => {
   const filters = useMemo(
     () =>
       compactQuery({
-        internalOfficeId: internalOfficeId.trim() || undefined,
         ...(activeFilter === "all" ? {} : { isActive: activeFilter === "active" }),
       }),
-    [activeFilter, internalOfficeId],
+    [activeFilter],
   );
   const debouncedFilters = useDebouncedValue(filters);
 
@@ -107,17 +92,17 @@ const AgentsList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListAgents(listQuery);
+  const { data: pageData, isLoading, isFetching, isError, error } = useListAgents(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
   const totalPages = Math.max(1, pageData?.totalPages ?? pageData?.pageCount ?? 1);
 
-  const hasFilters = activeFilter !== "all" || Boolean(internalOfficeId.trim());
+  const hasFilters = activeFilter !== "all";
 
   const clearFilters = () => {
     setActiveFilter("all");
-    setInternalOfficeId("");
   };
 
   const openCreate = () => {
@@ -144,7 +129,6 @@ const AgentsList = () => {
 
   const handleSave = () => {
     const displayName = form.displayName.trim();
-    const officeId = form.internalOfficeId.trim() || undefined;
 
     if (!displayName) {
       toast.error("Display name is required");
@@ -157,7 +141,6 @@ const AgentsList = () => {
           agentId: editing.id,
           body: {
             displayName,
-            internalOfficeId: officeId,
             isActive: form.isActive,
           },
         },
@@ -172,31 +155,8 @@ const AgentsList = () => {
       return;
     }
 
-    const username = form.username.trim();
-    const email = form.email.trim();
-    const password = form.password;
-
-    if (!username) {
-      toast.error("Username is required");
-      return;
-    }
-    if (!email || !EMAIL_RE.test(email)) {
-      toast.error("A valid email is required");
-      return;
-    }
-    if (!password) {
-      toast.error("Password is required");
-      return;
-    }
-
     createAgent.mutate(
-      {
-        username,
-        email,
-        password,
-        displayName,
-        internalOfficeId: officeId,
-      },
+      { displayName },
       {
         onSuccess: () => {
           toast.success("Agent created");
@@ -216,16 +176,21 @@ const AgentsList = () => {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage selling agents, product authorizations, and commission rules.
+            Manage selling agents and their product commission configurations.
           </p>
         </div>
-        <Button className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Add agent
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Add agent
+          </Button>
+        )}
       </div>
 
-      <Card>
+      {accessDenied ? (
+        <AccessDeniedNotice />
+      ) : (
+        <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -265,15 +230,6 @@ const AgentsList = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Internal office ID</Label>
-                <Input
-                  className="h-9 font-mono"
-                  placeholder="Office ULID"
-                  value={internalOfficeId}
-                  onChange={(e) => setInternalOfficeId(e.target.value)}
-                />
-              </div>
             </div>
           </div>
         </CardHeader>
@@ -284,19 +240,21 @@ const AgentsList = () => {
                 <TableRow>
                   <TableHead>Display name</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Fiscal TCR</TableHead>
-                  <TableHead>Fiscal operator</TableHead>
-                  <TableHead>Office ID</TableHead>
-                  <TableHead>Auth user</TableHead>
                   <TableHead className="w-[96px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableLoadingRow colSpan={7} />
+                  <TableLoadingRow colSpan={3} />
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-10 text-sm text-muted-foreground">
+                      Agents could not be loaded.
+                    </TableCell>
+                  </TableRow>
                 ) : items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={3} className="text-center py-10 text-sm text-muted-foreground">
                       No agents match the current filters.
                     </TableCell>
                   </TableRow>
@@ -323,14 +281,6 @@ const AgentsList = () => {
                         >
                           {row.isActive ? "Active" : "Inactive"}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{row.fiscTcr?.trim() || "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.fiscOperatorCode?.trim() || "—"}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-[160px] truncate" title={row.internalOfficeId}>
-                        {row.internalOfficeId?.trim() || "—"}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {row.authUserId != null ? String(row.authUserId) : "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -372,7 +322,8 @@ const AgentsList = () => {
             />
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       <Dialog
         open={dialogOpen}
@@ -386,48 +337,12 @@ const AgentsList = () => {
             <DialogTitle>{editing ? "Edit agent" : "Add agent"}</DialogTitle>
             <DialogDescription>
               {editing
-                ? "Update the agent profile. Login credentials cannot be changed here."
-                : "Create an agent login and profile. Product authorizations can be added after creation."}
+                ? "Update the agent name and status."
+                : "Create an agent. Product configurations can be added after creation."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2 sm:grid-cols-2">
-            {!editing && (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="agent-username">Username</Label>
-                  <Input
-                    id="agent-username"
-                    value={form.username}
-                    onChange={(e) => setField("username", e.target.value)}
-                    placeholder="username"
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="agent-email">Email</Label>
-                  <Input
-                    id="agent-email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setField("email", e.target.value)}
-                    placeholder="agent@example.com"
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="agent-password">Password</Label>
-                  <Input
-                    id="agent-password"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setField("password", e.target.value)}
-                    placeholder="Password"
-                    autoComplete="new-password"
-                  />
-                </div>
-              </>
-            )}
-            <div className="space-y-1.5 sm:col-span-2">
+          <div className="grid gap-4 py-2">
+            <div className="space-y-1.5">
               <Label htmlFor="agent-display-name">Display name</Label>
               <Input
                 id="agent-display-name"
@@ -436,18 +351,8 @@ const AgentsList = () => {
                 placeholder="Agent name"
               />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="agent-office">Internal office ID</Label>
-              <Input
-                id="agent-office"
-                className="font-mono"
-                value={form.internalOfficeId}
-                onChange={(e) => setField("internalOfficeId", e.target.value)}
-                placeholder="Optional office ULID"
-              />
-            </div>
             {editing && (
-              <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
                 <div>
                   <Label htmlFor="agent-active">Active</Label>
                   <p className="text-xs text-muted-foreground">Inactive agents cannot be used for new sales.</p>

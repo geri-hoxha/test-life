@@ -4,6 +4,7 @@ import AppShell from "@/components/layout/AppShell";
 import { FilterGrid } from "@/components/FilterGrid";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -91,7 +92,7 @@ const InvoicesList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListInvoices(listQuery);
+  const { data: pageData, isLoading, isFetching, error } = useListInvoices(listQuery);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? items.length;
@@ -119,6 +120,7 @@ const InvoicesList = () => {
         </div>
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -329,6 +331,7 @@ const InvoicesList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
 
       <FiscalizationRetryDialog
         invoice={retryTarget}

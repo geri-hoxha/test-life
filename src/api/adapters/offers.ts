@@ -236,17 +236,25 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     premium,
     status: statusFromApi(o.status),
     createdDate: created,
+    createdOnUtc: o.createdOnUtc ?? null,
     quotedOnUtc: o.quotedOnUtc ?? null,
+    createdByAuthUserId: sales?.createdByAuthUserId ?? null,
+    createdByUserName: sales?.createdByUserName ?? null,
     salesChannel: sales?.salesChannel,
     salesPartyName:
       sales?.partnerName ??
       sales?.agentDisplayName ??
       sales?.internalOfficeName ??
+      sales?.createdByUserName ??
       null,
+    agentId: sales?.agentId ?? null,
+    agentSelectionMethod: sales?.agentSelectionMethod ?? null,
     salesAgentName: sales?.agentDisplayName ?? null,
+    partnerId: sales?.partnerId ?? null,
     salesPartnerName: sales?.partnerName ?? null,
+    partnerOfficeId: sales?.partnerOfficeId ?? null,
     salesOfficeName:
-      sales?.internalOfficeName ?? sales?.partnerOfficeName ?? null,
+      sales?.partnerOfficeName ?? sales?.internalOfficeName ?? null,
   };
 };
 

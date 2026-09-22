@@ -38,11 +38,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import AccessDeniedNotice from "@/components/AccessDeniedNotice";
 import { useCreatePartner, useListPartners, useUpdatePartner } from "@/api/partners";
 import type { PartnersPartnerResponse } from "@/api/types";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Eye, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,32 +51,18 @@ type ActiveFilter = "all" | "active" | "inactive";
 
 type FormState = {
   name: string;
-  createApiAccount: boolean;
-  username: string;
-  email: string;
-  password: string;
   isActive: boolean;
 };
 
 const emptyForm = (): FormState => ({
   name: "",
-  createApiAccount: false,
-  username: "",
-  email: "",
-  password: "",
   isActive: true,
 });
 
 const formFromPartner = (row: PartnersPartnerResponse): FormState => ({
   name: row.name ?? "",
-  createApiAccount: false,
-  username: "",
-  email: "",
-  password: "",
   isActive: row.isActive ?? true,
 });
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const PartnersList = () => {
   const navigate = useNavigate();
@@ -105,7 +92,8 @@ const PartnersList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListPartners(listQuery);
+  const { data: pageData, isLoading, isFetching, isError, error } = useListPartners(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
@@ -166,28 +154,8 @@ const PartnersList = () => {
       return;
     }
 
-    let apiAccount: { username: string; email: string; password: string } | undefined;
-    if (form.createApiAccount) {
-      const username = form.username.trim();
-      const email = form.email.trim();
-      const password = form.password;
-      if (!username) {
-        toast.error("Username is required");
-        return;
-      }
-      if (!email || !EMAIL_RE.test(email)) {
-        toast.error("A valid email is required");
-        return;
-      }
-      if (password.length < 12) {
-        toast.error("Password must be at least 12 characters");
-        return;
-      }
-      apiAccount = { username, email, password };
-    }
-
     createPartner.mutate(
-      { name, apiAccount },
+      { name },
       {
         onSuccess: () => {
           toast.success("Partner created");
@@ -207,16 +175,21 @@ const PartnersList = () => {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Partners</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage distribution partners, product authorizations, and commission rules.
+            Manage distribution partners, offices, and product configurations.
           </p>
         </div>
-        <Button className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Add partner
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Add partner
+          </Button>
+        )}
       </div>
 
-      <Card>
+      {accessDenied ? (
+        <AccessDeniedNotice />
+      ) : (
+        <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -266,18 +239,21 @@ const PartnersList = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Fiscal TCR</TableHead>
-                  <TableHead>Fiscal operator</TableHead>
-                  <TableHead>API user</TableHead>
                   <TableHead className="w-[96px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableLoadingRow colSpan={6} />
+                  <TableLoadingRow colSpan={3} />
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-10 text-sm text-muted-foreground">
+                      Partners could not be loaded.
+                    </TableCell>
+                  </TableRow>
                 ) : items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
+                    <TableCell colSpan={3} className="text-center py-10 text-sm text-muted-foreground">
                       No partners match the current filters.
                     </TableCell>
                   </TableRow>
@@ -304,11 +280,6 @@ const PartnersList = () => {
                         >
                           {row.isActive ? "Active" : "Inactive"}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{row.fiscTcr?.trim() || "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.fiscOperatorCode?.trim() || "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {row.apiAuthUserId != null ? String(row.apiAuthUserId) : "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -350,7 +321,8 @@ const PartnersList = () => {
             />
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       <Dialog
         open={dialogOpen}
@@ -364,8 +336,8 @@ const PartnersList = () => {
             <DialogTitle>{editing ? "Edit partner" : "Add partner"}</DialogTitle>
             <DialogDescription>
               {editing
-                ? "Update the partner profile. API credentials cannot be changed here."
-                : "Create a distribution partner. An optional API login can be attached at creation."}
+                ? "Update the partner name and status."
+                : "Create a distribution partner. Offices and product configurations can be added after creation."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
@@ -378,57 +350,6 @@ const PartnersList = () => {
                 placeholder="Partner name"
               />
             </div>
-            {!editing && (
-              <>
-                <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
-                  <div>
-                    <Label htmlFor="partner-api-account">Create API account</Label>
-                    <p className="text-xs text-muted-foreground">Optional login used by this partner’s API integration.</p>
-                  </div>
-                  <Switch
-                    id="partner-api-account"
-                    checked={form.createApiAccount}
-                    onCheckedChange={(checked) => setField("createApiAccount", checked)}
-                  />
-                </div>
-                {form.createApiAccount && (
-                  <>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="partner-username">Username</Label>
-                      <Input
-                        id="partner-username"
-                        value={form.username}
-                        onChange={(e) => setField("username", e.target.value)}
-                        placeholder="username"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="partner-email">Email</Label>
-                      <Input
-                        id="partner-email"
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setField("email", e.target.value)}
-                        placeholder="partner@example.com"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <Label htmlFor="partner-password">Password</Label>
-                      <Input
-                        id="partner-password"
-                        type="password"
-                        value={form.password}
-                        onChange={(e) => setField("password", e.target.value)}
-                        placeholder="At least 12 characters"
-                        autoComplete="new-password"
-                      />
-                    </div>
-                  </>
-                )}
-              </>
-            )}
             {editing && (
               <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
                 <div>

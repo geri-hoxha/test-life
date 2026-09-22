@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { format, parseISO } from "date-fns";
+import { addMonths, format, parseISO } from "date-fns";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { OverlayLoader } from "@/components/Loader";
@@ -46,12 +46,10 @@ import {
   Users,
   Package,
   Calendar as CalendarNavIcon,
-  Calculator,
   FileSpreadsheet,
 } from "lucide-react";
-import { ageFromDob } from "@/data/customers";
-import { Beneficiary, PaymentMode } from "@/data/offers";
-import { useListProducts, mapApiProduct } from "@/api/products";
+import { Beneficiary } from "@/data/offers";
+import { useGetProduct, useListProducts, mapApiProduct } from "@/api/products";
 import { useListProductGroups } from "@/api/product-groups";
 import { useListPeople, useGetPerson } from "@/api/people";
 import { useListCompanies, useGetCompany } from "@/api/companies";
@@ -68,48 +66,33 @@ import {
   useSubmitOfferLoan,
   useRateOffer,
 } from "@/api/offers";
-import type { DomainPoliciesRelationshipToInsured } from "@/api/types";
+import { useMySalesAccess } from "@/api/auth";
+import type {
+  DomainPoliciesRelationshipToInsured,
+  OffersCreateOfferRequest,
+} from "@/api/types";
 import { CustomerCombobox } from "@/components/CustomerCombobox";
 import { ProductCombobox } from "@/components/ProductCombobox";
 import CustomerForm from "@/pages/customers/CustomerForm";
-import PremiumCalculation from "./PremiumCalculation";
-import type { Gender as RuleGender } from "@/data/premiumRules";
 import {
   SAME_AS_INSURED,
   useRelationshipToInsuredOptions,
 } from "@/hooks/useRelationshipToInsuredOptions";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
+import { formatCoverageTermMonths } from "@/data/policy-plan-types";
 import { getApiErrorMessage, toastApiError } from "@/lib/api-error";
+import {
+  buildYearlyLoanPeriodDates,
+  inclusiveYearEnd,
+  nextAdjacentStart,
+} from "@/lib/loan-periods";
 import { getCurrencies } from "@/config/currencies";
 import { toast } from "sonner";
-
-const fmtMoney = (v: number, ccy: string) => {
-  if (!ccy || !isFinite(v)) return "—";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: ccy,
-      maximumFractionDigits: 2,
-    }).format(v);
-  } catch {
-    return `${v.toFixed(2)} ${ccy}`;
-  }
-};
-
-const PAYMENT_MODES: PaymentMode[] = [
-  "Pagesa me prim te rregullt",
-  "Pagese per gjithe periudhen (Upfront)",
-  "Pagesa me tarife te vetme për të gjithë periudhën",
-  "Pagesa me prim fiks mujor",
-  "Pagesa me prim fiks vjetor",
-  "Pagesa me prim te paracaktuar, kjo eshte e velfshme per sigurimin e jetes se kombinuar Protect, Sigurimi i jetes se kombinuar ISP",
-];
 
 const SECTIONS = [
   { id: "product", label: "Product", icon: Package },
   { id: "people", label: "People", icon: Users },
-  { id: "dates", label: "Dates", icon: CalendarNavIcon },
-  { id: "premium", label: "Premium", icon: Calculator },
+  { id: "dates", label: "Coverage term", icon: CalendarNavIcon },
 ] as const;
 
 type ManualLoanRow = {
@@ -121,14 +104,41 @@ type ManualLoanRow = {
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
+const DEFAULT_OFFER_TERM_YEARS = 20;
 
-const newManualLoanRow = (overrides?: Partial<ManualLoanRow>): ManualLoanRow => {
+const addMonthsIso = (iso: string, months: number) =>
+  format(addMonths(parseISO(iso), months), "yyyy-MM-dd");
+
+/** Latest allowed periodEnd = periodStart + maximumCoverageTermMonths (when the product sets it). */
+const maxCoverageEndDate = (
+  startDate: string,
+  maximumCoverageTermMonths?: number | null,
+): string | null => {
+  if (
+    !startDate ||
+    maximumCoverageTermMonths == null ||
+    maximumCoverageTermMonths <= 0
+  ) {
+    return null;
+  }
+  return addMonthsIso(startDate, maximumCoverageTermMonths);
+};
+
+const defaultEndFromStart = (startDate: string) => {
+  const d = parseISO(startDate);
+  d.setFullYear(d.getFullYear() + DEFAULT_OFFER_TERM_YEARS);
+  return format(d, "yyyy-MM-dd");
+};
+
+const newManualLoanRow = (
+  overrides?: Partial<ManualLoanRow>,
+): ManualLoanRow => {
   const today = todayIso();
   return {
     id: crypto.randomUUID(),
     year: 1,
     periodStart: today,
-    periodEnd: today,
+    periodEnd: inclusiveYearEnd(today),
     remainingLoanAmount: "",
     ...overrides,
   };
@@ -153,72 +163,49 @@ const cappedLoanYears = (
   return Math.min(requestedYears, Math.floor(maxCoveredYears));
 };
 
-/** One manual row per offer year: periodStart/End advance by 1 year from offer start. */
+/** One manual row per offer year: inclusive years, next starts the day after the previous ends. */
 const buildManualLoanRowsFromOfferTerm = (
   startDate: string,
   endDate: string,
   maxCoveredYears?: number | null,
 ): ManualLoanRow[] => {
   if (!startDate) return [newManualLoanRow()];
-  const start = parseISO(startDate);
   const term = cappedLoanYears(
     offerTermYears(startDate, endDate),
     maxCoveredYears,
   );
-  const rows: ManualLoanRow[] = [];
-  for (let i = 0; i < term; i++) {
-    const periodStartDate = new Date(start);
-    periodStartDate.setFullYear(start.getFullYear() + i);
-    const periodEndDate = new Date(start);
-    periodEndDate.setFullYear(start.getFullYear() + i + 1);
-    rows.push({
-      id: crypto.randomUUID(),
-      year: periodStartDate.getFullYear(),
-      periodStart: format(periodStartDate, "yyyy-MM-dd"),
-      periodEnd: format(periodEndDate, "yyyy-MM-dd"),
-      remainingLoanAmount: "",
-    });
-  }
-  return rows;
+  return buildYearlyLoanPeriodDates(startDate, endDate, term).map((range) => ({
+    id: crypto.randomUUID(),
+    year: parseISO(range.periodStart).getFullYear(),
+    periodStart: range.periodStart,
+    periodEnd: range.periodEnd,
+    remainingLoanAmount: "",
+  }));
 };
 
 /** One loan-disbursement per Loan Term year. Year and remaining balance come from the loop. */
 const buildLoanDisbursements = (opts: {
   startDate: string;
+  endDate?: string;
   loanTermYears: number;
   principal: number;
 }) => {
   const term = Math.max(0, Math.floor(opts.loanTermYears));
   if (term === 0 || !opts.startDate) return [];
 
-  const start = parseISO(opts.startDate);
+  const coverageEnd =
+    opts.endDate ||
+    format(addMonths(parseISO(opts.startDate), term * 12), "yyyy-MM-dd");
   const principal = Math.max(0, opts.principal);
+  const ranges = buildYearlyLoanPeriodDates(opts.startDate, coverageEnd, term);
 
-  const rows: {
-    year: number;
-    periodStart: string;
-    periodEnd: string;
-    remainingLoanAmount: number;
-  }[] = [];
-
-  for (let i = 0; i < term; i++) {
-    const periodStartDate = new Date(start);
-    periodStartDate.setFullYear(start.getFullYear() + i);
-    const periodEndDate = new Date(start);
-    periodEndDate.setFullYear(start.getFullYear() + i + 1);
-    // Declining balance: year 0 = full principal, last year = principal / term
-    const remainingLoanAmount =
-      Math.round(((principal * (term - i)) / term) * 100) / 100;
-
-    rows.push({
-      year: periodStartDate.getFullYear(),
-      periodStart: format(periodStartDate, "yyyy-MM-dd"),
-      periodEnd: format(periodEndDate, "yyyy-MM-dd"),
-      remainingLoanAmount,
-    });
-  }
-
-  return rows;
+  return ranges.map((range, i) => ({
+    year: parseISO(range.periodStart).getFullYear(),
+    periodStart: range.periodStart,
+    periodEnd: range.periodEnd,
+    remainingLoanAmount:
+      Math.round(((principal * (term - i)) / term) * 100) / 100,
+  }));
 };
 
 const SectionNav = () => (
@@ -254,7 +241,7 @@ const CreateOffer = () => {
   const relationshipOptions = useRelationshipToInsuredOptions();
   const policyPlanTypeLabel = usePolicyPlanTypeLabel();
 
-  // Step 1
+  // Step 1 — CreateOfferRequest: productId, currency, periodStart, periodEnd
   const [productGroupId, setProductGroupId] = useState("");
   const [productId, setProductId] = useState("");
   const [currency, setCurrency] = useState("");
@@ -279,6 +266,10 @@ const CreateOffer = () => {
     pageNumber: 1,
     pageSize: 200,
   });
+  const { data: selectedApiProduct, isLoading: productDetailLoading } =
+    useGetProduct(productId, {
+      enabled: Boolean(productId),
+    });
   const customers = useMemo(() => {
     const merged = mergeCustomers(peoplePage?.items, companiesPage?.items);
     const byId = new Map(merged.map((c) => [c.id, c]));
@@ -307,10 +298,16 @@ const CreateOffer = () => {
     () => (productGroupsPage?.items ?? []).filter((g) => g.id),
     [productGroupsPage?.items],
   );
-  const products = useMemo(
-    () => (productsPage?.items ?? []).map(mapApiProduct),
-    [productsPage?.items],
-  );
+  const products = useMemo(() => {
+    const mapped = (productsPage?.items ?? []).map(mapApiProduct);
+    if (
+      selectedApiProduct?.id &&
+      !mapped.some((p) => p.id === selectedApiProduct.id)
+    ) {
+      mapped.unshift(mapApiProduct(selectedApiProduct));
+    }
+    return mapped;
+  }, [productsPage?.items, selectedApiProduct]);
   const productsInGroup = useMemo(
     () => products.filter((p) => p.productGroupId === productGroupId),
     [products, productGroupId],
@@ -321,8 +318,8 @@ const CreateOffer = () => {
       ? "company"
       : "person";
   const [policyHolderId, setPolicyHolderId] = useState("");
-  const [holderRelationship, setHolderRelationship] = useState("");
   const [payerId, setPayerId] = useState("");
+  const [payerRelationship, setPayerRelationship] = useState("");
   const [insuredId, setInsuredId] = useState("");
   const prefillApplied = useRef(false);
 
@@ -340,10 +337,10 @@ const CreateOffer = () => {
   }, [prefillCustomerId, customers]);
 
   useEffect(() => {
-    if (policyHolderId && insuredId && policyHolderId === insuredId) {
-      setHolderRelationship(SAME_AS_INSURED);
+    if (payerId && insuredId && payerId === insuredId) {
+      setPayerRelationship(SAME_AS_INSURED);
     }
-  }, [policyHolderId, insuredId]);
+  }, [payerId, insuredId]);
 
   type BeneficiaryDraft = Omit<Beneficiary, "percentage"> & {
     percentage: number | "";
@@ -366,22 +363,56 @@ const CreateOffer = () => {
   const [loanSubmitProgress, setLoanSubmitProgress] = useState(false);
 
   // Step 3
-  const [startDate, setStartDate] = useState(
-    new Date().toISOString().slice(0, 10),
+  const [startDate, setStartDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState(() => defaultEndFromStart(todayIso()));
+  const { data: salesAccess } = useMySalesAccess();
+  const grantedOffices = useMemo(
+    () =>
+      (salesAccess?.partnerOffices ?? []).filter(
+        (office) => office.partnerOfficeId && office.isActive !== false,
+      ),
+    [salesAccess],
   );
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 20);
-    return d.toISOString().slice(0, 10);
-  });
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
-    "Pagesa me prim te rregullt",
+  const grantedAgents = useMemo(
+    () =>
+      (salesAccess?.agents ?? []).filter(
+        (agent) => agent.agentId && agent.isActive !== false,
+      ),
+    [salesAccess],
   );
+  const [partnerOfficeId, setPartnerOfficeId] = useState(() =>
+    grantedOffices.length === 1
+      ? (grantedOffices[0]?.partnerOfficeId ?? "")
+      : "",
+  );
+  const [agentId, setAgentId] = useState(() =>
+    grantedAgents.length === 1 ? (grantedAgents[0]?.agentId ?? "") : "",
+  );
+
+  useEffect(() => {
+    setPartnerOfficeId((current) => {
+      if (grantedOffices.length === 1)
+        return grantedOffices[0]?.partnerOfficeId ?? "";
+      if (grantedOffices.some((office) => office.partnerOfficeId === current))
+        return current;
+      return "";
+    });
+  }, [grantedOffices]);
+
+  useEffect(() => {
+    setAgentId((current) => {
+      if (grantedAgents.length === 1) return grantedAgents[0]?.agentId ?? "";
+      if (grantedAgents.some((agent) => agent.agentId === current))
+        return current;
+      return "";
+    });
+  }, [grantedAgents]);
   const [hasLoan, setHasLoan] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
   const [outstandingBalance, setOutstandingBalance] = useState("");
   const loanFileRef = useRef<HTMLInputElement>(null);
+  const createdOfferIdRef = useRef<string | null>(null);
   const [loanFileName, setLoanFileName] = useState<string | null>(null);
   const [manualLoans, setManualLoans] = useState(false);
   const [manualLoanRows, setManualLoanRows] = useState<ManualLoanRow[]>([]);
@@ -486,16 +517,38 @@ const CreateOffer = () => {
 
   // Derived
   const productGroup = productGroups.find((g) => g.id === productGroupId);
-  const product = products.find((p) => p.id === productId);
+  const product =
+    (selectedApiProduct ? mapApiProduct(selectedApiProduct) : undefined) ??
+    products.find((p) => p.id === productId);
+  const maxEndDate = maxCoverageEndDate(
+    startDate,
+    product?.maximumCoverageTermMonths,
+  );
+  const termWithinLimit = !maxEndDate || (!!endDate && endDate <= maxEndDate);
 
-  const insured = insuredId ? getCustomerLocal(insuredId) : undefined;
-  const insuredAge = insured ? ageFromDob(insured.dateOfBirth) : 35;
-  const insuredGender: RuleGender =
-    insured?.gender === "Female"
-      ? "Female"
-      : insured?.gender === "Male"
-        ? "Male"
-        : "Any";
+  useEffect(() => {
+    if (!product) return;
+    setCurrency((current) => {
+      if (current && product.currencies.includes(current)) return current;
+      return product.currencies[0] ?? current;
+    });
+  }, [product]);
+
+  useEffect(() => {
+    if (!startDate) return;
+    const maxEnd = maxCoverageEndDate(
+      startDate,
+      product?.maximumCoverageTermMonths,
+    );
+    setEndDate((current) => {
+      let next = current;
+      if (!next || next < startDate) {
+        next = defaultEndFromStart(startDate);
+      }
+      if (maxEnd && next > maxEnd) return maxEnd;
+      return next;
+    });
+  }, [startDate, product?.id, product?.maximumCoverageTermMonths]);
 
   const termYears = useMemo(
     () => offerTermYears(startDate, endDate),
@@ -528,17 +581,24 @@ const CreateOffer = () => {
     );
   };
 
-  // Validation — version not yet on API; product group + product + currency are required.
-  const productOk = !!(productGroupId && productId && currency);
+  // CreateOfferRequest requires currency; productId + period dates are sent with it.
+  const productOk =
+    !!(productId && currency && startDate && endDate) &&
+    !productDetailLoading &&
+    termWithinLimit;
+
+  const peopleStarted =
+    Boolean(policyHolderId || payerId || insuredId) ||
+    beneficiaries.some((b) => b.customerId);
+
   const peopleOk =
-    !!(policyHolderId && payerId && insuredId && holderRelationship) &&
-    peopleOnly.some((p) => p.id === insuredId) &&
+    !!(policyHolderId && payerId && insuredId && payerRelationship) &&
+    (peopleOnly.some((p) => p.id === insuredId) || Boolean(insuredId)) &&
     beneficiariesValid &&
-    beneficiaries.every(
-      (b) => b.customerId && Number(b.percentage) > 0 && b.relationship,
-    );
-  const hasLoanInput = hasLoan || manualLoans;
-  const canSave = productOk && peopleOk && (!loanRequired || hasLoanInput);
+    beneficiaries.every((b) => b.customerId && Number(b.percentage) > 0);
+
+  const canSave = productOk && (!peopleStarted || peopleOk);
+
   const saving =
     createOffer.isPending ||
     addParticipant.isPending ||
@@ -549,65 +609,85 @@ const CreateOffer = () => {
 
   const handleSave = async () => {
     if (saving) return;
+    if (createdOfferIdRef.current) {
+      navigate(`/offers/${createdOfferIdRef.current}`);
+      window.scrollTo({ top: 0, left: 0 });
+      return;
+    }
     if (!canSave) {
       toast.error("Complete required fields before saving");
       return;
     }
 
+    let offerId = "";
     try {
-      const created = await createOffer.mutateAsync({
+      const body: OffersCreateOfferRequest = {
         productId,
         currency,
         periodStart: startDate,
-        periodEnd: endDate,
-      });
-      const offerId = created.id;
-      if (!offerId) throw new Error("Offer created without id");
+        periodEnd: maxEndDate && endDate > maxEndDate ? maxEndDate : endDate,
+        ...(partnerOfficeId.trim()
+          ? { partnerOfficeId: partnerOfficeId.trim() }
+          : {}),
+        ...(agentId.trim() ? { agentId: agentId.trim() } : {}),
+      };
+      const created = await createOffer.mutateAsync(body);
+      if (!created.id) throw new Error("Offer created without id");
+      offerId = created.id;
+      createdOfferIdRef.current = offerId;
+    } catch (err) {
+      toastApiError(err, "Failed to create offer");
+      return;
+    }
 
-      // Participants: policyHolder / invoiced / beneficiary via /participants
-      // share is always 1 except beneficiaries (UI % → fraction, e.g. 50 → 0.5)
-      await addParticipant.mutateAsync({
-        offerId,
-        body: {
-          partyId: policyHolderId,
-          partyType: partyTypeOf(policyHolderId),
-          role: "policyHolder",
-          isLeader: true,
-          share: 1,
-          relationshipToInsured: holderRelationship as DomainPoliciesRelationshipToInsured,
-        },
-      });
-
-      await addParticipant.mutateAsync({
-        offerId,
-        body: {
-          partyId: payerId,
-          partyType: partyTypeOf(payerId),
-          role: "invoiced",
-          isLeader: true,
-          share: 1,
-        },
-      });
-
-      for (const b of beneficiaries.filter((x) => x.customerId)) {
+    try {
+      if (peopleOk) {
+        // Participants: policyHolder / invoiced / beneficiary via /participants
+        // share is always 1 except beneficiaries (UI % → fraction, e.g. 50 → 0.5)
+        // relationshipToInsured is only valid on role "invoiced"
         await addParticipant.mutateAsync({
           offerId,
           body: {
-            partyId: b.customerId,
-            partyType: partyTypeOf(b.customerId),
-            role: "beneficiary",
+            partyId: policyHolderId,
+            partyType: partyTypeOf(policyHolderId),
+            role: "policyHolder",
             isLeader: true,
-            share: (Number(b.percentage) || 0) / 100,
-            relationshipToInsured: b.relationship as DomainPoliciesRelationshipToInsured,
+            share: 1,
           },
         });
-      }
 
-      // Insured person is always a person (never company) via /insured-persons
-      await addInsured.mutateAsync({
-        offerId,
-        body: { personId: insuredId },
-      });
+        await addParticipant.mutateAsync({
+          offerId,
+          body: {
+            partyId: payerId,
+            partyType: partyTypeOf(payerId),
+            role: "invoiced",
+            isLeader: true,
+            share: 1,
+            relationshipToInsured:
+              payerRelationship as DomainPoliciesRelationshipToInsured,
+          },
+        });
+
+        for (const b of beneficiaries.filter((x) => x.customerId)) {
+          await addParticipant.mutateAsync({
+            offerId,
+            body: {
+              partyId: b.customerId,
+              partyType: partyTypeOf(b.customerId),
+              role: "beneficiary",
+              isLeader: true,
+              share: (Number(b.percentage) || 0) / 100,
+            },
+          });
+        }
+
+        // Insured person is always a person (never company) via /insured-persons
+        await addInsured.mutateAsync({
+          offerId,
+          body: { personId: insuredId },
+        });
+      }
 
       const loanRows = manualLoans
         ? manualLoanRows.map((r) => ({
@@ -618,9 +698,9 @@ const CreateOffer = () => {
         : hasLoan
           ? buildLoanDisbursements({
               startDate,
+              endDate,
               loanTermYears: termYears,
-              principal:
-                Number(outstandingBalance) || Number(loanAmount) || 0,
+              principal: Number(outstandingBalance) || Number(loanAmount) || 0,
             })
           : [];
 
@@ -630,8 +710,13 @@ const CreateOffer = () => {
           await submitLoan.mutateAsync({
             offerId,
             body: {
-              sourceSystem: (loanFileName ? "excel-import" : "manual").slice(0, 100),
-              externalReference: loanFileName ? loanFileName.slice(0, 200) : null,
+              sourceSystem: (loanFileName ? "excel-import" : "manual").slice(
+                0,
+                100,
+              ),
+              externalReference: loanFileName
+                ? loanFileName.slice(0, 200)
+                : null,
               periods: loanRows.map((row, i) => ({
                 sequenceNumber: i + 1,
                 periodStart: row.periodStart,
@@ -646,29 +731,45 @@ const CreateOffer = () => {
         }
       }
 
-      try {
-        await rateOffer.mutateAsync(offerId);
-      } catch (rateErr) {
+      if (peopleOk && (!loanRequired || loanRows.length > 0)) {
+        try {
+          await rateOffer.mutateAsync(offerId);
+        } catch (rateErr) {
+          toast.warning(
+            getApiErrorMessage(
+              rateErr,
+              "Offer saved, but rating could not be completed yet.",
+            ),
+          );
+        }
+      } else if (loanRequired && loanRows.length === 0) {
         toast.warning(
-          getApiErrorMessage(
-            rateErr,
-            "Offer saved, but rating could not be completed yet.",
-          ),
+          "Offer created. Submit loan balances on the offer to rate it.",
         );
       }
 
-      toast.success(`Offer ${offerId} saved`);
-      navigate(`/offers/${offerId}`);
+      toast.success(`Offer ${offerId} created`);
     } catch (err) {
       setLoanSubmitProgress(false);
-      toastApiError(err, "Failed to create offer");
+      toastApiError(err, "Offer created, but follow-up steps failed.");
     }
+
+    navigate(`/offers/${offerId}`);
+    window.scrollTo({ top: 0, left: 0 });
   };
 
   return (
     <AppShell>
-      {loanSubmitProgress && (
-        <OverlayLoader label="Submitting loan balances…" />
+      {saving && (
+        <OverlayLoader
+          label={
+            loanSubmitProgress
+              ? "Submitting loan balances…"
+              : createOffer.isPending
+                ? "Creating offer…"
+                : "Saving offer…"
+          }
+        />
       )}
 
       <div className="flex items-center justify-between mb-4">
@@ -688,7 +789,8 @@ const CreateOffer = () => {
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">Create Offer</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Fill in the details below — all sections are on one page.
+          Create with product, currency, and coverage term. People and loan
+          balances can be added here or on the offer after save.
         </p>
       </div>
 
@@ -700,15 +802,15 @@ const CreateOffer = () => {
             <CardHeader>
               <CardTitle className="text-base">Product Selection</CardTitle>
               <CardDescription>
-                Pick a product group and a package (product) to base the offer
-                on.
+                CreateOfferRequest: productId, currency, periodStart, periodEnd,
+                optional partnerOfficeId and agentId.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label>Product</Label>
+                <Label>Product group</Label>
                 <Select
-                  value={productGroupId}
+                  value={productGroupId || undefined}
                   onValueChange={onProductGroupChange}
                 >
                   <SelectTrigger>
@@ -724,7 +826,7 @@ const CreateOffer = () => {
                 </Select>
               </div>
               <div>
-                <Label>Template / Package</Label>
+                <Label>Product</Label>
                 <ProductCombobox
                   products={productsInGroup}
                   value={productId}
@@ -732,13 +834,13 @@ const CreateOffer = () => {
                   disabled={!productGroupId}
                   placeholder={
                     productGroupId
-                      ? "Select package"
+                      ? "Select product"
                       : "Pick product group first"
                   }
                   emptyMessage={
                     productsInGroup.length === 0
-                      ? "No packages for this product group."
-                      : "No package found."
+                      ? "No products for this group."
+                      : "No product found."
                   }
                 />
               </div>
@@ -746,14 +848,14 @@ const CreateOffer = () => {
               <div>
                 <Label>Currency</Label>
                 <Select
-                  value={currency}
+                  value={currency || undefined}
                   onValueChange={setCurrency}
                   disabled={!productId}
                 >
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
-                        productId ? "Select currency" : "Pick package first"
+                        productId ? "Select currency" : "Pick product first"
                       }
                     />
                   </SelectTrigger>
@@ -784,6 +886,73 @@ const CreateOffer = () => {
                 )}
               </div>
 
+              <div>
+                <Label>Partner office</Label>
+                <Select
+                  value={partnerOfficeId || undefined}
+                  onValueChange={setPartnerOfficeId}
+                  disabled={grantedOffices.length <= 1}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        grantedOffices.length === 0
+                          ? "No partner office assigned"
+                          : "Select partner office"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {grantedOffices.map((office) => {
+                      const id = office.partnerOfficeId ?? "";
+                      const label = [
+                        office.partnerName,
+                        office.officeName || office.officeCode,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ");
+                      return (
+                        <SelectItem key={id} value={id}>
+                          {label || id}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Agent</Label>
+                <Select
+                  value={agentId || undefined}
+                  onValueChange={setAgentId}
+                  disabled={grantedAgents.length <= 1}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        grantedAgents.length === 0
+                          ? "No agent assigned"
+                          : "Select agent"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {grantedAgents.map((agent) => {
+                      const id = agent.agentId ?? "";
+                      return (
+                        <SelectItem key={id} value={id}>
+                          {agent.displayName?.trim() || id}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <div className="text-[11px] text-muted-foreground mt-1.5">
+                  Agents assigned to your user.
+                </div>
+              </div>
+
               {product && (
                 <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 text-sm">
                   <div className="font-medium">
@@ -792,7 +961,10 @@ const CreateOffer = () => {
                   {product.policyPlanType ? (
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {policyPlanTypeLabel(product.policyPlanType)}
-                      <span className="font-mono"> ({product.policyPlanType})</span>
+                      <span className="font-mono">
+                        {" "}
+                        ({product.policyPlanType})
+                      </span>
                     </div>
                   ) : null}
                   {product.coverageText ? (
@@ -815,7 +987,7 @@ const CreateOffer = () => {
                 beneficiaries.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
+            <CardContent className="grid gap-4 md:grid-cols-4">
               <div>
                 <Label>Policy Holder</Label>
                 <CustomerCombobox
@@ -832,25 +1004,6 @@ const CreateOffer = () => {
                 >
                   Create a new customer
                 </Button>
-                <div className="mt-2">
-                  <Label>Relationship to insured</Label>
-                  <Select
-                    value={holderRelationship || undefined}
-                    onValueChange={setHolderRelationship}
-                    disabled={Boolean(policyHolderId && insuredId && policyHolderId === insuredId)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select relationship" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {relationshipOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.text}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
               <div>
                 <Label>Invoice Recipient / Payer</Label>
@@ -880,6 +1033,27 @@ const CreateOffer = () => {
                     </Button>
                   )}
                 </div>
+              </div>
+              <div>
+                <Label>Relationship to insured</Label>
+                <Select
+                  value={payerRelationship || undefined}
+                  onValueChange={setPayerRelationship}
+                  disabled={Boolean(
+                    payerId && insuredId && payerId === insuredId,
+                  )}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select relationship" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {relationshipOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.text}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Insured Person</Label>
@@ -928,7 +1102,6 @@ const CreateOffer = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Customer</TableHead>
-                      <TableHead className="w-[200px]">Relationship</TableHead>
                       <TableHead className="w-[140px]">Percentage</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -941,12 +1114,7 @@ const CreateOffer = () => {
                               customers={customers}
                               value={b.customerId}
                               onValueChange={(v) =>
-                                updateBeneficiary(b.id, {
-                                  customerId: v,
-                                  ...(v === insuredId
-                                    ? { relationship: SAME_AS_INSURED }
-                                    : {}),
-                                })
+                                updateBeneficiary(b.id, { customerId: v })
                               }
                               placeholder="Select customer"
                               triggerClassName="h-9"
@@ -972,9 +1140,6 @@ const CreateOffer = () => {
                                   onClick={() =>
                                     updateBeneficiary(b.id, {
                                       customerId: policyHolderId,
-                                      ...(policyHolderId === insuredId
-                                        ? { relationship: SAME_AS_INSURED }
-                                        : {}),
                                     })
                                   }
                                 >
@@ -983,26 +1148,6 @@ const CreateOffer = () => {
                               )}
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={b.relationship || undefined}
-                            onValueChange={(v) =>
-                              updateBeneficiary(b.id, { relationship: v })
-                            }
-                            disabled={Boolean(b.customerId && b.customerId === insuredId)}
-                          >
-                            <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {relationshipOptions.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.text}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                         </TableCell>
                         <TableCell>
                           <div className="relative">
@@ -1014,8 +1159,7 @@ const CreateOffer = () => {
                               onChange={(e) => {
                                 const raw = e.target.value;
                                 updateBeneficiary(b.id, {
-                                  percentage:
-                                    raw === "" ? "" : Number(raw),
+                                  percentage: raw === "" ? "" : Number(raw),
                                 });
                               }}
                               className="h-9 pr-7"
@@ -1030,19 +1174,9 @@ const CreateOffer = () => {
                   </TableBody>
                 </Table>
               </div>
-              {beneficiaries.length > 0 && (
-                <div
-                  className={`mt-3 text-sm flex items-center justify-between rounded-md px-3 py-2 ${
-                    beneficiariesValid
-                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "bg-destructive/10 text-destructive"
-                  }`}
-                >
-                  <span>
-                    {beneficiariesValid
-                      ? "Beneficiary ownership is valid."
-                      : "Ownership percentage must equal 100%."}
-                  </span>
+              {beneficiaries.length > 0 && !beneficiariesValid && (
+                <div className="mt-3 text-sm flex items-center justify-between rounded-md px-3 py-2 bg-destructive/10 text-destructive">
+                  <span>Ownership percentage must equal 100%.</span>
                   <span className="font-mono font-semibold">
                     {beneficiaryTotal}%
                   </span>
@@ -1055,16 +1189,22 @@ const CreateOffer = () => {
         <section id="dates" className="scroll-mt-32">
           <Card className="mb-4">
             <CardHeader>
-              <CardTitle className="text-base">
-                Policy Dates & Payment
-              </CardTitle>
+              <CardTitle className="text-base">Coverage term</CardTitle>
               <CardDescription>
-                Set the cover period and payment schedule.
+                periodStart and periodEnd sent on create.
+                {product?.maximumCoverageTermMonths != null &&
+                product.maximumCoverageTermMonths > 0
+                  ? ` Maximum coverage is ${product.maximumCoverageTermMonths} months${
+                      product.maximumCoverageTermMonths % 12 === 0
+                        ? ` (${formatCoverageTermMonths(product.maximumCoverageTermMonths)})`
+                        : ""
+                    }.`
+                  : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label>Start Date</Label>
+                <Label>Period start</Label>
                 <DatePicker
                   value={startDate ? parseISO(startDate) : undefined}
                   onChange={(d) =>
@@ -1073,16 +1213,27 @@ const CreateOffer = () => {
                 />
               </div>
               <div>
-                <Label>End Date</Label>
+                <Label>Period end</Label>
                 <DatePicker
                   value={endDate ? parseISO(endDate) : undefined}
                   onChange={(d) => setEndDate(d ? format(d, "yyyy-MM-dd") : "")}
-                  disabled={(date) =>
-                    startDate ? date < parseISO(startDate) : false
-                  }
+                  disabled={(date) => {
+                    if (startDate && date < parseISO(startDate)) return true;
+                    if (maxEndDate && date > parseISO(maxEndDate)) return true;
+                    return false;
+                  }}
                 />
-                <div className="text-[11px] text-muted-foreground mt-1">
+                <div
+                  className={`text-[11px] mt-1 ${
+                    termWithinLimit
+                      ? "text-muted-foreground"
+                      : "text-destructive"
+                  }`}
+                >
                   Term: {termYears} years
+                  {maxEndDate
+                    ? ` · Max ${product?.maximumCoverageTermMonths} months (ends ${format(parseISO(maxEndDate), "dd/MM/yyyy")})`
+                    : ""}
                 </div>
               </div>
             </CardContent>
@@ -1224,15 +1375,13 @@ const CreateOffer = () => {
                             newManualLoanRow({ year: rows.length + 1 }),
                           ];
                         }
-                        const nextStart = parseISO(last.periodEnd);
-                        const nextEnd = new Date(nextStart);
-                        nextEnd.setFullYear(nextStart.getFullYear() + 1);
+                        const nextStart = nextAdjacentStart(last.periodEnd);
                         return [
                           ...rows,
                           newManualLoanRow({
-                            year: nextStart.getFullYear(),
-                            periodStart: format(nextStart, "yyyy-MM-dd"),
-                            periodEnd: format(nextEnd, "yyyy-MM-dd"),
+                            year: parseISO(nextStart).getFullYear(),
+                            periodStart: nextStart,
+                            periodEnd: inclusiveYearEnd(nextStart),
                           }),
                         ];
                       });
@@ -1247,8 +1396,8 @@ const CreateOffer = () => {
                   termYears > product.maxCoveredYears && (
                     <div className="mb-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                       Offer term is {termYears} years, but this product’s max
-                      covered years is {product.maxCoveredYears}. Loan rows
-                      are limited to {product.maxCoveredYears}.
+                      covered years is {product.maxCoveredYears}. Loan rows are
+                      limited to {product.maxCoveredYears}.
                     </div>
                   )}
                 <div className="rounded-md border">
@@ -1321,9 +1470,7 @@ const CreateOffer = () => {
                                 }
                                 onChange={(d) =>
                                   updateManualLoanRow(row.id, {
-                                    periodEnd: d
-                                      ? format(d, "yyyy-MM-dd")
-                                      : "",
+                                    periodEnd: d ? format(d, "yyyy-MM-dd") : "",
                                   })
                                 }
                                 buttonClassName="h-7 px-2 text-xs"
@@ -1371,45 +1518,27 @@ const CreateOffer = () => {
                   </Table>
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  Closing balance for each period is taken from the next row’s opening balance (0 on the last row). Premium is calculated after the offer is saved.
+                  Closing balance for each period is taken from the next row’s
+                  opening balance (0 on the last row). Premium is calculated
+                  after the offer is saved.
                 </div>
               </CardContent>
             )}
           </Card>
-        </section>
-
-        <section id="premium" className="scroll-mt-32">
-          <PremiumCalculation
-            productId={productId}
-            versionId="N/A"
-            templateId="N/A"
-            currency={currency}
-            insuredAge={insuredAge}
-            insuredGender={insuredGender}
-            startDate={startDate}
-            termYears={termYears}
-            paymentMode={paymentMode}
-            loan={
-              hasLoan
-                ? {
-                    amount: Number(loanAmount) || 0,
-                    interestRate: Number(interestRate) || 0,
-                    loanTermYears: termYears,
-                    outstandingBalance: Number(outstandingBalance) || 0,
-                  }
-                : undefined
-            }
-          />
         </section>
       </div>
 
       <div className="flex items-center justify-between mt-6 sticky bottom-0 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-3 -mx-2 px-2">
         <div className="text-xs text-muted-foreground">
           {canSave
-            ? "Ready to save."
-            : loanRequired && !hasLoanInput
-              ? "This product requires loan balances before the offer can be saved."
-              : "Complete product, parties and beneficiaries to enable submission."}
+            ? peopleOk
+              ? "Ready to create the offer and add parties."
+              : "Ready to create the offer (product, currency, coverage term)."
+            : !termWithinLimit
+              ? `Coverage term cannot exceed ${product?.maximumCoverageTermMonths} months for this product.`
+              : peopleStarted && !peopleOk
+                ? "Complete parties and beneficiaries, or clear them to create the offer first."
+                : "Select product, currency, and coverage term to create the offer."}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -1417,7 +1546,7 @@ const CreateOffer = () => {
             disabled={!canSave || saving}
             className="gap-2"
           >
-            <Check className="h-4 w-4" /> Submit Offer
+            <Check className="h-4 w-4" /> Create Offer
           </Button>
         </div>
       </div>
@@ -1448,7 +1577,6 @@ const CreateOffer = () => {
                 else if (target && "beneficiaryId" in target) {
                   updateBeneficiary(target.beneficiaryId, {
                     customerId: id,
-                    ...(id === insuredId ? { relationship: SAME_AS_INSURED } : {}),
                   });
                 }
               }}

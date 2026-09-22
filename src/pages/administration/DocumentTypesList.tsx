@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/layout/AppShell";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -65,7 +66,7 @@ import {
 import type { DocumentsDocumentResponse, DocumentsDocumentTypesDocumentTypeResponse } from "@/api/types";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -147,7 +148,8 @@ const DocumentTypesList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListDocumentTypes(listQuery);
+  const { data: pageData, isLoading, isFetching, error } = useListDocumentTypes(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
@@ -286,12 +288,15 @@ const DocumentTypesList = () => {
             Manage the catalog of document types and their templates.
           </p>
         </div>
-        <Button className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Add document type
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Add document type
+          </Button>
+        )}
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -429,6 +434,7 @@ const DocumentTypesList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
 
       <Dialog
         open={dialogOpen}

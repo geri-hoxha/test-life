@@ -39,7 +39,6 @@ import { useGetProduct, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
 import { mergeCustomers } from "@/api/adapters/customers";
-import { useRelationshipToInsuredEnum, smartEnumLabel } from "@/api/smart-enums";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { mapReviewFlagsToChecks, overallStatus } from "./VerificationStep";
 import { formatOfferMoney, offerStatusLabel } from "./offer-ui";
@@ -94,8 +93,6 @@ const IssuePolicy = () => {
   const navigate = useNavigate();
 
   const { data: apiOffer, isLoading } = useGetOffer(offerId ?? "", { enabled: Boolean(offerId) });
-  const { data: relationshipOptions = [] } = useRelationshipToInsuredEnum();
-  const relationshipLabel = (value?: string | null) => smartEnumLabel(relationshipOptions, value);
   const policyPlanTypeLabel = usePolicyPlanTypeLabel();
   const issuePolicy = useIssueOfferPolicy();
   const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
@@ -315,19 +312,17 @@ const IssuePolicy = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Customer</TableHead>
-                        <TableHead>Relationship</TableHead>
                         <TableHead className="text-right">%</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {offer.beneficiaries.length === 0 ? (
-                        <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-4">No beneficiaries</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={2} className="text-center text-sm text-muted-foreground py-4">No beneficiaries</TableCell></TableRow>
                       ) : offer.beneficiaries.map((b) => {
                         const c = getCustomerLocal(b.customerId);
                         return (
                           <TableRow key={b.id}>
                             <TableCell>{c ? fullName(c) : "—"}</TableCell>
-                            <TableCell>{relationshipLabel(b.relationship)}</TableCell>
                             <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
                           </TableRow>
                         );

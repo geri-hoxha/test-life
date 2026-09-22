@@ -100,11 +100,33 @@ export const discountStatusClass = (
   return "bg-muted text-muted-foreground";
 };
 
+export const agentSelectionMethodLabel = (method?: string | null) =>
+  method ? humanizeOfferEnum(method) : "—";
+
 export const salesChannelLabel = (channel?: DomainDistributionSalesChannel | string | null) => {
   if (channel === "partnerApi") return "Partner API";
   if (channel === "internalDirect") return "Internal direct";
   if (channel === "internalForPartner") return "Internal for partner";
   return channel ? humanizeOfferEnum(channel) : "—";
+};
+
+export const participantRoleLabel = (role?: string | null) => {
+  if (role === "policyHolder") return "Policy holder";
+  if (role === "invoiced") return "Payer";
+  if (role === "beneficiary") return "Beneficiary";
+  return role ? humanizeOfferEnum(role) : "—";
+};
+
+export const participantRoleClass = (role?: string | null) => {
+  if (role === "policyHolder") return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
+  if (role === "invoiced") return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+  if (role === "beneficiary") return "bg-violet-500/15 text-violet-700 dark:text-violet-300";
+  return "bg-muted text-muted-foreground";
+};
+
+export const formatSharePct = (share?: number | null) => {
+  if (share == null || Number.isNaN(share)) return null;
+  return `${Math.round(share * 10000) / 100}%`;
 };
 
 export const formatOfferMoney = (value?: number | null, currency?: string) => {
@@ -168,11 +190,12 @@ export const shortOfferId = (id?: string | null) => {
 export const salesPartyLabel = (attribution?: OffersSalesAttributionResponse | null) => {
   if (!attribution) return null;
   return (
-    attribution.agentDisplayName?.trim() ||
     attribution.partnerName?.trim() ||
+    attribution.agentDisplayName?.trim() ||
+    attribution.partnerOfficeName?.trim() ||
     attribution.internalOfficeName?.trim() ||
     attribution.internalBranchName?.trim() ||
-    attribution.partnerOfficeName?.trim() ||
+    attribution.createdByUserName?.trim() ||
     null
   );
 };

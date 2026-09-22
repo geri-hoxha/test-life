@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -48,6 +49,7 @@ import { fullName, COMPANY_TYPE_OPTIONS, companyTypeLabel } from "@/data/custome
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { isApiForbidden } from "@/lib/api-error";
 
 const initials = (first: string, last: string) =>
   `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
@@ -188,6 +190,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
     data: peoplePage,
     isLoading: peopleLoading,
     isFetching: peopleFetching,
+    error: peopleError,
   } = useListPeople(peopleQuery, {
     enabled: !isCompany,
   });
@@ -195,6 +198,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
     data: companiesPage,
     isLoading: companiesLoading,
     isFetching: companiesFetching,
+    error: companiesError,
   } = useListCompanies(companiesQuery, {
     enabled: isCompany,
   });
@@ -223,6 +227,8 @@ export const PartyList = ({ partyType }: PartyListProps) => {
 
   const isLoading = isCompany ? companiesLoading : peopleLoading;
   const isFetching = isCompany ? companiesFetching : peopleFetching;
+  const error = isCompany ? companiesError : peopleError;
+  const accessDenied = isApiForbidden(error);
 
   const hasPeopleFilters =
     personalIdentifier || nationality !== "ALL" || firstName || lastName || gender !== "ALL";
@@ -243,14 +249,17 @@ export const PartyList = ({ partyType }: PartyListProps) => {
           <h1 className="text-2xl font-semibold tracking-tight">{ui.title}</h1>
           <p className="text-sm text-muted-foreground mt-1">{ui.description}</p>
         </div>
-        <Button asChild className="gap-2">
-          <Link to={ui.newPath}>
-            <Plus className="h-4 w-4" />
-            {ui.newLabel}
-          </Link>
-        </Button>
+        {!accessDenied && (
+          <Button asChild className="gap-2">
+            <Link to={ui.newPath}>
+              <Plus className="h-4 w-4" />
+              {ui.newLabel}
+            </Link>
+          </Button>
+        )}
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -558,6 +567,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
     </AppShell>
   );
 };

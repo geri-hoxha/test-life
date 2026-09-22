@@ -6,6 +6,7 @@ import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { PartnerCombobox } from "@/components/PartnerCombobox";
 import { ProductCombobox } from "@/components/ProductCombobox";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -110,7 +111,7 @@ const PartnerCommissionsList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, isError } = useListPartnerCommissions(listQuery);
+  const { data: pageData, isLoading, isFetching, isError, error } = useListPartnerCommissions(listQuery);
   const { data: partnersPage } = useListPartners({ pageNumber: 1, pageSize: 200 });
 
   const items = pageData?.items ?? [];
@@ -160,6 +161,7 @@ const PartnerCommissionsList = () => {
         </div>
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -415,6 +417,7 @@ const PartnerCommissionsList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
     </AppShell>
   );
 };

@@ -1,17 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiKeys, apiRequest } from "./client";
 import type {
-  AgentsAgentCommissionRuleResponse,
-  AgentsAgentProductAuthorizationResponse,
+  AgentsAgentProductConfigurationResponse,
   AgentsAgentResponse,
-  AgentsCreateAgentCommissionRuleRequest,
-  AgentsCreateAgentProductAuthorizationRequest,
+  AgentsCreateAgentProductConfigurationRequest,
   AgentsCreateAgentRequest,
   AgentsListAgentsRequest,
-  AgentsUpdateAgentCommissionRuleRequest,
-  AgentsUpdateAgentProductAuthorizationRequest,
+  AgentsUpdateAgentProductConfigurationRequest,
   AgentsUpdateAgentRequest,
-  DomainCommissionsBusinessType,
   PaginationPagedListOfAgentResponse,
 } from "./types";
 
@@ -21,10 +17,8 @@ export const agentsKeys = {
   list: (params?: Record<string, unknown>) => [...agentsKeys.lists(), params ?? {}] as const,
   details: () => [...agentsKeys.all, "detail"] as const,
   detail: (id: string) => [...agentsKeys.details(), id] as const,
-  authorizations: (agentId: string, params?: Record<string, unknown>) =>
-    [...agentsKeys.detail(agentId), "authorizations", params ?? {}] as const,
-  commissionRules: (agentId: string, authorizationId: string, params?: Record<string, unknown>) =>
-    [...agentsKeys.detail(agentId), "authorizations", authorizationId, "commission-rules", params ?? {}] as const,
+  configurations: (agentId: string, params?: Record<string, unknown>) =>
+    [...agentsKeys.detail(agentId), "product-configurations", params ?? {}] as const,
 };
 
 export type ListAgentsQuery = AgentsListAgentsRequest & {
@@ -62,6 +56,10 @@ export const useListAgents = (query?: ListAgentsQuery, options?: { enabled?: boo
     },
     enabled: options?.enabled ?? true,
     placeholderData: keepPreviousData,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return false;
+      return failureCount < 3;
+    },
   });
 };
 
@@ -99,6 +97,12 @@ export const useGetAgent = (id: string, options?: { enabled?: boolean }) => {
       return agent;
     },
     enabled: Boolean(id) && (options?.enabled ?? true),
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 };
 
@@ -150,223 +154,105 @@ export const useUpdateAgent = () => {
   });
 };
 
-export type ListAgentProductAuthorizationsQuery = {
+export type ListAgentProductConfigurationsQuery = {
   productId?: string;
   effectiveOn?: string;
 };
 
-/** GET /api/agents/{agentId}/product-authorizations */
-export const listAgentProductAuthorizations = async (
+/** GET /api/agents/{agentId}/product-configurations */
+export const listAgentProductConfigurations = async (
   agentId: string,
-  query?: ListAgentProductAuthorizationsQuery,
+  query?: ListAgentProductConfigurationsQuery,
   signal?: AbortSignal,
-): Promise<AgentsAgentProductAuthorizationResponse[]> =>
-  apiRequest<AgentsAgentProductAuthorizationResponse[]>({
+): Promise<AgentsAgentProductConfigurationResponse[]> =>
+  apiRequest<AgentsAgentProductConfigurationResponse[]>({
     method: "GET",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations`,
+    path: `/api/agents/${encodeURIComponent(agentId)}/product-configurations`,
     query: query as Record<string, string | number | boolean | null | undefined>,
     signal,
   });
 
-export const useListAgentProductAuthorizations = (
+export const useListAgentProductConfigurations = (
   agentId: string,
-  query?: ListAgentProductAuthorizationsQuery,
+  query?: ListAgentProductConfigurationsQuery,
   options?: { enabled?: boolean },
 ) =>
   useQuery({
-    queryKey: agentsKeys.authorizations(agentId, query as Record<string, unknown> | undefined),
-    queryFn: ({ signal }) => listAgentProductAuthorizations(agentId, query, signal),
+    queryKey: agentsKeys.configurations(agentId, query as Record<string, unknown> | undefined),
+    queryFn: ({ signal }) => listAgentProductConfigurations(agentId, query, signal),
     enabled: Boolean(agentId) && (options?.enabled ?? true),
+    placeholderData: keepPreviousData,
   });
 
-/** POST /api/agents/{agentId}/product-authorizations */
-export const createAgentProductAuthorization = async (
+/** POST /api/agents/{agentId}/product-configurations */
+export const createAgentProductConfiguration = async (
   agentId: string,
-  body: AgentsCreateAgentProductAuthorizationRequest,
+  body: AgentsCreateAgentProductConfigurationRequest,
   signal?: AbortSignal,
-): Promise<AgentsAgentProductAuthorizationResponse> =>
-  apiRequest<AgentsAgentProductAuthorizationResponse>({
+): Promise<AgentsAgentProductConfigurationResponse> =>
+  apiRequest<AgentsAgentProductConfigurationResponse>({
     method: "POST",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations`,
+    path: `/api/agents/${encodeURIComponent(agentId)}/product-configurations`,
     body,
     signal,
   });
 
-export const useCreateAgentProductAuthorization = () => {
+export const useCreateAgentProductConfiguration = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { agentId: string; body: AgentsCreateAgentProductAuthorizationRequest }) =>
-      createAgentProductAuthorization(vars.agentId, vars.body),
+    mutationFn: (vars: { agentId: string; body: AgentsCreateAgentProductConfigurationRequest }) =>
+      createAgentProductConfiguration(vars.agentId, vars.body),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: agentsKeys.detail(vars.agentId) });
     },
   });
 };
 
-/** PUT /api/agents/{agentId}/product-authorizations/{authorizationId} */
-export const updateAgentProductAuthorization = async (
+/** PUT /api/agents/{agentId}/product-configurations/{configurationId} */
+export const updateAgentProductConfiguration = async (
   agentId: string,
-  authorizationId: string,
-  body: AgentsUpdateAgentProductAuthorizationRequest,
+  configurationId: string,
+  body: AgentsUpdateAgentProductConfigurationRequest,
   signal?: AbortSignal,
-): Promise<AgentsAgentProductAuthorizationResponse> =>
-  apiRequest<AgentsAgentProductAuthorizationResponse>({
+): Promise<AgentsAgentProductConfigurationResponse> =>
+  apiRequest<AgentsAgentProductConfigurationResponse>({
     method: "PUT",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations/${encodeURIComponent(authorizationId)}`,
+    path: `/api/agents/${encodeURIComponent(agentId)}/product-configurations/${encodeURIComponent(configurationId)}`,
     body,
     signal,
   });
 
-export const useUpdateAgentProductAuthorization = () => {
+export const useUpdateAgentProductConfiguration = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
       agentId: string;
-      authorizationId: string;
-      body: AgentsUpdateAgentProductAuthorizationRequest;
-    }) => updateAgentProductAuthorization(vars.agentId, vars.authorizationId, vars.body),
+      configurationId: string;
+      body: AgentsUpdateAgentProductConfigurationRequest;
+    }) => updateAgentProductConfiguration(vars.agentId, vars.configurationId, vars.body),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: agentsKeys.detail(vars.agentId) });
     },
   });
 };
 
-/** DELETE /api/agents/{agentId}/product-authorizations/{authorizationId} */
-export const deleteAgentProductAuthorization = async (
+/** DELETE /api/agents/{agentId}/product-configurations/{configurationId} */
+export const deleteAgentProductConfiguration = async (
   agentId: string,
-  authorizationId: string,
+  configurationId: string,
   signal?: AbortSignal,
 ): Promise<void> =>
   apiRequest<void>({
     method: "DELETE",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations/${encodeURIComponent(authorizationId)}`,
+    path: `/api/agents/${encodeURIComponent(agentId)}/product-configurations/${encodeURIComponent(configurationId)}`,
     signal,
   });
 
-export const useDeleteAgentProductAuthorization = () => {
+export const useDeleteAgentProductConfiguration = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { agentId: string; authorizationId: string }) =>
-      deleteAgentProductAuthorization(vars.agentId, vars.authorizationId),
-    onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({ queryKey: agentsKeys.detail(vars.agentId) });
-    },
-  });
-};
-
-export type ListAgentCommissionRulesQuery = {
-  businessType?: DomainCommissionsBusinessType;
-  effectiveOn?: string;
-};
-
-/** GET /api/agents/{agentId}/product-authorizations/{authorizationId}/commission-rules */
-export const listAgentCommissionRules = async (
-  agentId: string,
-  authorizationId: string,
-  query?: ListAgentCommissionRulesQuery,
-  signal?: AbortSignal,
-): Promise<AgentsAgentCommissionRuleResponse[]> =>
-  apiRequest<AgentsAgentCommissionRuleResponse[]>({
-    method: "GET",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules`,
-    query: query as Record<string, string | number | boolean | null | undefined>,
-    signal,
-  });
-
-export const useListAgentCommissionRules = (
-  agentId: string,
-  authorizationId: string,
-  query?: ListAgentCommissionRulesQuery,
-  options?: { enabled?: boolean },
-) =>
-  useQuery({
-    queryKey: agentsKeys.commissionRules(
-      agentId,
-      authorizationId,
-      query as Record<string, unknown> | undefined,
-    ),
-    queryFn: ({ signal }) => listAgentCommissionRules(agentId, authorizationId, query, signal),
-    enabled: Boolean(agentId) && Boolean(authorizationId) && (options?.enabled ?? true),
-  });
-
-/** POST /api/agents/{agentId}/product-authorizations/{authorizationId}/commission-rules */
-export const createAgentCommissionRule = async (
-  agentId: string,
-  authorizationId: string,
-  body: AgentsCreateAgentCommissionRuleRequest,
-  signal?: AbortSignal,
-): Promise<AgentsAgentCommissionRuleResponse> =>
-  apiRequest<AgentsAgentCommissionRuleResponse>({
-    method: "POST",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules`,
-    body,
-    signal,
-  });
-
-export const useCreateAgentCommissionRule = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: {
-      agentId: string;
-      authorizationId: string;
-      body: AgentsCreateAgentCommissionRuleRequest;
-    }) => createAgentCommissionRule(vars.agentId, vars.authorizationId, vars.body),
-    onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({
-        queryKey: agentsKeys.detail(vars.agentId),
-      });
-    },
-  });
-};
-
-/** PUT /api/agents/{agentId}/product-authorizations/{authorizationId}/commission-rules/{ruleId} */
-export const updateAgentCommissionRule = async (
-  agentId: string,
-  authorizationId: string,
-  ruleId: string,
-  body: AgentsUpdateAgentCommissionRuleRequest,
-  signal?: AbortSignal,
-): Promise<AgentsAgentCommissionRuleResponse> =>
-  apiRequest<AgentsAgentCommissionRuleResponse>({
-    method: "PUT",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules/${encodeURIComponent(ruleId)}`,
-    body,
-    signal,
-  });
-
-export const useUpdateAgentCommissionRule = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: {
-      agentId: string;
-      authorizationId: string;
-      ruleId: string;
-      body: AgentsUpdateAgentCommissionRuleRequest;
-    }) => updateAgentCommissionRule(vars.agentId, vars.authorizationId, vars.ruleId, vars.body),
-    onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({ queryKey: agentsKeys.detail(vars.agentId) });
-    },
-  });
-};
-
-/** DELETE /api/agents/{agentId}/product-authorizations/{authorizationId}/commission-rules/{ruleId} */
-export const deleteAgentCommissionRule = async (
-  agentId: string,
-  authorizationId: string,
-  ruleId: string,
-  signal?: AbortSignal,
-): Promise<void> =>
-  apiRequest<void>({
-    method: "DELETE",
-    path: `/api/agents/${encodeURIComponent(agentId)}/product-authorizations/${encodeURIComponent(authorizationId)}/commission-rules/${encodeURIComponent(ruleId)}`,
-    signal,
-  });
-
-export const useDeleteAgentCommissionRule = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: { agentId: string; authorizationId: string; ruleId: string }) =>
-      deleteAgentCommissionRule(vars.agentId, vars.authorizationId, vars.ruleId),
+    mutationFn: (vars: { agentId: string; configurationId: string }) =>
+      deleteAgentProductConfiguration(vars.agentId, vars.configurationId),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: agentsKeys.detail(vars.agentId) });
     },

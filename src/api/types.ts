@@ -426,9 +426,11 @@ export type DomainBillingPremiumInstallmentStatus =
 
 export type OffersSalesAttributionResponse = {
   createdByAuthUserId?: number;
+  createdByUserName?: string | null;
   salesChannel?: DomainDistributionSalesChannel;
   agentId?: string | null;
   agentDisplayName?: string | null;
+  agentSelectionMethod?: string | null;
   internalBranchId?: string | null;
   internalBranchName?: string | null;
   internalOfficeId?: string | null;
@@ -877,7 +879,8 @@ export type OffersSubmitOfferLoanPeriodRequest = {
 export type OffersSubmitOfferLoanRequest = {
   sourceSystem: string;
   externalReference?: string | null;
-  rawPayload?: unknown;
+  /** JSON object or array. Echo of the loan-submission request. */
+  rawPayload?: Record<string, unknown> | unknown[];
   periods: OffersSubmitOfferLoanPeriodRequest[];
 };
 
@@ -983,12 +986,14 @@ export type OffersOfferListItemResponse = {
 
 export type OffersCancelOfferRequest = Record<string, unknown>;
 
+/** POST /api/offers — `CreateOfferRequest`. */
 export type OffersCreateOfferRequest = {
   productId?: string;
   currency: string;
   periodStart?: string;
   periodEnd?: string;
   partnerOfficeId?: string | null;
+  agentId?: string | null;
 };
 
 export type OffersGetOfferRequest = Record<string, unknown>;
@@ -1020,7 +1025,7 @@ export type OffersListOffersRequest = PaginationPagedRequest & {
 };
 
 export type OffersResolveOfferReviewFlagRequest = {
-  note?: string | null;
+  note: string;
 };
 
 export type OffersRefuseOfferDocumentRequest = {
@@ -1250,6 +1255,29 @@ export type AuthTokenResponse = {
   expiresOnUtc: string;
 };
 
+/** GET /api/me/sales-access */
+export type GrantedPartnerOfficeResponse = {
+  partnerId?: Ulid;
+  partnerName?: string;
+  partnerOfficeId?: Ulid;
+  officeCode?: string;
+  officeName?: string;
+  isActive?: boolean;
+};
+
+export type GrantedAgentResponse = {
+  agentId?: Ulid;
+  displayName?: string;
+  isActive?: boolean;
+};
+
+export type UserSalesAccessResponse = {
+  authUserId: number;
+  mayChooseAgent: boolean;
+  partnerOffices: GrantedPartnerOfficeResponse[];
+  agents: GrantedAgentResponse[];
+};
+
 export type DomainInvoicesInvoiceStatus = "pending" | "failed" | "fiscalized";
 
 export type DomainInvoicesInvoiceType = "credit" | "sale";
@@ -1344,9 +1372,8 @@ export type AgentCommissionsAgentCommissionResponse = {
   productName?: string | null;
   policyId?: string;
   policySerial?: number;
-  policyRenewalId?: string | null;
   premiumInstallmentId?: string;
-  agentCommissionRuleId?: string;
+  agentProductConfigurationId?: string;
   businessType?: DomainCommissionsBusinessType;
   basis?: DomainCommissionsBasis;
   appliedRate?: number;
@@ -1355,7 +1382,6 @@ export type AgentCommissionsAgentCommissionResponse = {
   currency?: string;
   entryType?: DomainCommissionsEntryType;
   calculationVersion?: number;
-  reversalOfCommissionId?: string | null;
   postedOnUtc?: string;
 };
 
@@ -1401,12 +1427,8 @@ export type AgentCommissionsGetSummaryRequest = {
 
 export type AgentsAgentResponse = {
   id?: string;
-  authUserId?: number;
-  internalOfficeId?: string;
   displayName?: string;
   isActive?: boolean;
-  fiscTcr?: string;
-  fiscOperatorCode?: string;
 };
 
 export type PaginationPagedListOfAgentResponse = {
@@ -1421,62 +1443,41 @@ export type PaginationPagedListOfAgentResponse = {
 };
 
 export type AgentsListAgentsRequest = PaginationPagedRequest & {
-  internalOfficeId?: string;
   isActive?: boolean;
 };
 
 export type AgentsCreateAgentRequest = {
-  username: string;
-  email: string;
-  password: string;
   displayName: string;
-  internalOfficeId?: string;
 };
 
 export type AgentsUpdateAgentRequest = {
   displayName: string;
-  internalOfficeId?: string;
   isActive?: boolean;
 };
 
-export type AgentsAgentProductAuthorizationResponse = {
+export type AgentsAgentProductConfigurationResponse = {
   id?: string;
   agentId?: string;
   productId?: string;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
   effectiveFrom?: string;
   effectiveToExclusive?: string | null;
 };
 
-export type AgentsCreateAgentProductAuthorizationRequest = {
+export type AgentsCreateAgentProductConfigurationRequest = {
   productId?: string;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
   effectiveFrom?: string;
   effectiveToExclusive?: string | null;
 };
 
-export type AgentsUpdateAgentProductAuthorizationRequest = {
-  effectiveFrom?: string;
-  effectiveToExclusive?: string | null;
-};
-
-export type AgentsAgentCommissionRuleResponse = {
-  id?: string;
-  agentProductAuthorizationId?: string;
-  businessType?: DomainCommissionsBusinessType;
-  basis?: DomainCommissionsBasis;
-  rate?: number;
-  effectiveFrom?: string;
-  effectiveToExclusive?: string | null;
-};
-
-export type AgentsCreateAgentCommissionRuleRequest = {
-  businessType?: DomainCommissionsBusinessType;
-  basis?: DomainCommissionsBasis;
-  rate?: number;
-  effectiveFrom?: string;
-  effectiveToExclusive?: string | null;
-};
-
-export type AgentsUpdateAgentCommissionRuleRequest = {
+export type AgentsUpdateAgentProductConfigurationRequest = {
   effectiveFrom?: string;
   effectiveToExclusive?: string | null;
 };
@@ -1484,10 +1485,7 @@ export type AgentsUpdateAgentCommissionRuleRequest = {
 export type PartnersPartnerResponse = {
   id?: string;
   name?: string;
-  apiAuthUserId?: number | null;
   isActive?: boolean;
-  fiscTcr?: string;
-  fiscOperatorCode?: string;
 };
 
 export type PaginationPagedListOfPartnerResponse = {
@@ -1505,15 +1503,8 @@ export type PartnersListPartnersRequest = PaginationPagedRequest & {
   isActive?: boolean;
 };
 
-export type PartnersCreatePartnerApiAccountRequest = {
-  username: string;
-  email: string;
-  password: string;
-};
-
 export type PartnersCreatePartnerRequest = {
   name: string;
-  apiAccount?: PartnersCreatePartnerApiAccountRequest;
 };
 
 export type PartnersUpdatePartnerRequest = {
@@ -1521,48 +1512,62 @@ export type PartnersUpdatePartnerRequest = {
   isActive?: boolean;
 };
 
-export type PartnersPartnerProductAuthorizationResponse = {
+export type PartnersPartnerOfficeResponse = {
+  id?: string;
+  partnerId?: string;
+  code?: string;
+  name?: string;
+  address?: string | null;
+  isActive?: boolean;
+};
+
+export type PartnersCreatePartnerOfficeRequest = {
+  code: string;
+  name: string;
+  address?: string | null;
+};
+
+export type PartnersUpdatePartnerOfficeRequest = {
+  code: string;
+  name: string;
+  address?: string | null;
+  isActive?: boolean;
+};
+
+export type PartnersListPartnerOfficesRequest = {
+  isActive?: boolean;
+};
+
+export type PartnersPartnerProductConfigurationResponse = {
   id?: string;
   partnerId?: string;
   productId?: string;
-  partnerOfficeId?: string | null;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
   effectiveFrom?: string;
   effectiveToExclusive?: string | null;
 };
 
-export type PartnersCreatePartnerProductAuthorizationRequest = {
+export type PartnersCreatePartnerProductConfigurationRequest = {
   productId?: string;
-  effectiveFrom?: string;
-  effectiveToExclusive?: string | null;
-  partnerOfficeId?: string | null;
-};
-
-export type PartnersUpdatePartnerProductAuthorizationRequest = {
-  effectiveFrom?: string;
-  effectiveToExclusive?: string | null;
-};
-
-export type PartnersPartnerCommissionRuleResponse = {
-  id?: string;
-  partnerProductAuthorizationId?: string;
-  businessType?: DomainCommissionsBusinessType;
-  basis?: DomainCommissionsBasis;
-  rate?: number;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
   effectiveFrom?: string;
   effectiveToExclusive?: string | null;
 };
 
-export type PartnersCreatePartnerCommissionRuleRequest = {
-  businessType?: DomainCommissionsBusinessType;
-  basis?: DomainCommissionsBasis;
-  rate?: number;
+export type PartnersUpdatePartnerProductConfigurationRequest = {
   effectiveFrom?: string;
   effectiveToExclusive?: string | null;
 };
 
-export type PartnersUpdatePartnerCommissionRuleRequest = {
-  effectiveFrom?: string;
-  effectiveToExclusive?: string | null;
+export type PartnersListPartnerProductConfigurationsRequest = {
+  productId?: string;
+  effectiveOn?: string;
 };
 
 export type PartnerCommissionsPartnerCommissionResponse = {
@@ -1572,9 +1577,8 @@ export type PartnerCommissionsPartnerCommissionResponse = {
   productName?: string | null;
   policyId?: string;
   policySerial?: number;
-  policyRenewalId?: string | null;
   premiumInstallmentId?: string;
-  partnerCommissionRuleId?: string;
+  partnerProductConfigurationId?: string;
   businessType?: DomainCommissionsBusinessType;
   basis?: DomainCommissionsBasis;
   appliedRate?: number;
@@ -1583,7 +1587,6 @@ export type PartnerCommissionsPartnerCommissionResponse = {
   currency?: string;
   entryType?: DomainCommissionsEntryType;
   calculationVersion?: number;
-  reversalOfCommissionId?: string | null;
   postedOnUtc?: string;
 };
 
@@ -1725,7 +1728,7 @@ export type PoliciesStartPolicyRenewalRequest = {
 };
 
 export type PoliciesResolveRenewalFlagRequest = {
-  note?: string | null;
+  note: string;
 };
 
 export type PoliciesResolveRenewalDocumentRequest = {
@@ -1745,4 +1748,47 @@ export type PoliciesApplyPolicyRenewalResponse = {
   policy?: PoliciesPolicyResponse;
   installments?: PoliciesPremiumInstallmentResponse[];
   invoices?: InvoicesInvoiceResponse[];
+};
+
+/** GET /api/users */
+export type UsersUserResponse = {
+  id?: number;
+  publicId?: string;
+  userName?: string;
+  email?: string | null;
+  displayName?: string;
+  isActive?: boolean;
+  roles?: string[];
+};
+
+export type PaginationPagedListOfUserResponse = {
+  items?: UsersUserResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type UsersListUsersRequest = PaginationPagedRequest & {
+  isActive?: boolean;
+  role?: string;
+};
+
+/** POST /api/users */
+export type UsersCreateUserRequest = {
+  username: string;
+  email: string;
+  password: string;
+  displayName: string;
+  roles: string[];
+};
+
+/** PUT /api/users/{authUserId} */
+export type UsersUpdateUserRequest = {
+  displayName: string;
+  isActive?: boolean;
+  roles: string[];
 };

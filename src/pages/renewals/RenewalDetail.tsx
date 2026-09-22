@@ -354,10 +354,14 @@ const RenewalDetail = () => {
 
   const handleFlagAction = () => {
     if (!flagDialog?.flag.id) return;
+    if (!flagNote.trim()) {
+      toast.error("A note is required");
+      return;
+    }
     const vars = {
       ...ids,
       flagId: String(flagDialog.flag.id),
-      body: { note: flagNote.trim() || null },
+      body: { note: flagNote.trim() },
     };
     if (flagDialog.kind === "approve") {
       approveFlag.mutate(vars, {
@@ -711,7 +715,9 @@ const RenewalDetail = () => {
                         <TableHead>Type</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Note</TableHead>
                         <TableHead>Raised</TableHead>
+                        <TableHead>Resolved</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -725,8 +731,14 @@ const RenewalDetail = () => {
                               {flagStatusLabel(flag.status)}
                             </span>
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
+                          <TableCell className="text-sm max-w-[200px] text-muted-foreground">
+                            {flag.resolutionNote?.trim() || "—"}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                             {formatRenewalDateTime(flag.raisedOnUtc)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                            {formatRenewalDateTime(flag.resolvedOnUtc)}
                           </TableCell>
                           <TableCell className="text-right">
                             {mutable && flag.status === "raised" ? (
@@ -755,8 +767,6 @@ const RenewalDetail = () => {
                                   Reject
                                 </Button>
                               </div>
-                            ) : flag.resolutionNote ? (
-                              <span className="text-xs text-muted-foreground">{flag.resolutionNote}</span>
                             ) : (
                               "—"
                             )}
@@ -1014,14 +1024,24 @@ const RenewalDetail = () => {
             <DialogTitle>
               {flagDialog?.kind === "approve" ? "Approve review flag" : "Reject review flag"}
             </DialogTitle>
-            <DialogDescription>Optional note for the resolution.</DialogDescription>
+            <DialogDescription>A note is sent with the decision.</DialogDescription>
           </DialogHeader>
-          <Textarea value={flagNote} onChange={(e) => setFlagNote(e.target.value)} rows={3} />
+          <div className="space-y-2">
+            <Label htmlFor="renewal-flag-note">Note</Label>
+            <Textarea
+              id="renewal-flag-note"
+              value={flagNote}
+              onChange={(e) => setFlagNote(e.target.value)}
+              maxLength={512}
+              rows={3}
+              placeholder="Why is this review flag being resolved?"
+            />
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFlagDialog(null)} disabled={flagBusy}>
               Cancel
             </Button>
-            <Button onClick={handleFlagAction} disabled={flagBusy}>
+            <Button onClick={handleFlagAction} disabled={flagBusy || !flagNote.trim()}>
               {flagBusy ? "Saving…" : flagDialog?.kind === "approve" ? "Approve" : "Reject"}
             </Button>
           </DialogFooter>

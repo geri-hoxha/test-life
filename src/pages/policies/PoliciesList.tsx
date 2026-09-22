@@ -9,6 +9,7 @@ import { ProductCombobox } from "@/components/ProductCombobox";
 import { PersonCombobox } from "@/components/PersonCombobox";
 import { CustomerCombobox } from "@/components/CustomerCombobox";
 import { OfferCombobox } from "@/components/OfferCombobox";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -96,7 +97,7 @@ const PoliciesList = () => {
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
 
-  const { data: policiesPage, isLoading, isFetching, isError } = useListPolicies(listQuery);
+  const { data: policiesPage, isLoading, isFetching, isError, error } = useListPolicies(listQuery);
 
   const items = policiesPage?.items ?? [];
 
@@ -161,6 +162,7 @@ const PoliciesList = () => {
         </div>
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -384,6 +386,7 @@ const PoliciesList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
     </AppShell>
   );
 };

@@ -43,7 +43,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { policyPlanTypeDescription } from "@/data/policy-plan-types";
+import { policyPlanTypeDescription, policyRenewalFlow } from "@/data/policy-plan-types";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { ageFromDob } from "@/data/customers";
 import {
@@ -182,7 +182,9 @@ const ParticipantFields = ({
         label="Leader"
         value={party.isLeader == null ? undefined : party.isLeader ? "Yes" : "No"}
       />
-      <Field label="Relationship" value={relationshipLabel(party.relationshipToInsured)} />
+      {party.role === "invoiced" ? (
+        <Field label="Relationship" value={relationshipLabel(party.relationshipToInsured)} />
+      ) : null}
       <Field
         label="Share"
         value={party.share == null ? undefined : `${shareToPercentage(party.share)}%`}
@@ -241,28 +243,6 @@ const formatRate = (rate: RatingTablesRateResponse | undefined, currency: string
   return "—";
 };
 
-const CoverageMetric = ({
-  label,
-  value,
-  emphasize,
-}: {
-  label: string;
-  value: ReactNode;
-  emphasize?: boolean;
-}) => (
-  <div className="min-w-[6.5rem] sm:text-right">
-    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-    <div
-      className={cn(
-        "mt-0.5 font-mono text-sm tabular-nums",
-        emphasize ? "font-semibold text-foreground" : "text-muted-foreground",
-      )}
-    >
-      {value}
-    </div>
-  </div>
-);
-
 const CoverageNestedPanel = ({
   coverages,
   currency,
@@ -275,65 +255,76 @@ const CoverageNestedPanel = ({
   const totalPremium = coverages.reduce((sum, c) => sum + (c.calculatedPremium ?? 0), 0);
 
   return (
-    <div className="mx-3 mb-3 ml-12 overflow-hidden rounded-md border border-border bg-background shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-3.5 py-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="ml-11 mr-3 mb-3 border-l-2 border-accent/30 pl-4 py-1">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Coverages
-        </span>
-        <span className="text-xs text-muted-foreground">
+        </div>
+        <div className="text-xs text-muted-foreground">
           {coverages.length} {coverages.length === 1 ? "line" : "lines"}
           {coverages.length > 0 ? ` · ${formatPolicyMoney(totalPremium, currency)}` : ""}
-        </span>
+        </div>
       </div>
       {coverages.length === 0 ? (
-        <div className="px-3.5 py-4 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground py-2">
           No coverages for period {sequence}.
-        </div>
+        </p>
       ) : (
-        <div className="divide-y">
-          {coverages.map((c, i) => {
-            const name = c.coverageName?.trim() || c.coverageId || `Coverage ${i + 1}`;
-            const description = c.coverageDescription?.trim();
-            return (
-              <div
-                key={`${c.id ?? c.coverageId ?? i}`}
-                className="flex flex-col gap-3 px-3.5 py-3 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-foreground" title={c.coverageId}>
-                    {name}
-                  </div>
-                  {description ? (
-                    <p
-                      className="mt-0.5 text-xs leading-relaxed text-muted-foreground line-clamp-2"
-                      title={description}
-                    >
-                      {description}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:flex sm:shrink-0 sm:gap-8 sm:text-right">
-                  <CoverageMetric
-                    label="Sum insured"
-                    value={formatPolicyMoney(c.sumInsured, currency)}
-                  />
-                  <CoverageMetric label="Rate" value={formatRate(c.rateUsed, currency)} />
-                  <CoverageMetric
-                    label="Multiplier"
-                    value={
-                      c.ratingTableMultiplierUsed != null ? `${c.ratingTableMultiplierUsed}x` : "—"
-                    }
-                  />
-                  <CoverageMetric
-                    label="Premium"
-                    value={formatPolicyMoney(c.calculatedPremium, currency)}
-                    emphasize
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="border-0 hover:bg-transparent">
+              <TableHead className="h-8 px-2 text-[11px] font-semibold uppercase tracking-wider">
+                Coverage
+              </TableHead>
+              <TableHead className="h-8 px-2 text-right text-[11px] font-semibold uppercase tracking-wider">
+                Sum insured
+              </TableHead>
+              <TableHead className="h-8 px-2 text-right text-[11px] font-semibold uppercase tracking-wider">
+                Rate
+              </TableHead>
+              <TableHead className="h-8 px-2 text-right text-[11px] font-semibold uppercase tracking-wider">
+                Multiplier
+              </TableHead>
+              <TableHead className="h-8 px-2 text-right text-[11px] font-semibold uppercase tracking-wider">
+                Premium
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {coverages.map((c, i) => {
+              const name = c.coverageName?.trim() || c.coverageId || `Coverage ${i + 1}`;
+              return (
+                <TableRow
+                  key={`${c.id ?? c.coverageId ?? i}`}
+                  className="border-0 hover:bg-transparent"
+                >
+                  <TableCell className="px-2 py-1.5">
+                    <div className="text-sm font-medium" title={c.coverageId}>
+                      {name}
+                    </div>
+                    {c.coverageId ? (
+                      <div className="font-mono text-[11px] text-muted-foreground">
+                        {c.coverageId}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-right font-mono text-sm">
+                    {formatPolicyMoney(c.sumInsured, currency)}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-right font-mono text-sm text-muted-foreground">
+                    {formatRate(c.rateUsed, currency)}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-right font-mono text-sm text-muted-foreground">
+                    {c.ratingTableMultiplierUsed != null ? c.ratingTableMultiplierUsed : "—"}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-primary">
+                    {formatPolicyMoney(c.calculatedPremium, currency)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
     </div>
   );
@@ -363,7 +354,7 @@ const PolicyDetail = () => {
   const relationshipLabel = (value?: string | null) => smartEnumLabel(relationshipOptions, value);
   const policyPlanTypeLabel = usePolicyPlanTypeLabel();
 
-  const { data: apiProduct } = useGetProduct(policy?.productId ?? "", {
+  const { data: apiProduct, isFetched: productFetched } = useGetProduct(policy?.productId ?? "", {
     enabled: Boolean(policy?.productId),
   });
   const product = useMemo(
@@ -459,8 +450,13 @@ const PolicyDetail = () => {
     })();
   };
 
+  const planCode = policy?.policyPlan ?? product?.policyPlanType ?? null;
+  const renewalFlow = policyRenewalFlow(planCode, product?.planRules?.continuation);
+  const renewalActionsReady =
+    policyRenewalFlow(policy?.policyPlan) != null || !policy?.productId || productFetched;
+
   const handleCreateRenewalOffer = () => {
-    if (!policy?.id) return;
+    if (!policy?.id || renewalFlow !== "newPolicyOffer") return;
     createRenewalOffer.mutate(policy.id, {
       onSuccess: (offer) => {
         toast.success("Renewal offer created");
@@ -537,11 +533,13 @@ const PolicyDetail = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" className="gap-2" asChild>
-            <Link to={`/renewals?policyId=${encodeURIComponent(policy.id ?? "")}`}>
-              <RefreshCw className="h-4 w-4" /> View renewals
-            </Link>
-          </Button>
+          {renewalActionsReady && renewalFlow === "appendPeriod" ? (
+            <Button size="sm" variant="outline" className="gap-2" asChild>
+              <Link to={`/renewals?policyId=${encodeURIComponent(policy.id ?? "")}`}>
+                <RefreshCw className="h-4 w-4" /> View renewals
+              </Link>
+            </Button>
+          ) : null}
           <Button size="sm" variant="outline" className="gap-2" asChild>
             <Link to={`/invoices?policyId=${encodeURIComponent(policy.id ?? "")}`}>
               <Receipt className="h-4 w-4" /> View invoices
@@ -552,20 +550,22 @@ const PolicyDetail = () => {
               <Percent className="h-4 w-4" /> View commissions
             </Link>
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-2"
-            onClick={handleCreateRenewalOffer}
-            disabled={!policy.id || createRenewalOffer.isPending}
-          >
-            {createRenewalOffer.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FilePlus className="h-4 w-4" />
-            )}
-            Renewal offer
-          </Button>
+          {renewalActionsReady && renewalFlow === "newPolicyOffer" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={handleCreateRenewalOffer}
+              disabled={!policy.id || createRenewalOffer.isPending}
+            >
+              {createRenewalOffer.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FilePlus className="h-4 w-4" />
+              )}
+              Renewal offer
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="outline"
@@ -640,29 +640,29 @@ const PolicyDetail = () => {
         onValueChange={setTab}
         className="w-full"
       >
-        <TabsList className="flex flex-wrap h-auto w-full max-w-6xl justify-start gap-1">
-          <TabsTrigger value="summary">
-            <FileText className="h-3.5 w-3.5 mr-1.5" />
+        <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          <TabsTrigger value="summary" className="w-full gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
             Summary
           </TabsTrigger>
-          <TabsTrigger value="periods">
-            <Calendar className="h-3.5 w-3.5 mr-1.5" />
+          <TabsTrigger value="periods" className="w-full gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />
             Periods
           </TabsTrigger>
-          <TabsTrigger value="participants">
-            <Users className="h-3.5 w-3.5 mr-1.5" />
+          <TabsTrigger value="participants" className="w-full gap-1.5">
+            <Users className="h-3.5 w-3.5" />
             Participants
           </TabsTrigger>
-          <TabsTrigger value="installments">
-            <Wallet className="h-3.5 w-3.5 mr-1.5" />
+          <TabsTrigger value="installments" className="w-full gap-1.5">
+            <Wallet className="h-3.5 w-3.5" />
             Installments
           </TabsTrigger>
-          <TabsTrigger value="documents">
-            <Files className="h-3.5 w-3.5 mr-1.5" />
+          <TabsTrigger value="documents" className="w-full gap-1.5">
+            <Files className="h-3.5 w-3.5" />
             Documents
           </TabsTrigger>
-          <TabsTrigger value="cancellation">
-            <Ban className="h-3.5 w-3.5 mr-1.5" />
+          <TabsTrigger value="cancellation" className="w-full gap-1.5">
+            <Ban className="h-3.5 w-3.5" />
             Cancellation
           </TabsTrigger>
         </TabsList>
@@ -845,8 +845,8 @@ const PolicyDetail = () => {
                           <Fragment key={y.id ?? sequence}>
                             <TableRow
                               className={cn(
-                                "cursor-pointer",
-                                isExpanded && "border-b-0 bg-muted/30 hover:bg-muted/30",
+                                "cursor-pointer hover:bg-accent-soft/70",
+                                isExpanded && "border-b-0 bg-transparent hover:bg-transparent",
                               )}
                               data-state={isExpanded ? "open" : undefined}
                               onClick={() => togglePeriodExpanded(sequence)}
@@ -911,7 +911,7 @@ const PolicyDetail = () => {
                               </TableCell>
                             </TableRow>
                             {isExpanded && (
-                              <TableRow className="hover:bg-transparent">
+                              <TableRow className="hover:bg-transparent border-0">
                                 <TableCell colSpan={9} className="p-0">
                                   <CoverageNestedPanel
                                     coverages={periodCoverages}
