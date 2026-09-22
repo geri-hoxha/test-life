@@ -147,13 +147,11 @@ import type {
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { SAME_AS_INSURED } from "@/hooks/useRelationshipToInsuredOptions";
 import { useDocumentPreview } from "@/components/documents/DocumentPreview";
+import { DiscountRequestsTable } from "./DiscountRequestsTable";
 import {
   REASON_MAX_LENGTH,
   agentSelectionMethodLabel,
-  discountStatusClass,
-  discountStatusLabel,
   documentStatusLabel,
-  formatDiscountPct,
   formatOfferDate,
   formatOfferDateTime,
   formatOfferMoney,
@@ -453,12 +451,12 @@ const docStatusBadge = (status: string) => (
   </Badge>
 );
 
-type DocAction = {
+export type DocAction = {
   requirementId: string;
   label: string;
 };
 
-const OfferDocumentsPanel = ({
+export const OfferDocumentsPanel = ({
   documents,
   documentTypeNameById,
   docActionPending,
@@ -466,6 +464,7 @@ const OfferDocumentsPanel = ({
   onApprove,
   onReject,
   onWaive,
+  emptyMessage = "No document requirements on this offer.",
 }: {
   documents: {
     id: string;
@@ -484,6 +483,7 @@ const OfferDocumentsPanel = ({
   onApprove: (args: DocAction) => void;
   onReject: (args: DocAction) => void;
   onWaive: (args: DocAction) => void;
+  emptyMessage?: string;
 }) => {
   const { fileBusy, openPreview, download } = useDocumentPreview();
 
@@ -491,7 +491,7 @@ const OfferDocumentsPanel = ({
     <>
           {documents.length === 0 ? (
             <div className="text-sm text-muted-foreground py-6 text-center">
-              No document requirements on this offer.
+              {emptyMessage}
             </div>
           ) : (
             <div className="rounded-md border overflow-x-auto">
@@ -515,10 +515,12 @@ const OfferDocumentsPanel = ({
                     const canReview = d.status === "submitted";
                     const hasFile = Boolean(d.documentId);
                     const previewBusy =
-                      fileBusy?.id === d.documentId &&
+                      fileBusy != null &&
+                      fileBusy.id === d.documentId &&
                       fileBusy.action === "preview";
                     const downloadBusy =
-                      fileBusy?.id === d.documentId &&
+                      fileBusy != null &&
+                      fileBusy.id === d.documentId &&
                       fileBusy.action === "download";
                     const source = submissionSourceLabel(d.submissionSource);
                     return (
@@ -532,7 +534,7 @@ const OfferDocumentsPanel = ({
                                   type="button"
                                   size="icon"
                                   variant="ghost"
-                                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                                  className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-accent-soft hover:text-accent"
                                   title="View document"
                                   disabled={Boolean(fileBusy)}
                                   onClick={() =>
@@ -551,7 +553,7 @@ const OfferDocumentsPanel = ({
                                   type="button"
                                   size="icon"
                                   variant="ghost"
-                                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                                  className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-accent-soft hover:text-accent"
                                   title="Download document"
                                   disabled={Boolean(fileBusy)}
                                   onClick={() =>
@@ -1920,7 +1922,6 @@ const OfferDetail = () => {
                   offer.loanDisbursements.length === 0 ? (
                     <Button
                       size="sm"
-                      variant="outline"
                       className="gap-2"
                       onClick={openLoanDialog}
                     >
@@ -2035,12 +2036,25 @@ const OfferDetail = () => {
 
         <TabsContent value="years" className="mt-4 space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Coverage periods</CardTitle>
-              <CardDescription>
-                Rated periods for this offer. Rate the offer to persist premium
-                amounts.
-              </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <div className="space-y-1.5">
+                <CardTitle className="text-base">Coverage periods</CardTitle>
+                <CardDescription>
+                  Rated periods for this offer. Rate the offer to persist premium
+                  amounts.
+                </CardDescription>
+              </div>
+              {canEditParties &&
+              offer.requiresLoanBalances &&
+              offer.loanDisbursements.length === 0 ? (
+                <Button
+                  size="sm"
+                  className="gap-2 shrink-0"
+                  onClick={openLoanDialog}
+                >
+                  <Plus className="h-4 w-4" /> Submit loan balances
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent>
               {offer.offerYears.length === 0 ? (
@@ -2647,105 +2661,24 @@ const OfferDetail = () => {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[90px]">Period</TableHead>
-                          <TableHead className="text-center">
-                            Discount
-                          </TableHead>
-                          <TableHead className="text-center">Reason</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Requested</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {discountRows.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={6}
-                              className="text-center text-sm text-muted-foreground py-6"
-                            >
-                              No discount requests on this offer.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          discountRows.map((r) => {
-                            const canAct = r.status === "requested";
-                            return (
-                              <TableRow key={r.id}>
-                                <TableCell className="font-mono">
-                                  {r.targetPeriodSequence ?? "—"}
-                                </TableCell>
-                                <TableCell className="text-center font-mono text-sm font-semibold min-w-[320px]">
-                                  {formatDiscountPct(
-                                    r.requestedDiscountPercentage,
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-sm text-center min-w-[320px]">
-                                  {r.reason || "—"}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant="outline"
-                                    className={discountStatusClass(r.status)}
-                                  >
-                                    {discountStatusLabel(r.status)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                                  {formatOfferDateTime(r.requestedOnUtc)}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-1.5 h-8 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                      disabled={!canAct || pageBusy}
-                                      onClick={() =>
-                                        setDiscountConfirm({
-                                          kind: "approve",
-                                          requestId: r.id,
-                                          pctLabel:
-                                            formatDiscountPct(
-                                              r.requestedDiscountPercentage,
-                                            ) ?? "",
-                                        })
-                                      }
-                                    >
-                                      <CheckCircle2 className="h-3.5 w-3.5" />{" "}
-                                      Approve
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="gap-1.5 h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      disabled={!canAct || pageBusy}
-                                      onClick={() =>
-                                        setDiscountConfirm({
-                                          kind: "reject",
-                                          requestId: r.id,
-                                          pctLabel:
-                                            formatDiscountPct(
-                                              r.requestedDiscountPercentage,
-                                            ) ?? "",
-                                        })
-                                      }
-                                    >
-                                      <XCircle className="h-3.5 w-3.5" /> Reject
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <DiscountRequestsTable
+                    rows={discountRows}
+                    actionPending={pageBusy}
+                    onApprove={(action) =>
+                      setDiscountConfirm({
+                        kind: "approve",
+                        requestId: action.requestId,
+                        pctLabel: action.pctLabel,
+                      })
+                    }
+                    onReject={(action) =>
+                      setDiscountConfirm({
+                        kind: "reject",
+                        requestId: action.requestId,
+                        pctLabel: action.pctLabel,
+                      })
+                    }
+                  />
                 </CardContent>
               </Card>
             );

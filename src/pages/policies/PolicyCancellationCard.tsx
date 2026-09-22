@@ -382,8 +382,8 @@ const PolicyCancellationCard = ({
               <Button
                 type="button"
                 size="sm"
-                variant="destructive"
-                className="gap-2"
+                variant="ghost"
+                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                 disabled={busy}
                 onClick={() => setConfirmAction("apply")}
               >

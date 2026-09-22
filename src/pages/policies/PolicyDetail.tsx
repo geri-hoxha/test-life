@@ -1152,7 +1152,7 @@ const PolicyDetail = () => {
                                   type="button"
                                   variant="outline"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 text-muted-foreground hover:bg-accent-soft hover:text-accent"
                                   title="View document"
                                   disabled={!d.documentId || Boolean(fileBusy)}
                                   onClick={() => handlePreview(d.documentId, typeName ?? "Document")}
@@ -1168,7 +1168,7 @@ const PolicyDetail = () => {
                                   type="button"
                                   variant="outline"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 text-muted-foreground hover:bg-accent-soft hover:text-accent"
                                   title="Download document"
                                   disabled={!d.documentId || Boolean(fileBusy)}
                                   onClick={() => handleDownload(d.documentId, typeName)}

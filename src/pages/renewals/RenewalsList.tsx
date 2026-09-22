@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
+import { PolicyCombobox } from "@/components/PolicyCombobox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,15 +39,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isRenewalStatus, useListRenewals } from "@/api/renewals";
+import { isRenewalStatus, useListRenewals, useStartPolicyRenewal } from "@/api/renewals";
 import type {
   DomainPoliciesPolicyRenewalStatus,
   PoliciesRenewalListItemResponse,
 } from "@/api/types";
+import { toastApiError } from "@/lib/api-error";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
-import { Eye, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { Play, RefreshCw } from "lucide-react";
 import {
   RENEWAL_STATUSES,
   formatRenewalMoney,
@@ -75,6 +88,8 @@ const RenewalsList = () => {
   );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [startTarget, setStartTarget] = useState<PoliciesRenewalListItemResponse | null>(null);
+  const startRenewal = useStartPolicyRenewal();
 
   const filters = useMemo(
     () =>
@@ -124,6 +139,24 @@ const RenewalsList = () => {
       navigate(renewalDetailPath(row.policyId, row.id));
   };
 
+  const confirmStart = () => {
+    if (!startTarget?.policyId || !startTarget.id) return;
+    startRenewal.mutate(
+      {
+        policyId: startTarget.policyId,
+        renewalId: startTarget.id,
+        body: {},
+      },
+      {
+        onSuccess: () => {
+          toast.success("Renewal started");
+          setStartTarget(null);
+        },
+        onError: (err) => toastApiError(err, "Failed to start renewal"),
+      },
+    );
+  };
+
   return (
     <AppShell>
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
@@ -166,6 +199,16 @@ const RenewalsList = () => {
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Policy</Label>
+                  <PolicyCombobox
+                    value={policyId}
+                    onValueChange={setPolicyId}
+                    placeholder="All policies"
+                    allowClear
+                    triggerClassName="h-9"
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">
                     Status
@@ -215,7 +258,7 @@ const RenewalsList = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Policy</TableHead>
+                    <TableHead>Serial</TableHead>
                     <TableHead>Insured</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Period</TableHead>
@@ -230,7 +273,7 @@ const RenewalsList = () => {
                     <TableHead className="text-right">Docs</TableHead>
                     <TableHead className="text-right">Flags</TableHead>
                     <TableHead className="text-right">Discounts</TableHead>
-                    <TableHead className="w-[80px] text-right">
+                    <TableHead className="w-[110px] text-right">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -254,22 +297,19 @@ const RenewalsList = () => {
                           row.id ??
                           `${row.policyId}-${row.targetPeriodSequence}`
                         }
-                        className="hover:bg-muted/40 cursor-pointer"
+                        className={
+                          row.id && row.policyId
+                            ? "hover:bg-muted/40 cursor-pointer"
+                            : "hover:bg-muted/40"
+                        }
                         onClick={() => openRow(row)}
                       >
-                        <TableCell>
-                          {row.policyId ? (
-                            <Link
-                              to={`/policies/${row.policyId}`}
-                              className="font-mono text-xs text-primary hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                              title={row.policyId}
-                            >
-                              {row.policySerial ?? shortRenewalId(row.policyId)}
-                            </Link>
-                          ) : (
-                            "—"
-                          )}
+                        <TableCell className="font-mono text-xs">
+                          {row.policySerial != null
+                            ? row.policySerial
+                            : row.policyId
+                              ? shortRenewalId(row.policyId)
+                              : "—"}
                         </TableCell>
                         <TableCell
                           className="text-sm max-w-[180px] truncate"
@@ -335,19 +375,20 @@ const RenewalsList = () => {
                           {row.pendingDiscountRequestCount ?? 0}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8"
-                            disabled={!row.id || !row.policyId}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openRow(row);
-                            }}
-                            title="Open renewal"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
+                          {row.status === "planned" && (
+                            <Button
+                              size="sm"
+                              className="h-8 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                              disabled={!row.id || !row.policyId}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStartTarget(row);
+                              }}
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                              Start
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -367,6 +408,37 @@ const RenewalsList = () => {
           </CardContent>
         </Card>
       </AccessDeniedOr>
+      <AlertDialog
+        open={startTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !startRenewal.isPending) setStartTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start this renewal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {startTarget?.policySerial != null
+                ? `Start underwriting for policy ${startTarget.policySerial}.`
+                : "Start underwriting for this renewal."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={startRenewal.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={startRenewal.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmStart();
+              }}
+            >
+              <Play className="h-3.5 w-3.5" />
+              {startRenewal.isPending ? "Starting…" : "Start"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 };

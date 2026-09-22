@@ -88,16 +88,18 @@ export const VerificationChecksTable = ({
   actionPending,
   onApprove,
   onReject,
+  emptyMessage = "No review flags on this offer.",
 }: {
   checks: VerificationCheck[];
   actionPending?: boolean;
   onApprove?: (flagId: string) => void;
   onReject?: (flagId: string) => void;
+  emptyMessage?: string;
 }) => {
   if (checks.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-6 text-center">
-        No review flags on this offer.
+        {emptyMessage}
       </div>
     );
   }

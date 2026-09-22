@@ -654,6 +654,7 @@ export type PoliciesListPoliciesRequest = PaginationPagedRequest & {
   coverageOn?: string;
   partyId?: string;
   personId?: string;
+  serial?: number;
   pageNumber?: number;
   pageSize?: number;
 };
