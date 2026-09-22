@@ -1,7 +1,6 @@
 export type OfferStatus =
   | "Draft"
   | "Quoted"
-  | "Partially Bound"
   | "Bound"
   | "Cancelled"
   | "Expired";
@@ -34,6 +33,7 @@ export type OfferParticipant = {
   countryCode?: string;
   isLeader?: boolean;
   share?: number | null;
+  relationshipToInsured?: string | null;
 };
 
 export type OfferInsuredPerson = {
@@ -61,28 +61,37 @@ export type OfferYearCoverage = {
   calculatedPremium: number;
 };
 
-export type OfferYearDocument = {
+export type OfferDocumentRequirement = {
   id: string;
   documentId?: string | null;
   documentTypeId: string;
-  status: "required" | "submitted" | "accepted" | "refused";
+  status: "required" | "submitted" | "accepted" | "refused" | "waived";
+  submissionSource?: string | null;
   refusalReason?: string | null;
+  waiverReason?: string | null;
+  isSatisfied?: boolean;
+  submittedOnUtc?: string | null;
+  decidedOnUtc?: string | null;
 };
 
-export type OfferYearDiscountRequest = {
+export type OfferDiscountRequest = {
   id: string;
   requestedDiscountPercentage: number;
   reason: string;
   status: "requested" | "approved" | "rejected";
+  targetPeriodSequence?: number | null;
+  requestedOnUtc?: string;
+  decidedOnUtc?: string | null;
 };
 
-export type OfferYearReviewFlag = {
+export type OfferReviewFlag = {
   id: string;
   type: string;
   reason: string;
   status: string;
   raisedOnUtc?: string;
   resolvedOnUtc?: string | null;
+  resolutionNote?: string | null;
 };
 
 export type OfferYear = {
@@ -91,16 +100,13 @@ export type OfferYear = {
   startDate: string;
   endDate: string;
   insuredAmount: number;
-  /** Actuarially-calculated premium. */
   premium: number;
-  /** Amount actually billed — differs from `premium` only on PPFM/PPFV plans. */
   payPremium: number;
   internalStatus?: string;
   policyId?: string | null;
+  openingBalance?: number | null;
+  closingBalance?: number | null;
   coverages: OfferYearCoverage[];
-  documents: OfferYearDocument[];
-  discountRequests: OfferYearDiscountRequest[];
-  reviewFlags: OfferYearReviewFlag[];
 };
 
 export type OfferLoanDisbursement = {
@@ -109,24 +115,58 @@ export type OfferLoanDisbursement = {
   startDate: string;
   endDate: string;
   remainingLoanAmount: number;
+  closingBalance?: number | null;
+};
+
+export type OfferLoanSubmission = {
+  id: string;
+  sourceSystem: string;
+  externalReference?: string | null;
+  receivedOnUtc?: string;
+};
+
+export type OfferListItem = {
+  id: string;
+  number: string;
+  productId: string;
+  productName?: string | null;
+  policyPlan?: string;
+  currency: string;
+  status: OfferStatus;
+  createdDate: string;
+  expiresOnUtc?: string | null;
+  policyId?: string | null;
+  startDate: string;
+  endDate: string;
+  premium: number;
+  sumInsured?: number | null;
+  policyHolderName?: string | null;
+  insuredName?: string | null;
+  insuredAge?: number | null;
+  salesChannel?: string | null;
+  salesPartyName?: string | null;
+  outstandingDocumentCount: number;
+  raisedReviewFlagCount: number;
+  pendingDiscountRequestCount: number;
 };
 
 export type Offer = {
   id: string;
   number: string;
-  // Step 1
   productId: string;
   versionId: string;
   templateId: string;
   currency: string;
-  // Step 2
+  policyPlan?: string;
+  requiresLoanBalances?: boolean;
+  policyId?: string | null;
+  renewedFromPolicyId?: string | null;
   policyHolderId: string;
   payerId: string;
   insuredId: string;
   beneficiaries: Beneficiary[];
   participants: OfferParticipant[];
   insuredPersons: OfferInsuredPerson[];
-  // Step 3
   startDate: string;
   endDate: string;
   termYears: number;
@@ -139,94 +179,41 @@ export type Offer = {
     outstandingBalance: number;
   };
   loanDisbursements: OfferLoanDisbursement[];
+  loanSubmissions: OfferLoanSubmission[];
   offerYears: OfferYear[];
+  documentRequirements: OfferDocumentRequirement[];
+  reviewFlags: OfferReviewFlag[];
+  discountRequests: OfferDiscountRequest[];
   premium: number;
   status: OfferStatus;
   createdDate: string;
+  createdOnUtc?: string | null;
+  quotedOnUtc?: string | null;
+  createdByAuthUserId?: number | null;
+  createdByUserName?: string | null;
+  salesChannel?: string | null;
+  salesPartyName?: string | null;
+  agentId?: string | null;
+  agentSelectionMethod?: string | null;
+  salesAgentName?: string | null;
+  partnerId?: string | null;
+  salesPartnerName?: string | null;
+  partnerOfficeId?: string | null;
+  salesOfficeName?: string | null;
 };
-
-const emptyApiCollections = {
-  participants: [] as OfferParticipant[],
-  insuredPersons: [] as OfferInsuredPerson[],
-  loanDisbursements: [] as OfferLoanDisbursement[],
-  offerYears: [] as OfferYear[],
-};
-
-const seed: Offer[] = [
-  // 1) Draft — Premium Life Plus, USD, Mira Leka exploring options
-  {
-    id: "OFR-0001", number: "OFR-2026-0001",
-    productId: "PRD-003", versionId: "VRS-1020", templateId: "TPL-3003", currency: "USD",
-    policyHolderId: "CUS-0004", payerId: "CUS-0004", insuredId: "CUS-0004",
-    beneficiaries: [
-      { id: "b1", customerId: "CUS-0001", relationship: "Father", percentage: 100 },
-    ],
-    ...emptyApiCollections,
-    startDate: "2026-06-01", endDate: "2056-06-01", termYears: 30,
-    paymentMode: "Pagesa me prim te rregullt",
-    premium: 1180, status: "Draft", createdDate: "2026-04-26",
-  },
-  // 2) Pending Review — PEP-flagged client (Elira Dervishi)
-  {
-    id: "OFR-0002", number: "OFR-2026-0002",
-    productId: "PRD-002", versionId: "VRS-1010", templateId: "TPL-3010", currency: "EUR",
-    policyHolderId: "CUS-0002", payerId: "CUS-0002", insuredId: "CUS-0002",
-    beneficiaries: [
-      { id: "b1", customerId: "CUS-0004", relationship: "Sister", percentage: 100 },
-    ],
-    ...emptyApiCollections,
-    startDate: "2026-05-01", endDate: "2036-05-01", termYears: 10,
-    paymentMode: "Pagesa me prim te rregullt",
-    premium: 720, status: "Partially Bound", createdDate: "2026-04-22",
-  },
-  // 3) Quoted — Standard Life Insurance for Dritan Kola, ALL currency
-  {
-    id: "OFR-0003", number: "OFR-2026-0003",
-    productId: "PRD-002", versionId: "VRS-1010", templateId: "TPL-3010", currency: "ALL",
-    policyHolderId: "CUS-0003", payerId: "CUS-0003", insuredId: "CUS-0003",
-    beneficiaries: [
-      { id: "b1", customerId: "CUS-0004", relationship: "Daughter", percentage: 60 },
-      { id: "b2", customerId: "CUS-0001", relationship: "Brother", percentage: 40 },
-    ],
-    ...emptyApiCollections,
-    startDate: "2026-05-15", endDate: "2036-05-15", termYears: 10,
-    paymentMode: "Pagesa me prim te rregullt",
-    premium: 84000, status: "Quoted", createdDate: "2026-04-18",
-  },
-  // 4) Bound — Bank Loan Life Protection for Arben Hoxha (linked to policy below)
-  {
-    id: "OFR-0004", number: "OFR-2026-0004",
-    productId: "PRD-001", versionId: "VRS-1001", templateId: "TPL-3001", currency: "EUR",
-    policyHolderId: "CUS-0001", payerId: "CUS-0001", insuredId: "CUS-0001",
-    beneficiaries: [
-      { id: "b1", customerId: "CUS-0003", relationship: "Spouse", percentage: 100 },
-    ],
-    ...emptyApiCollections,
-    startDate: "2026-04-01", endDate: "2046-04-01", termYears: 20,
-    paymentMode: "Pagesa me prim te rregullt",
-    loan: { amount: 145000, interestRate: 4.5, loanTermYears: 20, remainingYears: 20, outstandingBalance: 145000 },
-    premium: 615, status: "Bound", createdDate: "2026-03-22",
-  },
-];
-
-let offers: Offer[] = [...seed];
-
-export const getOffer = (id: string) => offers.find((o) => o.id === id);
 
 export const statusColor: Record<OfferStatus, string> = {
-  Draft: "bg-muted text-muted-foreground",
+  Draft: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
   Quoted: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  "Partially Bound": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  Bound: "bg-primary/15 text-primary",
+  Bound: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   Cancelled: "bg-destructive/15 text-destructive",
-  Expired: "bg-muted text-muted-foreground",
+  Expired: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 };
 
 /** API query value ↔ UI label */
 export const offerStatusToApi: Record<OfferStatus, string> = {
   Draft: "draft",
   Quoted: "quoted",
-  "Partially Bound": "partiallyBound",
   Bound: "bound",
   Cancelled: "cancelled",
   Expired: "expired",

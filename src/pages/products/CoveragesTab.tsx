@@ -1,13 +1,19 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { FilterGrid } from "@/components/FilterGrid";
+import { Loader } from "@/components/Loader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -23,6 +29,8 @@ import {
   useUpdateProductCoverage,
   useAddProductCoverageCurrencyLimit,
   useRemoveProductCoverageCurrencyLimit,
+  buildAddProductCoverageBody,
+  buildAddProductCoverageCurrencyLimitBody,
 } from "@/api/products";
 import { useListCoverages, useCreateCoverage } from "@/api/coverages";
 import { useListRatingTables } from "@/api/rating-tables";
@@ -115,6 +123,7 @@ const LimitTypeTable = ({
     )
   );
   const [saving, setSaving] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const addLimit = useAddProductCoverageCurrencyLimit();
   const removeLimit = useRemoveProductCoverageCurrencyLimit();
 
@@ -154,7 +163,11 @@ const LimitTypeTable = ({
           addLimit.mutateAsync({
             productId,
             coverageEntryId: coverage.id,
-            body: { currency, type, value: Number(values[currency]) },
+            body: buildAddProductCoverageCurrencyLimitBody({
+              currency,
+              type,
+              value: Number(values[currency]),
+            }),
           })
         )
       );
@@ -226,7 +239,7 @@ const LimitTypeTable = ({
             size="icon"
             className="h-7 w-7 text-destructive"
             title="Clear all limits of this type"
-            onClick={() => void clearAll()}
+            onClick={() => setConfirmClear(true)}
             disabled={saving}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -264,6 +277,31 @@ const LimitTypeTable = ({
       <div className="px-3 py-2 border-t border-border bg-muted/20 text-[10px] text-muted-foreground">
         Fill every currency, then save — {rowCurrencies.length || 0} request(s) will be sent.
       </div>
+
+      <AlertDialog open={confirmClear} onOpenChange={(open) => !open && !saving && setConfirmClear(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear {label.toLowerCase()} limits?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove all saved {label.toLowerCase()} values for this coverage.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void clearAll().finally(() => setConfirmClear(false));
+              }}
+            >
+              {saving ? "Clearing…" : "Clear"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -297,6 +335,33 @@ const CoveragesTab = ({ productId }: Props) => {
     [apiProduct?.coverages, catalogById, productId]
   );
 
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editCoverage, setEditCoverage] = useState<Coverage | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [nameFilter, setNameFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "Mandatory" | "Optional Rider">("ALL");
+  const [ratingTableFilter, setRatingTableFilter] = useState("__all__");
+  const [sumInsuredFilter, setSumInsuredFilter] = useState<"ALL" | "fixed" | "percentage">("ALL");
+
+  const filteredCoverages = useMemo(() => {
+    const q = nameFilter.trim().toLowerCase();
+    return coverages.filter((c) => {
+      if (q && !`${c.name} ${c.description ?? ""}`.toLowerCase().includes(q)) return false;
+      if (typeFilter !== "ALL" && c.coverageType !== typeFilter) return false;
+      if (ratingTableFilter !== "__all__" && (c.ratingTableId ?? "") !== ratingTableFilter) return false;
+      const isFixed = c.isSumInsuredFixed ?? true;
+      if (sumInsuredFilter === "fixed" && !isFixed) return false;
+      if (sumInsuredFilter === "percentage" && isFixed) return false;
+      return true;
+    });
+  }, [coverages, nameFilter, typeFilter, ratingTableFilter, sumInsuredFilter]);
+
+  const hasCoverageFilters =
+    Boolean(nameFilter.trim()) ||
+    typeFilter !== "ALL" ||
+    ratingTableFilter !== "__all__" ||
+    sumInsuredFilter !== "ALL";
+
   const supportedCurrencies = apiProduct?.supportedCurrencies ?? [];
 
   const linkedCoverageIds = useMemo(
@@ -310,9 +375,6 @@ const CoveragesTab = ({ productId }: Props) => {
     return t?.name?.trim() || id;
   };
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editCoverage, setEditCoverage] = useState<Coverage | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   /** Limit types the agent selected to configure (plus complete ones synced from API). */
   const [selectedLimits, setSelectedLimits] = useState<Set<string>>(new Set());
   /** Coverage entry ids whose currency-limits panel is expanded. */
@@ -369,19 +431,24 @@ const CoveragesTab = ({ productId }: Props) => {
       toast.error("Rating table is required");
       return;
     }
+    const coverageId = c.code !== "N/A" ? c.code : "";
+    if (!coverageId) {
+      toast.error("Coverage catalog id is missing");
+      return;
+    }
     const isFixed = c.isSumInsuredFixed ?? true;
     try {
       await updateProductCoverage.mutateAsync({
         productId,
         coverageEntryId: c.id,
-        body: {
-          coverageId: c.code !== "N/A" ? c.code : undefined,
+        body: buildAddProductCoverageBody({
+          coverageId,
           ratingTableId: c.ratingTableId,
           ratingTableMultiplier: c.ratingTableMultiplier ?? 1,
           isMandatory: c.coverageType === "Mandatory",
           isSumInsuredFixed: isFixed,
-          ...(isFixed ? {} : { sumInsuredPercentage: c.sumInsuredPercentage ?? 1 }),
-        },
+          sumInsuredPercentage: isFixed ? undefined : c.sumInsuredPercentage,
+        }),
       });
       toast.success(`Coverage ${c.name} updated`);
       if (isFixed) {
@@ -399,6 +466,7 @@ const CoveragesTab = ({ productId }: Props) => {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update coverage");
+      throw err;
     }
   };
 
@@ -420,14 +488,14 @@ const CoveragesTab = ({ productId }: Props) => {
       const isFixed = c.isSumInsuredFixed ?? true;
       await addProductCoverage.mutateAsync({
         productId,
-        body: {
+        body: buildAddProductCoverageBody({
           coverageId,
           ratingTableId: c.ratingTableId,
           ratingTableMultiplier: c.ratingTableMultiplier ?? 1,
           isMandatory: c.coverageType === "Mandatory",
           isSumInsuredFixed: isFixed,
-          ...(isFixed ? {} : { sumInsuredPercentage: c.sumInsuredPercentage ?? 1 }),
-        },
+          sumInsuredPercentage: isFixed ? undefined : c.sumInsuredPercentage,
+        }),
       });
       toast.success(`Coverage ${c.name} linked to product`);
       if (isFixed) {
@@ -437,6 +505,7 @@ const CoveragesTab = ({ productId }: Props) => {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to link coverage");
+      throw err;
     }
   };
 
@@ -456,8 +525,8 @@ const CoveragesTab = ({ productId }: Props) => {
 
   if (productLoading || catalogLoading || tablesLoading) {
     return (
-      <Card className="p-10 text-center shadow-card border-border border-dashed">
-        <p className="text-sm text-muted-foreground">Loading coverages…</p>
+      <Card className="p-10 shadow-card border-border border-dashed">
+        <Loader label="Loading coverages…" />
       </Card>
     );
   }
@@ -480,16 +549,92 @@ const CoveragesTab = ({ productId }: Props) => {
       </div>
 
       <Card className="shadow-card border-border overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-md bg-accent-soft text-accent flex items-center justify-center">
-              <Shield className="h-4 w-4" />
+        <div className="flex flex-col gap-4 px-5 py-4 border-b border-border bg-muted/30">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-md bg-accent-soft text-accent flex items-center justify-center">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Coverages</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {hasCoverageFilters
+                    ? `${filteredCoverages.length} of ${coverages.length} coverage(s)`
+                    : `${coverages.length} coverage(s)`}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Coverages</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{coverages.length} coverage(s)</p>
-            </div>
+            {hasCoverageFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 text-muted-foreground"
+                onClick={() => {
+                  setNameFilter("");
+                  setTypeFilter("ALL");
+                  setRatingTableFilter("__all__");
+                  setSumInsuredFilter("ALL");
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
           </div>
+          <FilterGrid>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Name</Label>
+              <Input
+                className="h-9 bg-white"
+                placeholder="Filter by name…"
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Type</Label>
+              <Select
+                value={typeFilter}
+                onValueChange={(v) => setTypeFilter(v as "ALL" | "Mandatory" | "Optional Rider")}
+              >
+                <SelectTrigger className="h-9 bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All types</SelectItem>
+                  <SelectItem value="Mandatory">Mandatory</SelectItem>
+                  <SelectItem value="Optional Rider">Optional</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Rating table</Label>
+              <Select value={ratingTableFilter} onValueChange={setRatingTableFilter}>
+                <SelectTrigger className="h-9 bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All rating tables</SelectItem>
+                  {(tablesPage?.items ?? [])
+                    .filter((t) => Boolean(t.id))
+                    .map((t) => (
+                    <SelectItem key={t.id} value={t.id as string}>
+                      {t.name?.trim() || t.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Sum insured</Label>
+              <Select
+                value={sumInsuredFilter}
+                onValueChange={(v) => setSumInsuredFilter(v as "ALL" | "fixed" | "percentage")}
+              >
+                <SelectTrigger className="h-9 bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="fixed">Fixed</SelectItem>
+                  <SelectItem value="percentage">Percentage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </FilterGrid>
         </div>
         {coverages.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-muted-foreground">No coverages linked yet.</div>
@@ -510,7 +655,13 @@ const CoveragesTab = ({ productId }: Props) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {coverages.map((c) => {
+              {filteredCoverages.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={COL_COUNT} className="text-center text-sm text-muted-foreground py-10">
+                    No coverages match the current filters.
+                  </TableCell>
+                </TableRow>
+              ) : filteredCoverages.map((c) => {
                 const isExpanded = expandedIds.has(c.id);
                 const isFixed = c.isSumInsuredFixed ?? true;
                 const missingFixed = missingFixedSumInsuredCurrencies(c, supportedCurrencies);

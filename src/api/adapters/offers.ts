@@ -1,35 +1,35 @@
 /** Map Offers API ↔ UI `Offer` shape. Unsupported UI fields stay as placeholders. */
 
 import type {
-  OffersOfferResponse,
   DomainOffersOfferStatus,
-  OffersOfferParticipantResponse,
-  OffersOfferInsuredPersonResponse,
-  OffersOfferYearResponse,
-  OffersOfferLoanDisbursementResponse,
-  DomainOffersOfferYearDocumentStatus,
+  OffersOfferListItemResponse,
+  OffersOfferPeriodResponse,
+  OffersOfferResponse,
 } from "../types";
 import type {
   Offer,
-  OfferStatus,
-  PaymentMode,
-  OfferParticipant,
+  OfferDiscountRequest,
+  OfferDocumentRequirement,
   OfferInsuredPerson,
-  OfferYear,
+  OfferListItem,
   OfferLoanDisbursement,
+  OfferLoanSubmission,
+  OfferParticipant,
+  OfferReviewFlag,
+  OfferStatus,
+  OfferYear,
+  PaymentMode,
   Beneficiary,
 } from "@/data/offers";
 
 const DEFAULT_PAYMENT: PaymentMode = "Pagesa me prim te rregullt";
 
-const statusFromApi = (s?: DomainOffersOfferStatus): OfferStatus => {
+export const statusFromApi = (s?: DomainOffersOfferStatus | string | null): OfferStatus => {
   switch (s) {
     case "draft":
       return "Draft";
     case "quoted":
       return "Quoted";
-    case "partiallyBound":
-      return "Partially Bound";
     case "bound":
       return "Bound";
     case "cancelled":
@@ -44,7 +44,7 @@ const statusFromApi = (s?: DomainOffersOfferStatus): OfferStatus => {
 const shareToPercentage = (share?: number | null) =>
   Math.round((share ?? 0) * 10000) / 100;
 
-const mapParticipant = (p: OffersOfferParticipantResponse): OfferParticipant => ({
+const mapParticipant = (p: NonNullable<OffersOfferResponse["participants"]>[number]): OfferParticipant => ({
   id: String(p.id ?? ""),
   partyId: p.partyId ?? "",
   role: p.role ?? "policyHolder",
@@ -54,9 +54,10 @@ const mapParticipant = (p: OffersOfferParticipantResponse): OfferParticipant => 
   countryCode: p.countryCode,
   isLeader: p.isLeader,
   share: p.share,
+  relationshipToInsured: p.relationshipToInsured,
 });
 
-const mapInsuredPerson = (p: OffersOfferInsuredPersonResponse): OfferInsuredPerson => ({
+const mapInsuredPerson = (p: NonNullable<OffersOfferResponse["insuredPersons"]>[number]): OfferInsuredPerson => ({
   id: String(p.id ?? ""),
   personId: p.personId ?? "",
   personalIdentifier: p.personalIdentifier,
@@ -67,16 +68,22 @@ const mapInsuredPerson = (p: OffersOfferInsuredPersonResponse): OfferInsuredPers
   gender: p.gender,
 });
 
-const mapOfferYear = (s: OffersOfferYearResponse): OfferYear => ({
+const periodInsuredAmount = (s: OffersOfferPeriodResponse) =>
+  s.openingBalance ??
+  Math.max(0, ...(s.coverages ?? []).map((c) => c.sumInsured ?? 0));
+
+const mapOfferPeriod = (s: OffersOfferPeriodResponse, offerPolicyId?: string | null): OfferYear => ({
   id: String(s.id ?? ""),
-  year: s.year ?? 0,
+  year: s.sequenceNumber ?? 0,
   startDate: s.period?.startDate?.slice(0, 10) ?? "",
   endDate: s.period?.endDate?.slice(0, 10) ?? "",
-  insuredAmount: s.insuredAmount ?? 0,
-  premium: s.premium ?? 0,
-  payPremium: s.payPremium ?? s.premium ?? 0,
-  internalStatus: s.internalStatus,
-  policyId: s.policyId ?? null,
+  insuredAmount: periodInsuredAmount(s),
+  premium: s.calculatedPremium ?? 0,
+  payPremium: s.chargePremium ?? s.calculatedPremium ?? 0,
+  internalStatus: s.status,
+  policyId: s.status === "appliedToPolicy" ? offerPolicyId ?? null : null,
+  openingBalance: s.openingBalance ?? null,
+  closingBalance: s.closingBalance ?? null,
   coverages:
     s.coverages?.map((c) => ({
       id: String(c.id ?? ""),
@@ -86,45 +93,79 @@ const mapOfferYear = (s: OffersOfferYearResponse): OfferYear => ({
       ratingTableMultiplierUsed: c.ratingTableMultiplierUsed,
       calculatedPremium: c.calculatedPremium ?? 0,
     })) ?? [],
-  documents:
-    s.documents?.map((d) => ({
-      id: String(d.id ?? ""),
-      documentId: d.documentId ?? null,
-      documentTypeId: d.documentTypeId ?? "",
-      status: (d.status ?? "required") as DomainOffersOfferYearDocumentStatus,
-      refusalReason: d.refusalReason,
-    })) ?? [],
-  discountRequests:
-    s.discountRequests?.map((r) => ({
-      id: String(r.id ?? ""),
-      requestedDiscountPercentage: r.requestedDiscountPercentage ?? 0,
-      reason: r.reason ?? "",
-      status: r.status ?? "requested",
-    })) ?? [],
-  reviewFlags:
-    s.reviewFlags?.map((f) => ({
-      id: String(f.id ?? ""),
-      type: f.type ?? "",
-      reason: f.reason ?? "",
-      status: f.status ?? "pending",
-      raisedOnUtc: f.raisedOnUtc,
-      resolvedOnUtc: f.resolvedOnUtc ?? null,
-    })) ?? [],
 });
 
-const mapLoanDisbursement = (l: OffersOfferLoanDisbursementResponse): OfferLoanDisbursement => ({
+const mapLoanFromPeriod = (s: OffersOfferPeriodResponse): OfferLoanDisbursement => ({
+  id: String(s.id ?? ""),
+  year: s.sequenceNumber ?? 0,
+  startDate: s.period?.startDate?.slice(0, 10) ?? "",
+  endDate: s.period?.endDate?.slice(0, 10) ?? "",
+  remainingLoanAmount: s.openingBalance ?? 0,
+  closingBalance: s.closingBalance ?? null,
+});
+
+const mapLoanSubmission = (
+  l: NonNullable<OffersOfferResponse["loanSubmissions"]>[number],
+): OfferLoanSubmission => ({
   id: String(l.id ?? ""),
-  year: l.year ?? 0,
-  startDate: l.period?.startDate?.slice(0, 10) ?? "",
-  endDate: l.period?.endDate?.slice(0, 10) ?? "",
-  remainingLoanAmount: l.remainingLoanAmount ?? 0,
+  sourceSystem: l.sourceSystem ?? "",
+  externalReference: l.externalReference,
+  receivedOnUtc: l.receivedOnUtc,
+});
+
+const mapDocumentRequirement = (
+  d: NonNullable<OffersOfferResponse["documentRequirements"]>[number],
+): OfferDocumentRequirement => ({
+  id: String(d.id ?? ""),
+  documentId: d.documentId ?? null,
+  documentTypeId: d.documentTypeId ?? "",
+  status: d.status ?? "required",
+  submissionSource: d.submissionSource,
+  refusalReason: d.refusalReason,
+  waiverReason: d.waiverReason,
+  isSatisfied: d.isSatisfied,
+  submittedOnUtc: d.submittedOnUtc ?? null,
+  decidedOnUtc: d.decidedOnUtc ?? null,
+});
+
+const mapReviewFlag = (
+  f: NonNullable<OffersOfferResponse["reviewFlags"]>[number],
+): OfferReviewFlag => ({
+  id: String(f.id ?? ""),
+  type: f.type ?? "",
+  reason: f.reason ?? "",
+  status: f.status ?? "raised",
+  raisedOnUtc: f.raisedOnUtc,
+  resolvedOnUtc: f.resolvedOnUtc ?? null,
+  resolutionNote: f.resolutionNote,
+});
+
+const mapDiscountRequest = (
+  r: NonNullable<OffersOfferResponse["discountRequests"]>[number],
+): OfferDiscountRequest => ({
+  id: String(r.id ?? ""),
+  requestedDiscountPercentage: r.requestedDiscountPercentage ?? 0,
+  reason: r.reason ?? "",
+  status: r.status ?? "requested",
+  targetPeriodSequence: r.targetPeriodSequence ?? null,
+  requestedOnUtc: r.requestedOnUtc,
+  decidedOnUtc: r.decidedOnUtc ?? null,
 });
 
 export const mapApiOffer = (o: OffersOfferResponse): Offer => {
   const participants = (o.participants ?? []).map(mapParticipant);
   const insuredPersons = (o.insuredPersons ?? []).map(mapInsuredPerson);
-  const offerYears = (o.offerYears ?? []).map(mapOfferYear);
-  const loanDisbursements = (o.loanDisbursements ?? []).map(mapLoanDisbursement);
+  const offerYears = (o.periods ?? []).map((p) => mapOfferPeriod(p, o.policyId));
+  const hasLoanBalances = (o.periods ?? []).some(
+    (p) => p.openingBalance != null || p.closingBalance != null,
+  );
+  const loanDisbursements = hasLoanBalances
+    ? (o.periods ?? []).map(mapLoanFromPeriod)
+    : [];
+  const loanSubmissions = (o.loanSubmissions ?? []).map(mapLoanSubmission);
+  const documentRequirements = (o.documentRequirements ?? []).map(mapDocumentRequirement);
+  const reviewFlags = (o.reviewFlags ?? []).map(mapReviewFlag);
+  const discountRequests = (o.discountRequests ?? []).map(mapDiscountRequest);
 
   const holder = participants.find((p) => p.role === "policyHolder");
   const payer = participants.find((p) => p.role === "invoiced") ?? holder;
@@ -135,7 +176,7 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     .map((p) => ({
       id: p.id,
       customerId: p.partyId,
-      relationship: "N/A",
+      relationship: p.relationshipToInsured ?? "N/A",
       percentage: shareToPercentage(p.share),
       displayName: p.displayName,
       partyType: p.partyType,
@@ -143,18 +184,18 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     }));
 
   const firstYear = offerYears[0];
-  const premium =
-    firstYear?.payPremium ??
-    firstYear?.premium ??
-    firstYear?.coverages.reduce((sum, c) => sum + c.calculatedPremium, 0) ??
-    0;
+  const premium = offerYears.reduce(
+    (sum, s) => sum + (s.payPremium || s.premium || 0),
+    0,
+  );
 
   const created = o.createdOnUtc?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
-  const start = firstYear?.startDate || created;
-  const end = firstYear?.endDate || created;
+  const start = o.coverageTerm?.startDate?.slice(0, 10) || firstYear?.startDate || created;
+  const end = o.coverageTerm?.endDate?.slice(0, 10) || firstYear?.endDate || created;
   const startYear = Number(start.slice(0, 4)) || new Date().getFullYear();
   const endYear = Number(end.slice(0, 4)) || startYear;
   const loan = loanDisbursements[0];
+  const sales = o.salesAttribution;
 
   return {
     id: o.id ?? "",
@@ -163,6 +204,10 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     versionId: "N/A",
     templateId: "N/A",
     currency: o.currency ?? "EUR",
+    policyPlan: o.policyPlan,
+    requiresLoanBalances: o.requiresLoanBalances,
+    policyId: o.policyId ?? null,
+    renewedFromPolicyId: o.renewedFromPolicyId ?? null,
     policyHolderId: holder?.partyId ?? "",
     payerId: payer?.partyId ?? "",
     insuredId: insured?.personId ?? "",
@@ -177,15 +222,67 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
       ? {
           amount: loan.remainingLoanAmount,
           interestRate: 0,
-          loanTermYears: Math.max(1, endYear - startYear),
-          remainingYears: Math.max(1, endYear - startYear),
+          loanTermYears: Math.max(1, loanDisbursements.length),
+          remainingYears: Math.max(1, loanDisbursements.length),
           outstandingBalance: loan.remainingLoanAmount,
         }
       : undefined,
     loanDisbursements,
+    loanSubmissions,
     offerYears,
+    documentRequirements,
+    reviewFlags,
+    discountRequests,
     premium,
     status: statusFromApi(o.status),
     createdDate: created,
+    createdOnUtc: o.createdOnUtc ?? null,
+    quotedOnUtc: o.quotedOnUtc ?? null,
+    createdByAuthUserId: sales?.createdByAuthUserId ?? null,
+    createdByUserName: sales?.createdByUserName ?? null,
+    salesChannel: sales?.salesChannel,
+    salesPartyName:
+      sales?.partnerName ??
+      sales?.agentDisplayName ??
+      sales?.internalOfficeName ??
+      sales?.createdByUserName ??
+      null,
+    agentId: sales?.agentId ?? null,
+    agentSelectionMethod: sales?.agentSelectionMethod ?? null,
+    salesAgentName: sales?.agentDisplayName ?? null,
+    partnerId: sales?.partnerId ?? null,
+    salesPartnerName: sales?.partnerName ?? null,
+    partnerOfficeId: sales?.partnerOfficeId ?? null,
+    salesOfficeName:
+      sales?.partnerOfficeName ?? sales?.internalOfficeName ?? null,
+  };
+};
+
+export const mapApiOfferListItem = (o: OffersOfferListItemResponse): OfferListItem => {
+  const start = o.coverageTerm?.startDate?.slice(0, 10) ?? "";
+  const end = o.coverageTerm?.endDate?.slice(0, 10) ?? "";
+  return {
+    id: o.id ?? "",
+    number: o.id ?? "",
+    productId: o.productId ?? "",
+    productName: o.productName,
+    policyPlan: o.policyPlan,
+    currency: o.currency ?? "EUR",
+    status: statusFromApi(o.status),
+    createdDate: o.createdOnUtc?.slice(0, 10) ?? "",
+    expiresOnUtc: o.expiresOnUtc ?? null,
+    policyId: o.policyId ?? null,
+    startDate: start,
+    endDate: end,
+    premium: o.firstPeriodChargePremium ?? 0,
+    sumInsured: o.sumInsured ?? null,
+    policyHolderName: o.policyHolderName,
+    insuredName: o.insuredName,
+    insuredAge: o.insuredAge,
+    salesChannel: o.salesChannel,
+    salesPartyName: o.salesPartyName,
+    outstandingDocumentCount: o.outstandingDocumentCount ?? 0,
+    raisedReviewFlagCount: o.raisedReviewFlagCount ?? 0,
+    pendingDiscountRequestCount: o.pendingDiscountRequestCount ?? 0,
   };
 };

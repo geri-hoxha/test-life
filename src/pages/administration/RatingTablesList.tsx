@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
+import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,7 +49,7 @@ import {
 import type { RatingTablesRatingTableResponse } from "@/api/types";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -78,7 +80,8 @@ const RatingTablesList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListRatingTables(listQuery);
+  const { data: pageData, isLoading, isFetching, error } = useListRatingTables(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
@@ -162,12 +165,15 @@ const RatingTablesList = () => {
             Manage age and gender rating rules used by product coverages.
           </p>
         </div>
-        <Button className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Add rating table
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Add rating table
+          </Button>
+        )}
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -217,11 +223,7 @@ const RatingTablesList = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading data, please wait…
-                    </TableCell>
-                  </TableRow>
+                  <TableLoadingRow colSpan={4} />
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">
@@ -300,6 +302,7 @@ const RatingTablesList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
 
       <Dialog
         open={dialogOpen}
@@ -324,6 +327,7 @@ const RatingTablesList = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Standard life rates"
+              maxLength={512}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSave();
               }}

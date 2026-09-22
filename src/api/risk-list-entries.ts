@@ -1,9 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
-  DomainComplianceRiskListType,
   PaginationPagedListOfRiskListEntryResponse,
   RiskListsAddRiskListEntryRequest,
+  RiskListsListRiskListEntriesRequest,
   RiskListsRiskListEntryResponse,
 } from "./types";
 
@@ -35,11 +35,7 @@ export const useCreateRiskListEntry = () => {
   });
 };
 
-export type ListRiskListEntriesQuery = {
-  personalIdentifier?: string;
-  listType?: DomainComplianceRiskListType;
-  createdFromUtc?: string;
-  createdToUtc?: string;
+export type ListRiskListEntriesQuery = RiskListsListRiskListEntriesRequest & {
   pageNumber?: number;
   pageSize?: number;
 };

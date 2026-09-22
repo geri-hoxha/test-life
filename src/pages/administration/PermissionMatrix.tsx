@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
+import { FilterGrid } from "@/components/FilterGrid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -103,12 +105,72 @@ const PermissionMatrix = () => {
 
       {/* Table */}
       <Card className="mt-4 overflow-hidden">
-        <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-base">Permissions</CardTitle>
-            <CardDescription>
-              {rows.length} {rows.length === 1 ? "permission" : "permissions"} found
-            </CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Permissions</CardTitle>
+                <CardDescription>
+                  {rows.length} {rows.length === 1 ? "permission" : "permissions"} found
+                </CardDescription>
+              </div>
+            </div>
+            <FilterGrid>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Product</Label>
+                <Select
+                  value={fProduct}
+                  onValueChange={(v) => { setFProduct(v); setFTemplate(ALL); }}
+                >
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All products</SelectItem>
+                    {matrixProducts.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Template</Label>
+                <Select value={fTemplate} onValueChange={setFTemplate}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All templates</SelectItem>
+                    {templatesForFilter.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Agency</Label>
+                <Select
+                  value={fAgency}
+                  onValueChange={(v) => { setFAgency(v); setFAgent(ALL); }}
+                >
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All agencies</SelectItem>
+                    {matrixAgencies.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Agent</Label>
+                <Select value={fAgent} onValueChange={setFAgent}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All agents</SelectItem>
+                    {agentsForFilter.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </FilterGrid>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -116,38 +178,10 @@ const PermissionMatrix = () => {
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
                 <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <th className="p-2 border-b border-border font-semibold min-w-[200px]">
-                    <HeaderFilter
-                      label="Product Name"
-                      value={fProduct}
-                      onChange={(v) => { setFProduct(v); setFTemplate(ALL); }}
-                      options={matrixProducts.map((p) => ({ value: p.id, label: p.name }))}
-                    />
-                  </th>
-                  <th className="p-2 border-b border-border font-semibold min-w-[220px]">
-                    <HeaderFilter
-                      label="Template Name"
-                      value={fTemplate}
-                      onChange={setFTemplate}
-                      options={templatesForFilter.map((t) => ({ value: t.id, label: t.name }))}
-                    />
-                  </th>
-                  <th className="p-2 border-b border-border font-semibold min-w-[180px]">
-                    <HeaderFilter
-                      label="Agency"
-                      value={fAgency}
-                      onChange={(v) => { setFAgency(v); setFAgent(ALL); }}
-                      options={matrixAgencies.map((a) => ({ value: a.id, label: a.name }))}
-                    />
-                  </th>
-                  <th className="p-2 border-b border-border font-semibold min-w-[180px]">
-                    <HeaderFilter
-                      label="Agent"
-                      value={fAgent}
-                      onChange={setFAgent}
-                      options={agentsForFilter.map((a) => ({ value: a.id, label: a.name }))}
-                    />
-                  </th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[200px]">Product Name</th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[220px]">Template Name</th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[180px]">Agency</th>
+                  <th className="p-3 border-b border-border font-semibold min-w-[180px]">Agent</th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[110px]">Can Sell</th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">First Sale KMS</th>
                   <th className="p-3 border-b border-border font-semibold text-center min-w-[120px]">Renewal KMS</th>
@@ -293,32 +327,3 @@ const PermissionMatrix = () => {
 };
 
 export default PermissionMatrix;
-
-const HeaderFilter = ({
-  label, value, onChange, options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) => {
-  const active = value !== ALL;
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{label}</span>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger
-          className={`h-8 text-xs font-normal normal-case tracking-normal bg-background ${active ? "border-accent text-foreground" : "text-muted-foreground"}`}
-        >
-          <SelectValue placeholder="All" />
-        </SelectTrigger>
-        <SelectContent className="max-h-72">
-          <SelectItem value={ALL}>All</SelectItem>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-};

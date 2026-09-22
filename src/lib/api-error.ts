@@ -1,6 +1,9 @@
 import { toast } from "sonner";
 import { ApiError } from "@/api/client";
 
+export const isApiForbidden = (err: unknown): boolean =>
+  err instanceof ApiError && err.status === 403;
+
 /** Prefer RFC 7807 `detail`, then message, then fallback. */
 export const getApiErrorMessage = (err: unknown, fallback: string): string => {
   if (err instanceof ApiError) {

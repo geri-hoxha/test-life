@@ -16,6 +16,12 @@ import {
 } from "@/data/documents";
 import { useListDocumentTypes } from "@/api/document-types";
 import { useListDocuments } from "@/api/documents";
+import { getCurrencies } from "@/config/currencies";
+import {
+  DOCUMENT_REUSE_POLICIES,
+  DOCUMENT_STAGES,
+} from "@/pages/products/document-requirement-ui";
+import type { ProductsDocumentRequirementStage, ProductsDocumentReusePolicy } from "@/api/types";
 
 type Props = {
   open: boolean;
@@ -23,10 +29,11 @@ type Props = {
   productId: string;
   versionId: string;
   linkedDocumentTypeIds?: string[];
+  currencies?: string[];
   onSave: (d: ProductDocument & { description?: string; templateFile?: File | null }) => void;
 };
 
-const blank = (productId: string, versionId: string): ProductDocument => ({
+const blank = (productId: string, versionId: string, currency: string): ProductDocument => ({
   id: newDocumentId(),
   productId, versionId,
   name: "",
@@ -36,15 +43,30 @@ const blank = (productId: string, versionId: string): ProductDocument => ({
   thresholdAmount: 0,
   templateDocumentId: null,
   insuredAmountOver: null,
+  insuredAmountCurrency: currency,
   totalExposureOver: null,
+  totalExposureCurrency: currency,
   ageOver: 0,
   isPep: false,
+  isForeignCitizen: false,
+  stages: "initialOffer",
+  reusePolicy: "requireNewSubmission",
   notes: "",
 });
 
-const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocumentTypeIds = [], onSave }: Props) => {
+const DocumentDialog = ({
+  open,
+  onOpenChange,
+  productId,
+  versionId,
+  linkedDocumentTypeIds = [],
+  currencies: currenciesProp,
+  onSave,
+}: Props) => {
+  const currencies = currenciesProp?.length ? currenciesProp : [...getCurrencies()];
+  const defaultCurrency = currencies[0] ?? "EUR";
   const [source, setSource] = useState<"existing" | "new">("existing");
-  const [d, setD] = useState<ProductDocument>(blank(productId, versionId));
+  const [d, setD] = useState<ProductDocument>(blank(productId, versionId, defaultCurrency));
   const [description, setDescription] = useState("");
   const [documentTypeId, setDocumentTypeId] = useState<string>("");
   const [templateFile, setTemplateFile] = useState<File | null>(null);
@@ -63,12 +85,12 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
   const templateDocuments = documentsPage?.items ?? [];
 
   useEffect(() => {
-    setD(blank(productId, versionId));
+    setD(blank(productId, versionId, defaultCurrency));
     setDocumentTypeId("");
     setDescription("");
     setTemplateFile(null);
     setSource("existing");
-  }, [productId, versionId, open]);
+  }, [productId, versionId, open, defaultCurrency]);
 
   const set = <K extends keyof ProductDocument>(k: K, v: ProductDocument[K]) =>
     setD((s) => ({ ...s, [k]: v }));
@@ -79,7 +101,6 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
     setD((s) => ({
       ...s,
       name: found?.name?.trim() || s.name,
-      templateDocumentId: found?.templateDocumentId ?? null,
     }));
   };
 
@@ -117,7 +138,7 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add required document</DialogTitle>
           <DialogDescription>
@@ -248,6 +269,20 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
                 />
               </div>
               <div className="space-y-1.5">
+                <Label>Insured amount currency</Label>
+                <Select
+                  value={d.insuredAmountCurrency || defaultCurrency}
+                  onValueChange={(v) => set("insuredAmountCurrency", v)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {currencies.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="teo">Total exposure over</Label>
                 <Input
                   id="teo"
@@ -260,6 +295,20 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
                 />
               </div>
               <div className="space-y-1.5">
+                <Label>Total exposure currency</Label>
+                <Select
+                  value={d.totalExposureCurrency || defaultCurrency}
+                  onValueChange={(v) => set("totalExposureCurrency", v)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {currencies.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="age">Age over</Label>
                 <Input
                   id="age"
@@ -270,12 +319,47 @@ const DocumentDialog = ({ open, onOpenChange, productId, versionId, linkedDocume
                   className="font-mono"
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label>Stages</Label>
+                <Select
+                  value={d.stages && d.stages !== "none" ? d.stages : "initialOffer"}
+                  onValueChange={(v) => set("stages", v as ProductsDocumentRequirementStage)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_STAGES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Reuse policy</Label>
+                <Select
+                  value={d.reusePolicy ?? "requireNewSubmission"}
+                  onValueChange={(v) => set("reusePolicy", v as ProductsDocumentReusePolicy)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_REUSE_POLICIES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label className="block">PEP</Label>
               <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
                 <span className="text-sm">{d.isPep ? "Required for PEP" : "Not PEP-specific"}</span>
                 <Switch checked={Boolean(d.isPep)} onCheckedChange={(v) => set("isPep", v)} />
+              </label>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="block">Foreign citizen</Label>
+              <label className="flex items-center justify-between gap-3 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                <span className="text-sm">{d.isForeignCitizen ? "Required for foreign citizens" : "Not citizenship-specific"}</span>
+                <Switch checked={Boolean(d.isForeignCitizen)} onCheckedChange={(v) => set("isForeignCitizen", v)} />
               </label>
             </div>
           </div>

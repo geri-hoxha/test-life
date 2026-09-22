@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,23 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Customer, fullName } from "@/data/customers";
+import { useGetPerson, useListPeople } from "@/api/people";
+import { useGetCompany, useListCompanies } from "@/api/companies";
+import { mapCompanyToCustomer, mapPersonToCustomer, mergeCustomers } from "@/api/adapters/customers";
+import { compactQuery } from "@/lib/list-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 type CustomerComboboxProps = {
-  customers: Customer[];
+  /** When omitted, people and companies are loaded when the field is opened. */
+  customers?: Customer[];
   value: string;
   onValueChange: (id: string) => void;
   placeholder?: string;
   className?: string;
   triggerClassName?: string;
   disabled?: boolean;
+  allowClear?: boolean;
+  clearLabel?: string;
 };
 
 const formatBirthday = (iso: string) => {
@@ -78,11 +86,66 @@ export const CustomerCombobox = ({
   className,
   triggerClassName,
   disabled,
+  allowClear = false,
+  clearLabel = "All parties",
 }: CustomerComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const selected = customers.find((c) => c.id === value);
-  const filtered = customers.filter((c) => matchesCustomerSearch(c, search));
+  const isRemote = customers === undefined;
+  const debouncedSearch = useDebouncedValue(search.trim(), 500);
+
+  const peopleQuery = useMemo(() => {
+    const parts = debouncedSearch.split(/\s+/).filter(Boolean);
+    const firstName = parts[0];
+    const lastName = parts.length > 1 ? parts.slice(1).join(" ") : undefined;
+    return compactQuery({
+      pageNumber: 1,
+      pageSize: 50,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
+    });
+  }, [debouncedSearch]);
+
+  const companiesQuery = useMemo(
+    () =>
+      compactQuery({
+        pageNumber: 1,
+        pageSize: 50,
+        legalName: debouncedSearch || undefined,
+      }),
+    [debouncedSearch],
+  );
+
+  const { data: peoplePage, isFetching: peopleFetching } = useListPeople(peopleQuery, {
+    enabled: isRemote && open,
+  });
+  const { data: companiesPage, isFetching: companiesFetching } = useListCompanies(companiesQuery, {
+    enabled: isRemote && open,
+  });
+  const { data: selectedPerson } = useGetPerson(value, {
+    enabled: isRemote && Boolean(value),
+  });
+  const { data: selectedCompany } = useGetCompany(value, {
+    enabled: isRemote && Boolean(value) && !selectedPerson,
+  });
+
+  const remoteCustomers = useMemo(
+    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
+    [companiesPage?.items, peoplePage?.items],
+  );
+  const source = isRemote ? remoteCustomers : (customers ?? []);
+  const filtered = useMemo(
+    () => source.filter((c) => matchesCustomerSearch(c, search)),
+    [search, source],
+  );
+  const selectedFromList = source.find((c) => c.id === value);
+  const selectedMapped = selectedPerson
+    ? mapPersonToCustomer(selectedPerson)
+    : selectedCompany
+      ? mapCompanyToCustomer(selectedCompany)
+      : undefined;
+  const selected = selectedFromList ?? (isRemote ? selectedMapped : undefined);
+  const isFetching = peopleFetching || companiesFetching;
 
   return (
     <Popover
@@ -118,15 +181,27 @@ export const CustomerCombobox = ({
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>No customer found.</CommandEmpty>
+            <CommandEmpty>{isRemote && isFetching ? "Loading…" : "No customer found."}</CommandEmpty>
             <CommandGroup>
+              {allowClear && (
+                <CommandItem
+                  value="__clear__"
+                  onSelect={() => {
+                    onValueChange("");
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4 shrink-0", !value ? "opacity-100" : "opacity-0")} />
+                  <span className="text-muted-foreground">{clearLabel}</span>
+                </CommandItem>
+              )}
               {filtered.map((c) => (
                 <CommandItem
                   key={c.id}
                   value={customerSearchValue(c)}
-                  className="data-[selected=true]:bg-blue-50 data-[selected='true']:bg-blue-50 data-[selected=true]:text-foreground data-[selected='true']:text-foreground"
                   onSelect={() => {
-                    onValueChange(c.id);
+                    onValueChange(allowClear && value === c.id ? "" : c.id);
                     setOpen(false);
                     setSearch("");
                   }}

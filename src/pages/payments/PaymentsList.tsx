@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
+import { FilterGrid } from "@/components/FilterGrid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -40,15 +42,40 @@ const PaymentsList = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [yearFilter, setYearFilter] = useState("ALL");
+  const [currencyFilter, setCurrencyFilter] = useState("ALL");
   const rows = useMemo(() => getAllSchedules(), []);
+  const years = useMemo(
+    () => [...new Set(rows.map((r) => r.year))].sort((a, b) => b - a),
+    [rows],
+  );
+  const currencies = useMemo(
+    () => [...new Set(rows.map((r) => r.currency))].sort(),
+    [rows],
+  );
 
   const filtered = rows.filter((r) => {
     if (statusFilter !== "ALL" && r.status !== statusFilter) return false;
+    if (yearFilter !== "ALL" && String(r.year) !== yearFilter) return false;
+    if (currencyFilter !== "ALL" && r.currency !== currencyFilter) return false;
     if (!q.trim()) return true;
     const policy = getPolicy(r.policyId);
     const holder = policy ? getCustomer(policy.policyHolderId) : undefined;
     return [r.policyNumber, holder ? fullName(holder) : ""].join(" ").toLowerCase().includes(q.toLowerCase());
   });
+
+  const hasFilters =
+    Boolean(q.trim()) ||
+    statusFilter !== "ALL" ||
+    yearFilter !== "ALL" ||
+    currencyFilter !== "ALL";
+
+  const clearFilters = () => {
+    setQ("");
+    setStatusFilter("ALL");
+    setYearFilter("ALL");
+    setCurrencyFilter("ALL");
+  };
 
   const counts = STATUSES.reduce((acc, s) => {
     acc[s] = rows.filter((r) => r.status === s).length;
@@ -81,24 +108,61 @@ const PaymentsList = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payment Schedule</CardTitle>
-              <CardDescription>{filtered.length} of {rows.length} installments</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search policy, customer…" className="pl-8 h-9 w-[260px]" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payment Schedule</CardTitle>
+                <CardDescription>{filtered.length} of {rows.length} installments</CardDescription>
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All statuses</SelectItem>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {hasFilters && (
+                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )}
             </div>
+            <FilterGrid>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Search policy, customer…" className="pl-8 h-9" value={q} onChange={(e) => setQ(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All statuses</SelectItem>
+                    {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Year</Label>
+                <Select value={yearFilter} onValueChange={setYearFilter}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All years</SelectItem>
+                    {years.map((year) => (
+                      <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Currency</Label>
+                <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All currencies</SelectItem>
+                    {currencies.map((ccy) => (
+                      <SelectItem key={ccy} value={ccy}>{ccy}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </FilterGrid>
           </div>
         </CardHeader>
         <CardContent>

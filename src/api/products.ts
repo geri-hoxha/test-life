@@ -2,17 +2,21 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { apiKeys, apiRequest } from "./client";
 import type {
   PaginationPagedListOfProductResponse,
+  ProductsActuarialCode,
   ProductsAddProductCoverageCurrencyLimitRequest,
   ProductsAddProductCoverageRequest,
   ProductsAddProductDocumentTypeRequest,
-  ProductsAddProductPaymentMethodRequest,
+  ProductsAddProductBankAccountRequest,
   ProductsCreateProductRequest,
+  ProductsCurrencyLimitType,
+  ProductsDocumentRequirementStage,
+  ProductsDocumentReusePolicy,
+  ProductsPolicyPlanRules,
   ProductsPolicyPlanType,
-  ProductsScheduleBasis,
   ProductsProductCoverageCurrencyLimitResponse,
   ProductsProductCoverageResponse,
   ProductsProductDocumentTypeResponse,
-  ProductsProductPaymentMethodResponse,
+  ProductsProductBankAccountResponse,
   ProductsProductResponse,
   ProductsUpdateProductCoverageRequest,
   ProductsUpdateProductRequest,
@@ -24,6 +28,71 @@ export const productsKeys = {
   list: (params?: Record<string, unknown>) => [...productsKeys.lists(), params ?? {}] as const,
   details: () => [...productsKeys.all, "detail"] as const,
   detail: (id: string) => [...productsKeys.details(), id] as const,
+};
+
+export const buildAddProductBankAccountBody = (
+  bankAccountId: string,
+): ProductsAddProductBankAccountRequest => ({ bankAccountId });
+
+export const buildAddProductCoverageBody = (input: {
+  coverageId: string;
+  ratingTableId: string;
+  ratingTableMultiplier?: number;
+  isMandatory?: boolean;
+  isSumInsuredFixed?: boolean;
+  sumInsuredPercentage?: number;
+}): ProductsAddProductCoverageRequest => {
+  const isSumInsuredFixed = input.isSumInsuredFixed ?? true;
+  return {
+    coverageId: input.coverageId,
+    ratingTableId: input.ratingTableId,
+    ratingTableMultiplier: input.ratingTableMultiplier ?? 1,
+    isMandatory: input.isMandatory ?? true,
+    isSumInsuredFixed,
+    ...(!isSumInsuredFixed && input.sumInsuredPercentage != null
+      ? { sumInsuredPercentage: input.sumInsuredPercentage }
+      : {}),
+  };
+};
+
+export const buildAddProductCoverageCurrencyLimitBody = (input: {
+  currency: string;
+  type: ProductsCurrencyLimitType;
+  value: number;
+}): ProductsAddProductCoverageCurrencyLimitRequest => ({
+  currency: input.currency,
+  type: input.type,
+  value: input.value,
+});
+
+export const buildAddProductDocumentTypeBody = (input: {
+  documentTypeId: string;
+  alwaysRequired: boolean;
+  insuredAmountOver?: number | null;
+  insuredAmountCurrency?: string | null;
+  totalExposureOver?: number | null;
+  totalExposureCurrency?: string | null;
+  ageOver?: number | null;
+  isPep?: boolean | null;
+  isForeignCitizen?: boolean | null;
+  stages?: ProductsDocumentRequirementStage;
+  reusePolicy?: ProductsDocumentReusePolicy;
+}): ProductsAddProductDocumentTypeRequest => {
+  const insuredAmountOver = input.insuredAmountOver ?? null;
+  const totalExposureOver = input.totalExposureOver ?? null;
+  return {
+    documentTypeId: input.documentTypeId,
+    alwaysRequired: input.alwaysRequired,
+    insuredAmountOver,
+    insuredAmountCurrency: insuredAmountOver != null ? (input.insuredAmountCurrency || null) : null,
+    totalExposureOver,
+    totalExposureCurrency: totalExposureOver != null ? (input.totalExposureCurrency || null) : null,
+    ageOver: input.ageOver ?? null,
+    isPep: input.isPep ?? false,
+    isForeignCitizen: input.isForeignCitizen ?? false,
+    stages: input.stages && input.stages !== "none" ? input.stages : "initialOffer",
+    reusePolicy: input.reusePolicy ?? "requireNewSubmission",
+  };
 };
 
 /** POST /api/products/{productId}/coverages */
@@ -72,51 +141,51 @@ export const useAddProductDocumentType = () => {
   });
 };
 
-/** POST /api/products/{productId}/payment-methods */
-export const addProductPaymentMethod = async (
+/** POST /api/products/{productId}/bank-accounts */
+export const addProductBankAccount = async (
   productId: string,
-  body: ProductsAddProductPaymentMethodRequest,
+  body: ProductsAddProductBankAccountRequest,
   signal?: AbortSignal,
-): Promise<ProductsProductPaymentMethodResponse> =>
-  apiRequest<ProductsProductPaymentMethodResponse>({
+): Promise<ProductsProductBankAccountResponse> =>
+  apiRequest<ProductsProductBankAccountResponse>({
     method: "POST",
-    path: `/api/products/${encodeURIComponent(productId)}/payment-methods`,
+    path: `/api/products/${encodeURIComponent(productId)}/bank-accounts`,
     body,
     signal,
   });
 
-export const useAddProductPaymentMethod = () => {
+export const useAddProductBankAccount = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
       productId: string;
-      body: ProductsAddProductPaymentMethodRequest;
-    }) => addProductPaymentMethod(vars.productId, vars.body),
+      body: ProductsAddProductBankAccountRequest;
+    }) => addProductBankAccount(vars.productId, vars.body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: productsKeys.all });
     },
   });
 };
 
-/** DELETE /api/products/{productId}/payment-methods/{paymentMethodEntryId} */
-export const removeProductPaymentMethod = async (
+/** DELETE /api/products/{productId}/bank-accounts/{productBankAccountId} */
+export const removeProductBankAccount = async (
   productId: string,
-  paymentMethodEntryId: string,
+  productBankAccountId: string | number,
   signal?: AbortSignal,
 ): Promise<void> =>
   apiRequest<void>({
     method: "DELETE",
-    path: `/api/products/${encodeURIComponent(productId)}/payment-methods/${encodeURIComponent(paymentMethodEntryId)}`,
+    path: `/api/products/${encodeURIComponent(productId)}/bank-accounts/${encodeURIComponent(String(productBankAccountId))}`,
     signal,
   });
 
-export const useRemoveProductPaymentMethod = () => {
+export const useRemoveProductBankAccount = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: {
       productId: string;
-      paymentMethodEntryId: string;
-    }) => removeProductPaymentMethod(vars.productId, vars.paymentMethodEntryId),
+      productBankAccountId: string | number;
+    }) => removeProductBankAccount(vars.productId, vars.productBankAccountId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: productsKeys.all });
     },
@@ -357,143 +426,51 @@ export const useRemoveProductDocumentType = () => {
   });
 };
 
-/** UI-facing shape with safe defaults for fields the API does not return yet. */
+/** UI-facing product with defaults for optional API fields. */
 export type MappedProduct = {
   id: string;
   name: string;
-  code: string;
-  status: "Draft" | "Active" | "Inactive";
   currencies: string[];
-  activeVersion: string;
-  createdDate: string;
-  type: string;
-  description: string;
-  requiredDocuments: string[];
-  flags: {
-    pep: boolean;
-    highInsuredAmount: boolean;
-    totalExposure: boolean;
-    manualUnderwriting: boolean;
-    compliance: boolean;
-  };
-  agentCommission: number;
-  bankCommission: number;
-  bankPartnerCode: string;
   productGroupId?: string;
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
+  defaultTermsTemplateDocumentId?: string | null;
   policyPlanType?: ProductsPolicyPlanType | null;
-  issuanceMode?: string | null;
-  calculationMethod?: string | null;
-  scheduleBasis?: ProductsScheduleBasis | null;
+  planRules?: ProductsPolicyPlanRules;
+  maximumCoverageTermMonths?: number | null;
+  /** Whole years implied by `maximumCoverageTermMonths` (for offer term capping). */
   maxCoveredYears?: number | null;
-  paymentModel?: string;
-  premiumTableId?: string;
+  actuarialCode?: ProductsActuarialCode | null;
+  sapProductCode?: string | null;
+  sapChannelCode?: string | null;
+  f5ProductCode?: string | null;
+  requiresLoanBalances?: boolean;
   coverages?: ProductsProductCoverageResponse[];
   productDocumentTypes?: ProductsProductDocumentTypeResponse[];
-  paymentMethods?: ProductsProductPaymentMethodResponse[];
-  setupDetails?: {
-    legacyPacketId: number;
-    bankPartnerCode: string;
-    policyType: string;
-    insuranceAmountType: string;
-    legacyTariffId: number;
-    maxTenorMonths: number;
-    isObsolete: boolean;
-    apiSubject: boolean;
-    apiStraight: boolean;
-  };
-  paymentDetails?: {
-    premiumPaymentType: string;
-    packetPaymentType: string;
-    renewalType: string;
-  };
-  loanDetails?: {
-    packetLoanType: string;
-    loanProductType: string;
-  };
-  internalDetails?: {
-    coveragePrintableText: string;
-    packetFinType: number | null;
-  };
-  externalDetails?: {
-    sapProductCode: string;
-    sapChannelCode: string;
-    f5ProductCode: string;
-    actuarialProductCode: string;
-  };
+  bankAccounts?: ProductsProductBankAccountResponse[];
 };
 
-export const mapApiProduct = (p: ProductsProductResponse): MappedProduct => {
-  const statusRaw = p.status?.trim();
-  const status =
-    statusRaw === "Active" || statusRaw === "Inactive" || statusRaw === "Draft"
-      ? statusRaw
-      : "Draft";
-
-  return {
-    id: p.id ?? "",
-    name: p.name ?? "—",
-    code: p.code?.trim() || p.id || "—",
-    status,
-    currencies: p.supportedCurrencies ?? [],
-    activeVersion: p.activeVersion?.trim() || "—",
-    createdDate: p.createdDate?.trim() || "—",
-    type: p.type?.trim() || "Life Insurance",
-    description: p.description?.trim() || p.coverageText?.trim() || "",
-    requiredDocuments: p.requiredDocuments ?? [],
-    flags: {
-      pep: p.flags?.pep ?? false,
-      highInsuredAmount: p.flags?.highInsuredAmount ?? false,
-      totalExposure: p.flags?.totalExposure ?? false,
-      manualUnderwriting: p.flags?.manualUnderwriting ?? false,
-      compliance: p.flags?.compliance ?? false,
-    },
-    agentCommission: p.agentCommission ?? 0,
-    bankCommission: p.bankCommission ?? 0,
-    bankPartnerCode: p.bankPartnerCode?.trim() || "—",
-    productGroupId: p.productGroupId,
-    coverageText: p.coverageText,
-    defaultPrintableTemplateDocumentId: p.defaultPrintableTemplateDocumentId ?? null,
-    policyPlanType: p.policyPlanType ?? null,
-    issuanceMode: p.issuanceMode ?? null,
-    calculationMethod: p.calculationMethod ?? null,
-    scheduleBasis: p.scheduleBasis ?? null,
-    maxCoveredYears: p.maxCoveredYears ?? null,
-    paymentModel: p.paymentModel ?? undefined,
-    premiumTableId: p.premiumTableId ?? undefined,
-    coverages: p.coverages,
-    productDocumentTypes: p.productDocumentTypes,
-    paymentMethods: p.paymentMethods,
-    setupDetails: {
-      legacyPacketId: 0,
-      bankPartnerCode: p.bankPartnerCode?.trim() || "—",
-      policyType: "—",
-      insuranceAmountType: "—",
-      legacyTariffId: 0,
-      maxTenorMonths: 0,
-      isObsolete: false,
-      apiSubject: false,
-      apiStraight: false,
-    },
-    paymentDetails: {
-      premiumPaymentType: "—",
-      packetPaymentType: "—",
-      renewalType: "—",
-    },
-    loanDetails: {
-      packetLoanType: "—",
-      loanProductType: "—",
-    },
-    internalDetails: {
-      coveragePrintableText: p.coverageText ?? "",
-      packetFinType: null,
-    },
-    externalDetails: {
-      sapProductCode: "—",
-      sapChannelCode: "—",
-      f5ProductCode: "—",
-      actuarialProductCode: "—",
-    },
-  };
-};
+export const mapApiProduct = (p: ProductsProductResponse): MappedProduct => ({
+  id: p.id ?? "",
+  name: p.name ?? "—",
+  currencies: p.supportedCurrencies ?? [],
+  productGroupId: p.productGroupId,
+  coverageText: p.coverageText,
+  defaultPrintableTemplateDocumentId: p.defaultPrintableTemplateDocumentId ?? null,
+  defaultTermsTemplateDocumentId: p.defaultTermsTemplateDocumentId ?? null,
+  policyPlanType: p.policyPlanType ?? null,
+  planRules: p.planRules,
+  maximumCoverageTermMonths: p.maximumCoverageTermMonths ?? null,
+  maxCoveredYears:
+    p.maximumCoverageTermMonths != null && p.maximumCoverageTermMonths > 0
+      ? Math.max(1, Math.floor(p.maximumCoverageTermMonths / 12))
+      : null,
+  actuarialCode: p.actuarialCode ?? null,
+  sapProductCode: p.sapProductCode ?? null,
+  sapChannelCode: p.sapChannelCode ?? null,
+  f5ProductCode: p.f5ProductCode ?? null,
+  requiresLoanBalances: p.requiresLoanBalances ?? false,
+  coverages: p.coverages,
+  productDocumentTypes: p.productDocumentTypes,
+  bankAccounts: p.bankAccounts,
+});

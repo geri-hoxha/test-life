@@ -60,11 +60,14 @@ export type Customer = {
   lastName: string;
   fatherName?: string;
   personalId: string; // SSN / National ID (Individual)
-  ssnIssuingCountry?: string; // country that issued the SSN
+  ssnIssuingCountry?: string; // unused for people — countryCode is no longer on the person API
   dateOfBirth: string; // ISO
   gender: Gender;
   nationality?: string;
   placeOfBirth?: string;
+  addressDistrict?: string;
+  profession?: string;
+  position?: string;
 
   // Company fields
   companyName?: string;
@@ -101,15 +104,18 @@ export const ageFromDob = (iso: string) => {
 
 export const customerSchema = z.object({
   customerType: z.enum(["Individual", "Company"]),
-  firstName: z.string().trim().max(80).optional().or(z.literal("")),
-  lastName: z.string().trim().max(80).optional().or(z.literal("")),
-  fatherName: z.string().trim().max(80).optional().or(z.literal("")),
-  personalId: z.string().trim().max(40).optional().or(z.literal("")),
+  firstName: z.string().trim().max(256).optional().or(z.literal("")),
+  lastName: z.string().trim().max(256).optional().or(z.literal("")),
+  fatherName: z.string().trim().max(256).optional().or(z.literal("")),
+  personalId: z.string().trim().max(64).optional().or(z.literal("")),
   dateOfBirth: z.string().optional().or(z.literal("")),
   gender: z.enum(["Male", "Female", "Other"]).optional(),
   nationality: z.string().trim().max(80).optional().or(z.literal("")),
   ssnIssuingCountry: z.string().trim().max(80).optional().or(z.literal("")),
-  placeOfBirth: z.string().trim().max(120).optional().or(z.literal("")),
+  placeOfBirth: z.string().trim().max(256).optional().or(z.literal("")),
+  addressDistrict: z.string().trim().max(256).optional().or(z.literal("")),
+  profession: z.string().trim().max(256).optional().or(z.literal("")),
+  position: z.string().trim().max(256).optional().or(z.literal("")),
   companyName: z.string().trim().max(160).optional().or(z.literal("")),
   nipt: z.string().trim().max(30).optional().or(z.literal("")),
   companyType: z.string().optional(),
@@ -132,16 +138,9 @@ export const customerSchema = z.object({
     if (!c.nationality?.trim() || c.nationality === "N/A") {
       ctx.addIssue({ code: "custom", message: "Nationality is required", path: ["nationality"] });
     }
-    const country = c.ssnIssuingCountry || c.country;
-    if (!country?.trim() || country === "N/A") {
-      ctx.addIssue({ code: "custom", message: "Country is required", path: ["ssnIssuingCountry"] });
-    }
   } else {
     if (!c.companyName?.trim()) ctx.addIssue({ code: "custom", message: "Company name is required", path: ["companyName"] });
     if (!c.nipt?.trim()) ctx.addIssue({ code: "custom", message: "NIPT is required", path: ["nipt"] });
-    if (!c.nationality?.trim() || c.nationality === "N/A") {
-      ctx.addIssue({ code: "custom", message: "Nationality is required", path: ["nationality"] });
-    }
     if (!c.country?.trim() || c.country === "N/A") {
       ctx.addIssue({ code: "custom", message: "Country is required", path: ["country"] });
     }
@@ -178,7 +177,7 @@ const seed: Customer[] = [
     notes: "Group life cover for 42 employees." },
 ];
 
-let customers: Customer[] = [...seed];
+const customers: Customer[] = [...seed];
 
 export const getCustomer = (id: string) => customers.find((c) => c.id === id);
 

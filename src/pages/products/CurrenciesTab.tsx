@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
+import { Loader } from "@/components/Loader";
 import { Landmark } from "lucide-react";
 import { useGetProduct } from "@/api/products";
 import { useListBankAccounts } from "@/api/bank-accounts";
@@ -33,18 +34,18 @@ const CurrenciesTab = ({ productId, currencies }: { productId: string; currencie
 
   const accountByCurrency = useMemo(() => {
     const map: Record<string, BankAccountsBankAccountResponse | undefined> = {};
-    for (const pm of apiProduct?.paymentMethods ?? []) {
-      const currency = pm.currency?.trim();
-      if (!currency || !pm.bankAccountId) continue;
-      map[currency] = accountsById[pm.bankAccountId];
+    for (const entry of apiProduct?.bankAccounts ?? []) {
+      const currency = entry.currency?.trim();
+      if (!currency || !entry.bankAccountId) continue;
+      map[currency] = accountsById[entry.bankAccountId];
     }
     return map;
-  }, [apiProduct?.paymentMethods, accountsById]);
+  }, [apiProduct?.bankAccounts, accountsById]);
 
   if (productLoading || accountsLoading) {
     return (
-      <Card className="p-10 text-center shadow-card border-border">
-        <p className="text-sm text-muted-foreground">Loading currency bank configurations…</p>
+      <Card className="p-10 shadow-card border-border">
+        <Loader label="Loading currency bank configurations…" />
       </Card>
     );
   }

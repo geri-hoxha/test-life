@@ -64,7 +64,9 @@ export type PaginationPagedListOfRatingTableResponse = {
 
 export type PaginationPagedRequest = Record<string, unknown>;
 
-export type RatingTablesListRatingTablesRequest = PaginationPagedRequest & Record<string, unknown>;
+export type RatingTablesListRatingTablesRequest = PaginationPagedRequest & {
+  name?: string;
+};
 
 export type RatingTablesRemoveRatingTableRuleRequest = Record<string, unknown>;
 
@@ -91,12 +93,22 @@ export type ProductsProductCoverageResponse = {
   currencyLimits?: ProductsProductCoverageCurrencyLimitResponse[];
 };
 
+export type ProductsCurrencyLimitType =
+  | "fixedSumInsuredAmount"
+  | "minimumPremium"
+  | "yearlyLimit"
+  | "aggregateLimit";
+
+export type ProductsDocumentRequirementStage = "none" | "initialOffer" | "policyRenewal";
+
+export type ProductsDocumentReusePolicy = "requireNewSubmission" | "reuseAcceptedWithinPolicy";
+
 export type ProductsAddProductCoverageRequest = {
-  coverageId?: string;
-  ratingTableId?: string;
-  ratingTableMultiplier?: number;
-  isMandatory?: boolean;
-  isSumInsuredFixed?: boolean;
+  coverageId: string;
+  ratingTableId: string;
+  ratingTableMultiplier: number;
+  isMandatory: boolean;
+  isSumInsuredFixed: boolean;
   sumInsuredPercentage?: number;
 };
 
@@ -104,21 +116,18 @@ export type ProductsUpdateProductCoverageRequest = ProductsAddProductCoverageReq
 
 export type ProductsAddProductCoverageCurrencyLimitRequest = {
   currency: string;
-  type: string;
+  type: ProductsCurrencyLimitType;
   value: number;
 };
 
-export type ProductsCurrencyLimitType =
-  | "fixedSumInsuredAmount"
-  | "minimumPremium"
-  | "yearlyLimit"
-  | "aggregateLimit";
-
 export type ProductsProductDocumentTypeRequiredForResponse = {
   insuredAmountOver?: number | null;
+  insuredAmountCurrency?: string | null;
   totalExposureOver?: number | null;
+  totalExposureCurrency?: string | null;
   ageOver?: number | null;
   isPep?: boolean | null;
+  isForeignCitizen?: boolean | null;
   alwaysRequired?: boolean;
 };
 
@@ -126,26 +135,90 @@ export type ProductsProductDocumentTypeResponse = {
   id?: number;
   documentTypeId?: string;
   requiredFor?: ProductsProductDocumentTypeRequiredForResponse;
+  stages?: ProductsDocumentRequirementStage;
+  reusePolicy?: ProductsDocumentReusePolicy;
 };
 
 export type ProductsAddProductDocumentTypeRequest = {
-  documentTypeId?: string;
-  alwaysRequired?: boolean;
+  documentTypeId: string;
+  alwaysRequired: boolean;
   insuredAmountOver?: number | null;
+  insuredAmountCurrency?: string | null;
   totalExposureOver?: number | null;
+  totalExposureCurrency?: string | null;
   ageOver?: number | null;
   isPep?: boolean | null;
+  isForeignCitizen?: boolean | null;
+  stages?: ProductsDocumentRequirementStage;
+  reusePolicy?: ProductsDocumentReusePolicy;
 };
 
-export type ProductsAddProductPaymentMethodRequest = {
-  bankAccountId?: string;
+export type ProductsAddProductBankAccountRequest = {
+  bankAccountId: string;
 };
 
-export type ProductsProductPaymentMethodResponse = {
-  id?: string | number;
+export type ProductsProductBankAccountResponse = {
+  id?: number;
   bankAccountId?: string;
   currency?: string;
 };
+
+export type ProductsOfferScheduleMode =
+  | "initialPeriodOnly"
+  | "fullScheduleAtQuote"
+  | "singleCoveragePeriod";
+
+export type ProductsPolicyContinuationMode =
+  | "appendCoveragePeriodAtRenewal"
+  | "issueAllPeriodsAtInception"
+  | "issueNewPolicyAtRenewal";
+
+export type ProductsCoveragePeriodCadence = "annual" | "monthly" | "wholeTerm";
+
+export type ProductsBillingCadence =
+  | "singleAtInception"
+  | "oncePerCoveragePeriod"
+  | "monthlyWithinCoveragePeriod";
+
+export type ProductsPremiumCalculationMethod =
+  | "declining"
+  | "leveled"
+  | "singlePremium"
+  | "nonDecliningProrated"
+  | "entryAgeFixedMonthly";
+
+export type ProductsMaturityRuleKind = "explicitDate" | "fixedOneYear" | "attainedAge";
+
+export type ProductsMaturityRule = {
+  kind?: ProductsMaturityRuleKind;
+  attainedAge?: number | null;
+};
+
+/** Read-only rules derived from `policyPlanType`. */
+export type ProductsPolicyPlanRules = {
+  offerSchedule?: ProductsOfferScheduleMode;
+  continuation?: ProductsPolicyContinuationMode;
+  coverageCadence?: ProductsCoveragePeriodCadence;
+  billingCadence?: ProductsBillingCadence;
+  premiumCalculation?: ProductsPremiumCalculationMethod;
+  maturityRule?: ProductsMaturityRule;
+};
+
+export type ProductsActuarialCode =
+  | "RT"
+  | "ST"
+  | "STs"
+  | "STst"
+  | "STmc"
+  | "STmc-t"
+  | "STse"
+  | "STe"
+  | "STmc-EX"
+  | "STmc-ST"
+  | "STmc-SU"
+  | "STmu"
+  | "STet"
+  | "RP";
 
 export type ProductsProductResponse = {
   id?: string;
@@ -153,68 +226,45 @@ export type ProductsProductResponse = {
   coverageText?: string;
   productGroupId?: string;
   supportedCurrencies?: string[];
+  defaultPrintableTemplateDocumentId?: string | null;
+  defaultTermsTemplateDocumentId?: string | null;
   policyPlanType?: ProductsPolicyPlanType | null;
-  /** Derived from `policyPlanType`. */
-  issuanceMode?: string | null;
-  /** Derived from `policyPlanType`. */
-  calculationMethod?: string | null;
-  /** Read-only, derived from `policyPlanType`. Omitted for Upfront/PPI/NA plans. */
-  scheduleBasis?: ProductsScheduleBasis | null;
-  maxCoveredYears?: number | null;
+  planRules?: ProductsPolicyPlanRules;
+  maximumCoverageTermMonths?: number | null;
+  actuarialCode?: ProductsActuarialCode | null;
+  sapProductCode?: string | null;
+  sapChannelCode?: string | null;
   coverages?: ProductsProductCoverageResponse[];
   productDocumentTypes?: ProductsProductDocumentTypeResponse[];
-  paymentMethods?: ProductsProductPaymentMethodResponse[];
-  defaultPrintableTemplateDocumentId?: string | null;
-  /** Not yet returned by API — will be added later. */
-  code?: string | null;
-  status?: string | null;
-  description?: string | null;
-  type?: string | null;
-  activeVersion?: string | null;
-  createdDate?: string | null;
-  bankPartnerCode?: string | null;
-  agentCommission?: number | null;
-  bankCommission?: number | null;
-  paymentModel?: string | null;
-  premiumTableId?: string | null;
-  requiredDocuments?: string[] | null;
-  flags?: {
-    pep?: boolean;
-    highInsuredAmount?: boolean;
-    totalExposure?: boolean;
-    manualUnderwriting?: boolean;
-    compliance?: boolean;
-  } | null;
+  bankAccounts?: ProductsProductBankAccountResponse[];
+  f5ProductCode?: string | null;
+  requiresLoanBalances?: boolean;
 };
-
-export type ProductsIssuanceMode = "annualRenewable" | "wholeOfTerm";
-export type ProductsCalculationMethod = "declining" | "leveled";
 
 /** Product classification. Replaces the former `premiumPlan` + `sumInsuredBasis` pair. */
 export type ProductsPolicyPlanType =
   | "PPR-SIB"
   | "PPR-STB"
   | "PGP"
-  | "PPRS"
   | "PPFM"
   | "PPFV"
-  | "NA";
-
-export type ProductsScheduleBasis = "tabled" | "perRenewalInfo";
+  | "PPRS"
+  | "VOLUNTARY"
+  | "PROTECT-55";
 
 export type ProductsCreateProductRequest = {
   name: string;
   productGroupId?: string;
+  policyPlanType: ProductsPolicyPlanType;
   supportedCurrencies: string[];
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
-  policyPlanType?: ProductsPolicyPlanType | null;
-  maxCoveredYears?: number | null;
-  /** Not yet accepted by API — will be added later. */
-  code?: string;
-  status?: string;
-  description?: string;
-  bankPartnerCode?: string;
+  defaultTermsTemplateDocumentId?: string | null;
+  maximumCoverageTermMonths?: number | null;
+  actuarialCode?: ProductsActuarialCode | null;
+  sapProductCode?: string | null;
+  sapChannelCode?: string | null;
+  f5ProductCode?: string | null;
 };
 
 export type ProductsDeleteProductRequest = Record<string, unknown>;
@@ -238,40 +288,30 @@ export type ProductsRemoveProductCoverageRequest = Record<string, unknown>;
 
 export type ProductsRemoveProductDocumentTypeRequest = Record<string, unknown>;
 
-export type ProductsRemoveProductPaymentMethodRequest = Record<string, unknown>;
+export type ProductsRemoveProductBankAccountRequest = Record<string, unknown>;
 
 export type ProductsUpdateProductRequest = {
   name: string;
+  policyPlanType: ProductsPolicyPlanType;
   supportedCurrencies: string[];
   coverageText?: string;
   defaultPrintableTemplateDocumentId?: string | null;
-  policyPlanType?: ProductsPolicyPlanType | null;
-  maxCoveredYears?: number | null;
-  /** Not yet accepted by API — will be added later. */
-  code?: string;
-  status?: string;
-  description?: string;
-  productGroupId?: string;
-  bankPartnerCode?: string;
+  defaultTermsTemplateDocumentId?: string | null;
+  maximumCoverageTermMonths?: number | null;
+  actuarialCode?: ProductsActuarialCode | null;
+  sapProductCode?: string | null;
+  sapChannelCode?: string | null;
+  f5ProductCode?: string | null;
 };
 
 export type ProductGroupsProductGroupResponse = {
   id?: string;
   name?: string;
-  /** Not yet returned by API — will be added later. */
-  code?: string | null;
-  /** Albanian label — not yet returned by API. */
-  label?: string | null;
-  /** English display name — not yet returned by API (use `name` until then). */
-  english?: string | null;
+  legacyCode?: string | null;
 };
 
 export type ProductGroupsCreateProductGroupRequest = {
   name: string;
-  /** Not yet accepted by API — will be added later. */
-  code?: string;
-  label?: string;
-  english?: string;
 };
 
 export type ProductGroupsDeleteProductGroupRequest = Record<string, unknown>;
@@ -293,10 +333,6 @@ export type ProductGroupsListProductGroupsRequest = PaginationPagedRequest & Rec
 
 export type ProductGroupsUpdateProductGroupRequest = {
   name: string;
-  /** Not yet accepted by API — will be added later. */
-  code?: string;
-  label?: string;
-  english?: string;
 };
 
 export type CoveragesCoverageResponse = {
@@ -325,7 +361,9 @@ export type PaginationPagedListOfCoverageResponse = {
   hasNextPage?: boolean;
 };
 
-export type CoveragesListCoveragesRequest = PaginationPagedRequest & Record<string, unknown>;
+export type CoveragesListCoveragesRequest = PaginationPagedRequest & {
+  name?: string;
+};
 
 export type CoveragesUpdateCoverageRequest = {
   name: string;
@@ -335,6 +373,75 @@ export type CoveragesUpdateCoverageRequest = {
 export type DomainOffersParticipantRole = "policyHolder" | "invoiced" | "beneficiary";
 
 export type DomainPartiesEnumsPartyType = "person" | "company";
+
+export type DomainPoliciesPolicyStatus =
+  | "pendingActivation"
+  | "active"
+  | "lapsed"
+  | "cancelled"
+  | "matured";
+
+export type DomainPoliciesPolicyCancellationStatus = "draft" | "applied";
+
+export type DomainPoliciesCancellationKind = "full" | "partial";
+
+export type DomainPoliciesCancellationReason =
+  | "APL1"
+  | "APL2"
+  | "APL3"
+  | "APL4"
+  | "APJ1"
+  | "APJ2"
+  | "APJ3"
+  | "APJ4";
+
+export type DomainPoliciesPolicyPeriodStatus = "scheduled" | "active" | "expired" | "cancelled";
+
+export type DomainPoliciesPolicyPlan =
+  | "PPR-SIB"
+  | "PPR-STB"
+  | "PGP"
+  | "PPFM"
+  | "PPFV"
+  | "PPRS"
+  | "VOLUNTARY"
+  | "PROTECT-55";
+
+export type DomainPoliciesRelationshipToInsured =
+  | "E NJEJTE"
+  | "ADMINISTRATOR"
+  | "ORTAK"
+  | "TJETER";
+
+export type DomainDistributionSalesChannel =
+  | "partnerApi"
+  | "internalDirect"
+  | "internalForPartner";
+
+export type DomainBillingPremiumInstallmentStatus =
+  | "planned"
+  | "readyToInvoice"
+  | "invoiced"
+  | "cancelled";
+
+export type OffersSalesAttributionResponse = {
+  createdByAuthUserId?: number;
+  createdByUserName?: string | null;
+  salesChannel?: DomainDistributionSalesChannel;
+  agentId?: string | null;
+  agentDisplayName?: string | null;
+  agentSelectionMethod?: string | null;
+  internalBranchId?: string | null;
+  internalBranchName?: string | null;
+  internalOfficeId?: string | null;
+  internalOfficeName?: string | null;
+  partnerId?: string | null;
+  partnerName?: string | null;
+  partnerBranchId?: string | null;
+  partnerBranchName?: string | null;
+  partnerOfficeId?: string | null;
+  partnerOfficeName?: string | null;
+};
 
 export type PoliciesPolicyParticipantResponse = {
   id?: number;
@@ -346,6 +453,7 @@ export type PoliciesPolicyParticipantResponse = {
   countryCode?: string;
   isLeader?: boolean;
   share?: number | null;
+  relationshipToInsured?: DomainPoliciesRelationshipToInsured | null;
 };
 
 export type PoliciesPolicyInsuredPersonResponse = {
@@ -357,15 +465,22 @@ export type PoliciesPolicyInsuredPersonResponse = {
   lastName?: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
+  fatherName?: string | null;
+  birthPlace?: string | null;
+  addressDistrict?: string | null;
+  profession?: string | null;
+  position?: string | null;
 };
 
 export type PoliciesPolicyDocumentResponse = {
   id?: number;
   documentId?: string;
   documentTypeId?: string;
+  sourceRenewalId?: string | null;
+  coveragePeriodSequence?: number | null;
 };
 
-export type PoliciesPolicyCoverageResponse = {
+export type PoliciesPolicyPeriodCoverageResponse = {
   id?: number;
   coverageId?: string;
   coverageName?: string;
@@ -376,44 +491,148 @@ export type PoliciesPolicyCoverageResponse = {
   calculatedPremium?: number;
 };
 
-export type PoliciesPolicyYearResponse = {
+/** @deprecated Use PoliciesPolicyPeriodCoverageResponse. */
+export type PoliciesPolicyCoverageResponse = PoliciesPolicyPeriodCoverageResponse;
+
+export type PoliciesPolicyPeriodResponse = {
   id?: number;
-  year?: number;
+  sequenceNumber?: number;
   period?: OffersDateOnlyRangeResponse;
-  insuredAmount?: number;
-  /** Actuarially-calculated premium. */
-  premium?: number;
-  /** Amount actually billed. Equals `premium` except on PPFM/PPFV plans, where it is leveled. */
-  payPremium?: number;
-  coverages?: PoliciesPolicyCoverageResponse[];
+  openingBalance?: number | null;
+  closingBalance?: number | null;
+  calculatedPremium?: number;
+  chargePremium?: number;
+  status?: DomainPoliciesPolicyPeriodStatus;
+  sourceOfferPeriodSequence?: number | null;
+  sourceRenewalId?: string | null;
+  coverages?: PoliciesPolicyPeriodCoverageResponse[];
 };
+
+/** @deprecated Use PoliciesPolicyPeriodResponse. */
+export type PoliciesPolicyYearResponse = PoliciesPolicyPeriodResponse;
 
 export type PoliciesPolicyResponse = {
   id?: string;
+  serial?: number;
   productId?: string;
   currency?: string;
   offerId?: string;
-  /** Snapshotted from the product at issuance. */
-  policyPlanType?: ProductsPolicyPlanType | null;
   issuedOnUtc?: string;
-  effectiveFromUtc?: string;
-  effectiveToUtc?: string;
+  coverageTerm?: OffersDateOnlyRangeResponse;
   coverageText?: string;
   printableTemplateDocumentId?: string;
+  termsTemplateDocumentId?: string | null;
+  policyPlan?: DomainPoliciesPolicyPlan;
+  requiresLoanBalances?: boolean;
+  status?: DomainPoliciesPolicyStatus;
+  activatedOnUtc?: string | null;
+  cancelledOnUtc?: string | null;
+  cancellationEffectiveOn?: string | null;
+  isIssued?: boolean;
+  renewedFromPolicyId?: string | null;
+  salesAttribution?: OffersSalesAttributionResponse | null;
+  yearlyLimit?: number | null;
+  aggregateLimit?: number | null;
+  exchangeRateToAll?: number | null;
   participants?: PoliciesPolicyParticipantResponse[];
   insuredPersons?: PoliciesPolicyInsuredPersonResponse[];
   documents?: PoliciesPolicyDocumentResponse[];
-  policyYears?: PoliciesPolicyYearResponse[];
+  periods?: PoliciesPolicyPeriodResponse[];
+};
+
+export type PoliciesPolicyCancellationResponse = {
+  id?: string;
+  policyId?: string;
+  status?: DomainPoliciesPolicyCancellationStatus;
+  kind?: DomainPoliciesCancellationKind;
+  registeredOn?: string;
+  effectiveOn?: string;
+  reason?: DomainPoliciesCancellationReason | string;
+  note?: string | null;
+  administrativeExpensePercentage?: number;
+  exchangeRateToAll?: number | null;
+  currency?: string;
+  premiumInvoiced?: number;
+  coverageDays?: number;
+  consumedDays?: number;
+  consumedPremium?: number;
+  unearnedPremium?: number;
+  administrativeExpenses?: number;
+  refundAmount?: number;
+  refundAmountAll?: number | null;
+  agentCommissionReversed?: number;
+  partnerCommissionReversed?: number;
+  registeredByAuthUserId?: number;
+  registeredOnUtc?: string;
+  appliedByAuthUserId?: number | null;
+  appliedOnUtc?: string | null;
+};
+
+export type PoliciesPolicyCancellationRequest = {
+  kind?: DomainPoliciesCancellationKind;
+  reason: DomainPoliciesCancellationReason | string;
+  registeredOn?: string | null;
+  effectiveOn?: string | null;
+  note?: string | null;
+  administrativeExpensePercentage?: number | null;
+  exchangeRateToAll?: number | null;
+};
+
+export type PoliciesApplyPolicyCancellationResponse = {
+  cancellation?: PoliciesPolicyCancellationResponse;
+  creditInvoices?: InvoicesInvoiceResponse[];
+};
+
+export type PoliciesPolicyListItemResponse = {
+  id?: string;
+  serial?: number;
+  productId?: string;
+  productName?: string | null;
+  policyPlan?: DomainPoliciesPolicyPlan;
+  status?: DomainPoliciesPolicyStatus;
+  issuedOnUtc?: string;
+  offerId?: string;
+  renewedFromPolicyId?: string | null;
+  coverageTerm?: OffersDateOnlyRangeResponse;
+  currency?: string;
+  sumInsured?: number | null;
+  primaryCoverageName?: string | null;
+  firstPeriodChargePremium?: number | null;
+  policyHolderName?: string | null;
+  insuredName?: string | null;
+  insuredAge?: number | null;
+  salesChannel?: DomainDistributionSalesChannel | null;
+  salesPartyName?: string | null;
+  periodCount?: number;
+  documentCount?: number;
+};
+
+export type PoliciesPremiumInstallmentResponse = {
+  id?: string;
+  policyId?: string;
+  coveragePeriodSequence?: number | null;
+  installmentSequence?: number;
+  servicePeriod?: OffersDateOnlyRangeResponse;
+  invoiceOnDate?: string;
+  dueDate?: string;
+  currency?: string;
+  amount?: number;
+  status?: DomainBillingPremiumInstallmentStatus;
+  createdOnUtc?: string;
 };
 
 export type PoliciesGetPolicyRequest = Record<string, unknown>;
 
-export type PoliciesIssuePolicyRequest = {
-  printableTemplateDocumentId?: string;
+export type PoliciesIssuePolicyRequest = Record<string, never>;
+
+export type PoliciesIssuePolicyResponse = {
+  policy?: PoliciesPolicyResponse;
+  installments?: PoliciesPremiumInstallmentResponse[];
+  invoices?: InvoicesInvoiceResponse[];
 };
 
-export type PaginationPagedListOfPolicyResponse = {
-  items?: PoliciesPolicyResponse[];
+export type PaginationPagedListOfPolicyListItemResponse = {
+  items?: PoliciesPolicyListItemResponse[];
   pageNumber?: number;
   pageSize?: number;
   totalCount?: number;
@@ -423,7 +642,22 @@ export type PaginationPagedListOfPolicyResponse = {
   hasNextPage?: boolean;
 };
 
-export type PoliciesListPoliciesRequest = PaginationPagedRequest & Record<string, unknown>;
+/** @deprecated Use PaginationPagedListOfPolicyListItemResponse. */
+export type PaginationPagedListOfPolicyResponse = PaginationPagedListOfPolicyListItemResponse;
+
+export type PoliciesListPoliciesRequest = PaginationPagedRequest & {
+  productId?: string;
+  offerId?: string;
+  currency?: string;
+  issuedFromUtc?: string;
+  issuedToUtc?: string;
+  coverageOn?: string;
+  partyId?: string;
+  personId?: string;
+  serial?: number;
+  pageNumber?: number;
+  pageSize?: number;
+};
 
 export type SmartEnumsEnumItem = {
   value: string;
@@ -435,20 +669,28 @@ export type PeoplePersonResponse = {
   firstName?: string;
   lastName?: string;
   personalIdentifier?: string;
-  countryCode?: string;
   nationality?: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
+  fatherName?: string | null;
+  birthPlace?: string | null;
+  addressDistrict?: string | null;
+  profession?: string | null;
+  position?: string | null;
 };
 
 export type PeopleCreatePersonRequest = {
   firstName: string;
   lastName: string;
   personalIdentifier: string;
-  countryCode: string;
   nationality: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
+  fatherName?: string | null;
+  birthPlace?: string | null;
+  addressDistrict?: string | null;
+  profession?: string | null;
+  position?: string | null;
 };
 
 export type PeopleGetPersonRequest = Record<string, unknown>;
@@ -464,16 +706,26 @@ export type PaginationPagedListOfPersonResponse = {
   hasNextPage?: boolean;
 };
 
-export type PeopleListPeopleRequest = PaginationPagedRequest & Record<string, unknown>;
+export type PeopleListPeopleRequest = PaginationPagedRequest & {
+  personalIdentifier?: string;
+  nationality?: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: DomainCommonGender;
+};
 
 export type PeopleUpdatePersonRequest = {
   firstName: string;
   lastName: string;
   personalIdentifier: string;
-  countryCode: string;
   nationality: string;
   dateOfBirth?: string;
   gender?: DomainCommonGender;
+  fatherName?: string | null;
+  birthPlace?: string | null;
+  addressDistrict?: string | null;
+  profession?: string | null;
+  position?: string | null;
 };
 
 export type CompaniesCompanyAddressResponse = {
@@ -501,17 +753,14 @@ export type CompaniesCompanyResponse = {
   tradeName?: string | null;
   registrationNumber?: string;
   countryCode?: string;
-  nationality?: string;
   companyType?: DomainPartiesEnumsCompanyType;
   addresses?: CompaniesCompanyAddressResponse[];
 };
 
 export type CompaniesCreateCompanyRequest = {
   legalName: string;
-  tradeName?: string | null;
   registrationNumber: string;
   countryCode: string;
-  nationality: string;
   companyType?: DomainPartiesEnumsCompanyType;
 };
 
@@ -528,7 +777,13 @@ export type PaginationPagedListOfCompanyResponse = {
   hasNextPage?: boolean;
 };
 
-export type CompaniesListCompaniesRequest = PaginationPagedRequest & Record<string, unknown>;
+export type CompaniesListCompaniesRequest = PaginationPagedRequest & {
+  registrationNumber?: string;
+  countryCode?: string;
+  legalName?: string;
+  tradeName?: string;
+  companyType?: DomainPartiesEnumsCompanyType;
+};
 
 export type CompaniesRemoveCompanyAddressRequest = Record<string, unknown>;
 
@@ -537,7 +792,6 @@ export type CompaniesUpdateCompanyRequest = {
   tradeName?: string | null;
   registrationNumber: string;
   countryCode: string;
-  nationality: string;
   companyType?: DomainPartiesEnumsCompanyType;
 };
 
@@ -561,19 +815,6 @@ export type OffersDateOnlyRangeResponse = {
   endDate?: string;
 };
 
-export type OffersOfferLoanDisbursementResponse = {
-  id?: number;
-  year?: number;
-  period?: OffersDateOnlyRangeResponse;
-  remainingLoanAmount?: number;
-};
-
-export type OffersAddOfferLoanDisbursementRequest = {
-  year?: number;
-  periodStart?: string;
-  periodEnd?: string;
-  remainingLoanAmount?: number;
-};
 
 export type OffersOfferParticipantResponse = {
   id?: number;
@@ -585,6 +826,7 @@ export type OffersOfferParticipantResponse = {
   countryCode?: string;
   isLeader?: boolean;
   share?: number | null;
+  relationshipToInsured?: DomainPoliciesRelationshipToInsured | null;
 };
 
 export type OffersAddOfferParticipantRequest = {
@@ -593,11 +835,12 @@ export type OffersAddOfferParticipantRequest = {
   role?: DomainOffersParticipantRole;
   isLeader?: boolean;
   share?: number | null;
+  relationshipToInsured?: DomainPoliciesRelationshipToInsured | null;
 };
 
-export type DomainOffersInternalOfferYearStatus = "draft" | "pending" | "active" | "cancelled";
+export type DomainOffersOfferPeriodStatus = "draft" | "quoted" | "appliedToPolicy" | "cancelled";
 
-export type OffersOfferYearCoverageResponse = {
+export type OffersOfferPeriodCoverageResponse = {
   id?: number;
   coverageId?: string;
   sumInsured?: number;
@@ -606,140 +849,158 @@ export type OffersOfferYearCoverageResponse = {
   calculatedPremium?: number;
 };
 
-export type DomainOffersOfferYearDocumentStatus = "required" | "submitted" | "accepted" | "refused";
-
-export type OffersOfferYearDocumentResponse = {
+export type OffersOfferPeriodResponse = {
   id?: number;
-  documentId?: string | null;
-  documentTypeId?: string;
-  status?: DomainOffersOfferYearDocumentStatus;
-  refusalReason?: string | null;
+  sequenceNumber?: number;
+  period?: OffersDateOnlyRangeResponse;
+  openingBalance?: number | null;
+  closingBalance?: number | null;
+  calculatedPremium?: number;
+  chargePremium?: number;
+  status?: DomainOffersOfferPeriodStatus;
+  coverages?: OffersOfferPeriodCoverageResponse[];
 };
 
-export type DomainOffersOfferYearDiscountRequestStatus = "requested" | "approved" | "rejected";
+export type OffersOfferLoanSubmissionResponse = {
+  id?: number;
+  sourceSystem?: string;
+  externalReference?: string | null;
+  rawPayload?: string;
+  receivedOnUtc?: string;
+};
 
-export type OffersOfferYearDiscountRequestResponse = {
+export type OffersSubmitOfferLoanPeriodRequest = {
+  sequenceNumber?: number;
+  periodStart?: string;
+  periodEnd?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+};
+
+export type OffersSubmitOfferLoanRequest = {
+  sourceSystem: string;
+  externalReference?: string | null;
+  /** JSON object or array. Echo of the loan-submission request. */
+  rawPayload?: Record<string, unknown> | unknown[];
+  periods: OffersSubmitOfferLoanPeriodRequest[];
+};
+
+export type OffersSubmitOfferLoanResponse = {
+  submission?: OffersOfferLoanSubmissionResponse;
+  periods?: OffersOfferPeriodResponse[];
+};
+
+export type OffersUnderwritingDocumentRequirementResponse = {
+  id?: number;
+  documentTypeId?: string;
+  documentId?: string | null;
+  status?: DomainUnderwritingDocumentStatus;
+  submissionSource?: DomainUnderwritingDocumentSubmissionSource | null;
+  refusalReason?: string | null;
+  waiverReason?: string | null;
+  isSatisfied?: boolean;
+  submittedOnUtc?: string | null;
+  submittedByAuthUserId?: number | null;
+  decidedOnUtc?: string | null;
+  decidedByAuthUserId?: number | null;
+};
+
+export type OffersUnderwritingReviewFlagResponse = {
+  id?: number;
+  type?: DomainUnderwritingReviewFlagType | string;
+  reason?: string;
+  status?: DomainUnderwritingReviewFlagStatus | string;
+  resolutionNote?: string | null;
+  raisedOnUtc?: string;
+  resolvedOnUtc?: string | null;
+  resolvedByAuthUserId?: number | null;
+};
+
+export type OffersUnderwritingDiscountRequestResponse = {
   id?: number;
   requestedDiscountPercentage?: number;
   reason?: string;
-  status?: DomainOffersOfferYearDiscountRequestStatus;
+  targetPeriodSequence?: number | null;
+  status?: DomainUnderwritingDiscountRequestStatus;
+  requestedByAuthUserId?: number;
+  requestedOnUtc?: string;
+  decidedByAuthUserId?: number | null;
+  decidedOnUtc?: string | null;
 };
 
-export type DomainOffersOfferYearReviewFlagStatus = "pending" | "approved" | "rejected";
-
-export type OffersOfferYearReviewFlagResponse = {
-  id?: number;
-  type?: string;
-  reason?: string;
-  status?: DomainOffersOfferYearReviewFlagStatus | string;
-  raisedOnUtc?: string;
-  resolvedOnUtc?: string | null;
-};
-
-export type OffersOfferYearResponse = {
-  id?: number;
-  year?: number;
-  period?: OffersDateOnlyRangeResponse;
-  insuredAmount?: number;
-  /** Actuarially-calculated premium. */
-  premium?: number;
-  /** Amount actually billed. Equals `premium` except on PPFM/PPFV plans, where it is leveled. */
-  payPremium?: number;
-  internalStatus?: DomainOffersInternalOfferYearStatus;
-  policyId?: string | null;
-  coverages?: OffersOfferYearCoverageResponse[];
-  documents?: OffersOfferYearDocumentResponse[];
-  discountRequests?: OffersOfferYearDiscountRequestResponse[];
-  reviewFlags?: OffersOfferYearReviewFlagResponse[];
-};
-
-/** Slim shape used by POST /offers/{offerId}/premium and POST /offers/premium preview UI. */
+/** Slim shape used by POST /offers/{offerId}/premium preview UI. */
 export type OffersOfferPremiumPreview = {
+  sequenceNumber?: number;
   year?: number;
   insuredAmount: number;
   premium: number;
   payPremium: number;
 };
 
-/** POST /api/offers/premium — unbound premium calc from product + insured + loan rows. */
-export type OffersCalculatePremiumRequest = {
-  productId: string;
-  currency: string;
-  dateOfBirth: string;
-  gender: DomainCommonGender;
-  loanDisbursements: OffersAddOfferLoanDisbursementRequest[];
-};
-
-export type OffersApproveOfferYearDiscountRequest = Record<string, unknown>;
-
-export type OffersApproveOfferYearDocumentRequest = Record<string, unknown>;
-
-export type OffersApproveOfferYearReviewFlagRequest = Record<string, unknown>;
-
-export type DomainOffersOfferStatus = "draft" | "quoted" | "partiallyBound" | "bound" | "cancelled" | "expired";
+export type DomainOffersOfferStatus = "draft" | "quoted" | "bound" | "cancelled" | "expired";
 
 export type OffersOfferResponse = {
   id?: string;
   productId?: string;
   currency?: string;
+  coverageTerm?: OffersDateOnlyRangeResponse;
+  policyPlan?: ProductsPolicyPlanType;
+  requiresLoanBalances?: boolean;
   status?: DomainOffersOfferStatus;
+  policyId?: string | null;
+  renewedFromPolicyId?: string | null;
   createdOnUtc?: string;
+  quotedOnUtc?: string | null;
+  salesAttribution?: OffersSalesAttributionResponse | null;
   participants?: OffersOfferParticipantResponse[];
   insuredPersons?: OffersOfferInsuredPersonResponse[];
-  loanDisbursements?: OffersOfferLoanDisbursementResponse[];
-  offerYears?: OffersOfferYearResponse[];
+  periods?: OffersOfferPeriodResponse[];
+  loanSubmissions?: OffersOfferLoanSubmissionResponse[];
+  documentRequirements?: OffersUnderwritingDocumentRequirementResponse[];
+  reviewFlags?: OffersUnderwritingReviewFlagResponse[];
+  discountRequests?: OffersUnderwritingDiscountRequestResponse[];
 };
 
-/** Item of GET /api/offers/renewals-due. */
-export type OffersRenewalDueResponse = {
-  offerId?: string;
+export type OffersOfferListItemResponse = {
+  id?: string;
   productId?: string;
-  nextYear?: number;
-  /** true → next year is already priced, go straight to POST /offers/{offerId}/renewal. */
-  readyToRenew?: boolean;
-  currentPolicyEffectiveToUtc?: string;
+  productName?: string | null;
+  policyPlan?: ProductsPolicyPlanType;
+  status?: DomainOffersOfferStatus;
+  createdOnUtc?: string;
+  expiresOnUtc?: string | null;
+  policyId?: string | null;
+  renewedFromPolicyId?: string | null;
+  coverageTerm?: OffersDateOnlyRangeResponse;
+  currency?: string;
+  sumInsured?: number | null;
+  firstPeriodChargePremium?: number | null;
+  policyHolderName?: string | null;
+  insuredName?: string | null;
+  insuredAge?: number | null;
+  salesChannel?: DomainDistributionSalesChannel | null;
+  salesPartyName?: string | null;
+  outstandingDocumentCount?: number;
+  raisedReviewFlagCount?: number;
+  pendingDiscountRequestCount?: number;
 };
-
-export type PaginationPagedListOfRenewalDueResponse = {
-  items?: OffersRenewalDueResponse[];
-  pageNumber?: number;
-  pageSize?: number;
-  totalCount?: number;
-  totalPages?: number;
-  pageCount?: number;
-  hasPreviousPage?: boolean;
-  hasNextPage?: boolean;
-};
-
-export type OffersListRenewalsDueRequest = PaginationPagedRequest & Record<string, unknown>;
-
-export type OffersCalculateOfferYearsRequest = Record<string, unknown>;
 
 export type OffersCancelOfferRequest = Record<string, unknown>;
 
-/** PUT /api/offers/{offerId}/years/{year}/overwrite */
-export type OffersOverwriteOfferYearRequest = {
-  offerId: string;
-  year: number;
-  insuredAmount: number;
-  premium: number;
-  /** Required. Defaults to `premium` on every plan except PPFM/PPFV. */
-  payPremium: number;
-};
-
-export type OffersCancelOfferYearRequest = Record<string, unknown>;
-
+/** POST /api/offers — `CreateOfferRequest`. */
 export type OffersCreateOfferRequest = {
   productId?: string;
   currency: string;
+  periodStart?: string;
+  periodEnd?: string;
+  partnerOfficeId?: string | null;
+  agentId?: string | null;
 };
 
 export type OffersGetOfferRequest = Record<string, unknown>;
 
-export type OffersListOfferYearDocumentsRequest = Record<string, unknown>;
-
-export type PaginationPagedListOfOfferResponse = {
-  items?: OffersOfferResponse[];
+export type PaginationPagedListOfOfferListItemResponse = {
+  items?: OffersOfferListItemResponse[];
   pageNumber?: number;
   pageSize?: number;
   totalCount?: number;
@@ -749,30 +1010,46 @@ export type PaginationPagedListOfOfferResponse = {
   hasNextPage?: boolean;
 };
 
-export type OffersListOffersRequest = PaginationPagedRequest & Record<string, unknown>;
+/** @deprecated List items are `OfferListItemResponse`. */
+export type PaginationPagedListOfOfferResponse = PaginationPagedListOfOfferListItemResponse;
 
-export type OffersRejectOfferYearDiscountRequest = Record<string, unknown>;
+export type OffersListOffersRequest = PaginationPagedRequest & {
+  status?: DomainOffersOfferStatus;
+  productId?: string;
+  currency?: string;
+  createdFromUtc?: string;
+  createdToUtc?: string;
+  partyId?: string;
+  personId?: string;
+  pageNumber?: number;
+  pageSize?: number;
+};
 
-export type OffersRejectOfferYearDocumentRequest = {
+export type OffersResolveOfferReviewFlagRequest = {
+  note: string;
+};
+
+export type OffersRefuseOfferDocumentRequest = {
   reason: string;
 };
 
-export type OffersRejectOfferYearReviewFlagRequest = Record<string, unknown>;
+export type OffersSubmitOfferDocumentRequest = {
+  documentId?: string;
+};
+
+export type OffersWaiveOfferDocumentRequest = {
+  reason: string;
+};
+
+export type OffersRequestOfferDiscountRequest = {
+  requestedDiscountPercentage?: number;
+  reason: string;
+  targetPeriodSequence?: number | null;
+};
 
 export type OffersRemoveOfferInsuredPersonRequest = Record<string, unknown>;
 
-export type OffersRemoveOfferLoanDisbursementRequest = Record<string, unknown>;
-
 export type OffersRemoveOfferParticipantRequest = Record<string, unknown>;
-
-export type OffersRequestOfferYearDiscountRequest = {
-  requestedDiscountPercentage?: number;
-  reason: string;
-};
-
-export type OffersSubmitOfferYearDocumentRequest = {
-  documentId?: string;
-};
 
 export type DocumentsDocumentTypesDocumentTypeResponse = {
   id?: string;
@@ -825,7 +1102,6 @@ export type DocumentsDocumentResponse = {
   sha256Hash?: string;
   storageProvider?: DomainDocumentsDocumentStorageProvider;
   createdOn?: string;
-  deletedOn?: string | null;
 };
 
 export type DocumentsCreateDocumentRequest = {
@@ -850,10 +1126,10 @@ export type PaginationPagedListOfDocumentResponse = {
 };
 
 export type DocumentsListDocumentsRequest = PaginationPagedRequest & {
+  originalFileName?: string;
   createdFromUtc?: string;
   createdToUtc?: string;
   isDeleted?: boolean;
-  originalFileName?: string;
 };
 
 export type DocumentsUpdateDocumentRequest = {
@@ -894,7 +1170,12 @@ export type PaginationPagedListOfBankAccountResponse = {
   hasNextPage?: boolean;
 };
 
-export type BankAccountsListBankAccountsRequest = PaginationPagedRequest & Record<string, unknown>;
+export type BankAccountsListBankAccountsRequest = PaginationPagedRequest & {
+  currency?: string;
+  bankName?: string;
+  iban?: string;
+  swiftCode?: string;
+};
 
 export type BankAccountsUpdateBankAccountRequest = {
   bankCode: string;
@@ -933,7 +1214,12 @@ export type PaginationPagedListOfRiskListEntryResponse = {
   hasNextPage?: boolean;
 };
 
-export type RiskListsListRiskListEntriesRequest = PaginationPagedRequest & Record<string, unknown>;
+export type RiskListsListRiskListEntriesRequest = PaginationPagedRequest & {
+  personalIdentifier?: string;
+  listType?: DomainComplianceRiskListType;
+  createdFromUtc?: string;
+  createdToUtc?: string;
+};
 
 export type CurrencyRatesCurrencyRateResponse = {
   id?: string;
@@ -957,4 +1243,553 @@ export type PaginationPagedListOfCurrencyRateResponse = {
 export type CurrencyRatesListCurrencyRatesRequest = PaginationPagedRequest & {
   latestOnly?: boolean;
   currency?: string;
+};
+
+/** POST /api/auth/token */
+export type AuthTokenRequest = {
+  username: string;
+  password: string;
+};
+
+export type AuthTokenResponse = {
+  accessToken: string;
+  expiresOnUtc: string;
+};
+
+/** GET /api/me/sales-access */
+export type GrantedPartnerOfficeResponse = {
+  partnerId?: Ulid;
+  partnerName?: string;
+  partnerOfficeId?: Ulid;
+  officeCode?: string;
+  officeName?: string;
+  isActive?: boolean;
+};
+
+export type GrantedAgentResponse = {
+  agentId?: Ulid;
+  displayName?: string;
+  isActive?: boolean;
+};
+
+export type UserSalesAccessResponse = {
+  authUserId: number;
+  mayChooseAgent: boolean;
+  partnerOffices: GrantedPartnerOfficeResponse[];
+  agents: GrantedAgentResponse[];
+};
+
+export type DomainInvoicesInvoiceStatus = "pending" | "failed" | "fiscalized";
+
+export type DomainInvoicesInvoiceType = "credit" | "sale";
+
+export type InvoicesServicePeriod = {
+  startDate?: string;
+  endDate?: string;
+};
+
+export type InvoicesInvoiceLineResponse = {
+  id?: number;
+  lineNumber?: number;
+  type?: string;
+  name?: string;
+  fiscalName?: string;
+  quantity?: number;
+  fiscalUnitCode?: string;
+  netAmountPerUnit?: number;
+  vatAmountPerUnit?: number;
+  vatCategory?: string;
+  vatPercentage?: number;
+  vatExemptionReasonCode?: string | null;
+  lineNetAmount?: number;
+  lineVatAmount?: number;
+  lineGrossAmount?: number;
+};
+
+export type InvoicesInvoiceListItemResponse = {
+  id?: string;
+  number?: number;
+  policySerial?: number;
+  policyId?: string;
+  premiumInstallmentId?: string;
+  type?: DomainInvoicesInvoiceType;
+  servicePeriod?: InvoicesServicePeriod;
+  dueDate?: string;
+  currency?: string;
+  totalNetAmount?: number;
+  totalVatAmount?: number;
+  totalGrossAmount?: number;
+  issuedOn?: string;
+  status?: DomainInvoicesInvoiceStatus;
+  iic?: string | null;
+  fic?: string | null;
+  customerName?: string;
+  lineCount?: number;
+  provider?: string;
+};
+
+export type InvoicesInvoiceResponse = InvoicesInvoiceListItemResponse & {
+  qrUrl?: string | null;
+  errorCode?: string | null;
+  faultDescription?: string | null;
+  lines?: InvoicesInvoiceLineResponse[];
+  externalDocumentId?: string | null;
+  creditsInvoiceId?: string | null;
+  creditedByInvoiceId?: string | null;
+};
+
+export type PaginationPagedListOfInvoiceListItemResponse = {
+  items?: InvoicesInvoiceListItemResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type InvoicesListInvoicesRequest = PaginationPagedRequest & {
+  policyId?: string;
+  status?: DomainInvoicesInvoiceStatus;
+  type?: DomainInvoicesInvoiceType;
+};
+
+export type InvoicesRetryFiscalizationRequest = {
+  reason: string;
+  externalDocumentId?: string;
+};
+
+export type DomainCommissionsBusinessType = "newBusiness" | "renewal";
+
+export type DomainCommissionsBasis = "premium" | "sumInsured";
+
+export type DomainCommissionsEntryType = "accrual" | "reversal";
+
+export type AgentCommissionsAgentCommissionResponse = {
+  id?: string;
+  agentId?: string;
+  productId?: string;
+  productName?: string | null;
+  policyId?: string;
+  policySerial?: number;
+  premiumInstallmentId?: string;
+  agentProductConfigurationId?: string;
+  businessType?: DomainCommissionsBusinessType;
+  basis?: DomainCommissionsBasis;
+  appliedRate?: number;
+  basisAmount?: number;
+  amount?: number;
+  currency?: string;
+  entryType?: DomainCommissionsEntryType;
+  calculationVersion?: number;
+  postedOnUtc?: string;
+};
+
+export type PaginationPagedListOfAgentCommissionResponse = {
+  items?: AgentCommissionsAgentCommissionResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type AgentCommissionsListAgentCommissionsRequest = PaginationPagedRequest & {
+  agentId?: string;
+  policyId?: string;
+  productId?: string;
+  businessType?: DomainCommissionsBusinessType;
+  entryType?: DomainCommissionsEntryType;
+  postedFrom?: string;
+  postedTo?: string;
+};
+
+export type CommissionsCommissionSummaryLine = {
+  currency?: string;
+  businessType?: DomainCommissionsBusinessType;
+  entryCount?: number;
+  accruedAmount?: number;
+  reversedAmount?: number;
+  netAmount?: number;
+};
+
+export type CommissionsCommissionSummaryResponse = {
+  lines?: CommissionsCommissionSummaryLine[];
+};
+
+export type AgentCommissionsGetSummaryRequest = {
+  agentId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type AgentsAgentResponse = {
+  id?: string;
+  displayName?: string;
+  isActive?: boolean;
+};
+
+export type PaginationPagedListOfAgentResponse = {
+  items?: AgentsAgentResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type AgentsListAgentsRequest = PaginationPagedRequest & {
+  isActive?: boolean;
+};
+
+export type AgentsCreateAgentRequest = {
+  displayName: string;
+};
+
+export type AgentsUpdateAgentRequest = {
+  displayName: string;
+  isActive?: boolean;
+};
+
+export type AgentsAgentProductConfigurationResponse = {
+  id?: string;
+  agentId?: string;
+  productId?: string;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
+  effectiveFrom?: string;
+  effectiveToExclusive?: string | null;
+};
+
+export type AgentsCreateAgentProductConfigurationRequest = {
+  productId?: string;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
+  effectiveFrom?: string;
+  effectiveToExclusive?: string | null;
+};
+
+export type AgentsUpdateAgentProductConfigurationRequest = {
+  effectiveFrom?: string;
+  effectiveToExclusive?: string | null;
+};
+
+export type PartnersPartnerResponse = {
+  id?: string;
+  name?: string;
+  isActive?: boolean;
+};
+
+export type PaginationPagedListOfPartnerResponse = {
+  items?: PartnersPartnerResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type PartnersListPartnersRequest = PaginationPagedRequest & {
+  isActive?: boolean;
+};
+
+export type PartnersCreatePartnerRequest = {
+  name: string;
+};
+
+export type PartnersUpdatePartnerRequest = {
+  name: string;
+  isActive?: boolean;
+};
+
+export type PartnersPartnerOfficeResponse = {
+  id?: string;
+  partnerId?: string;
+  code?: string;
+  name?: string;
+  address?: string | null;
+  isActive?: boolean;
+};
+
+export type PartnersCreatePartnerOfficeRequest = {
+  code: string;
+  name: string;
+  address?: string | null;
+};
+
+export type PartnersUpdatePartnerOfficeRequest = {
+  code: string;
+  name: string;
+  address?: string | null;
+  isActive?: boolean;
+};
+
+export type PartnersListPartnerOfficesRequest = {
+  isActive?: boolean;
+};
+
+export type PartnersPartnerProductConfigurationResponse = {
+  id?: string;
+  partnerId?: string;
+  productId?: string;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
+  effectiveFrom?: string;
+  effectiveToExclusive?: string | null;
+};
+
+export type PartnersCreatePartnerProductConfigurationRequest = {
+  productId?: string;
+  newBusinessCommissionBasis?: DomainCommissionsBasis;
+  newBusinessCommissionRate?: number;
+  renewalCommissionBasis?: DomainCommissionsBasis;
+  renewalCommissionRate?: number;
+  effectiveFrom?: string;
+  effectiveToExclusive?: string | null;
+};
+
+export type PartnersUpdatePartnerProductConfigurationRequest = {
+  effectiveFrom?: string;
+  effectiveToExclusive?: string | null;
+};
+
+export type PartnersListPartnerProductConfigurationsRequest = {
+  productId?: string;
+  effectiveOn?: string;
+};
+
+export type PartnerCommissionsPartnerCommissionResponse = {
+  id?: string;
+  partnerId?: string;
+  productId?: string;
+  productName?: string | null;
+  policyId?: string;
+  policySerial?: number;
+  premiumInstallmentId?: string;
+  partnerProductConfigurationId?: string;
+  businessType?: DomainCommissionsBusinessType;
+  basis?: DomainCommissionsBasis;
+  appliedRate?: number;
+  basisAmount?: number;
+  amount?: number;
+  currency?: string;
+  entryType?: DomainCommissionsEntryType;
+  calculationVersion?: number;
+  postedOnUtc?: string;
+};
+
+export type PaginationPagedListOfPartnerCommissionResponse = {
+  items?: PartnerCommissionsPartnerCommissionResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type PartnerCommissionsListPartnerCommissionsRequest = PaginationPagedRequest & {
+  partnerId?: string;
+  policyId?: string;
+  productId?: string;
+  businessType?: DomainCommissionsBusinessType;
+  entryType?: DomainCommissionsEntryType;
+  postedFrom?: string;
+  postedTo?: string;
+};
+
+export type PartnerCommissionsGetSummaryRequest = {
+  partnerId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type DomainPoliciesPolicyRenewalStatus = "planned" | "draft" | "priced" | "applied";
+
+export type DomainUnderwritingDocumentStatus =
+  | "required"
+  | "submitted"
+  | "accepted"
+  | "refused"
+  | "waived";
+
+export type DomainUnderwritingDocumentSubmissionSource =
+  | "newSubmission"
+  | "existingPolicyDocument";
+
+export type DomainUnderwritingReviewFlagType =
+  | "blackList"
+  | "pep"
+  | "foreignCitizen"
+  | "clientSsnInconsistent"
+  | "clientAge"
+  | "approvalLimit"
+  | "exposure";
+
+export type DomainUnderwritingReviewFlagStatus = "raised" | "approved" | "rejected";
+
+export type DomainUnderwritingDiscountRequestStatus = "requested" | "approved" | "rejected";
+
+export type PoliciesUnderwritingDocumentRequirementResponse =
+  OffersUnderwritingDocumentRequirementResponse;
+
+export type PoliciesUnderwritingReviewFlagResponse = OffersUnderwritingReviewFlagResponse;
+
+export type PoliciesUnderwritingDiscountRequestResponse =
+  OffersUnderwritingDiscountRequestResponse;
+
+export type PoliciesPolicyRenewalCoverageResponse = {
+  id?: number;
+  coverageId?: string;
+  coverageName?: string;
+  coverageDescription?: string;
+  sumInsured?: number;
+  rateUsed?: RatingTablesRateResponse;
+  ratingTableMultiplierUsed?: number;
+  calculatedPremium?: number;
+};
+
+export type PoliciesPolicyRenewalResponse = {
+  id?: string;
+  policyId?: string;
+  requiresLoanBalances?: boolean;
+  targetPeriodSequence?: number;
+  targetPeriod?: OffersDateOnlyRangeResponse;
+  sourceOfferPeriodSequence?: number | null;
+  existingExposure?: number;
+  openingBalance?: number | null;
+  closingBalance?: number | null;
+  calculatedPremium?: number;
+  chargePremium?: number;
+  status?: DomainPoliciesPolicyRenewalStatus;
+  createdOnUtc?: string;
+  startedOnUtc?: string | null;
+  pricedOnUtc?: string | null;
+  appliedOnUtc?: string | null;
+  coverages?: PoliciesPolicyRenewalCoverageResponse[];
+  documentRequirements?: PoliciesUnderwritingDocumentRequirementResponse[];
+  reviewFlags?: PoliciesUnderwritingReviewFlagResponse[];
+  discountRequests?: PoliciesUnderwritingDiscountRequestResponse[];
+};
+
+export type PoliciesRenewalListItemResponse = {
+  id?: string;
+  policyId?: string;
+  policySerial?: number;
+  productId?: string;
+  productName?: string | null;
+  policyPlan?: ProductsPolicyPlanType | string;
+  targetPeriodSequence?: number;
+  targetPeriod?: OffersDateOnlyRangeResponse;
+  status?: DomainPoliciesPolicyRenewalStatus;
+  requiresLoanBalances?: boolean;
+  openingBalance?: number | null;
+  closingBalance?: number | null;
+  chargePremium?: number;
+  insuredName?: string | null;
+  outstandingDocumentCount?: number;
+  raisedReviewFlagCount?: number;
+  pendingDiscountRequestCount?: number;
+};
+
+export type PaginationPagedListOfRenewalListItemResponse = {
+  items?: PoliciesRenewalListItemResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type PoliciesListRenewalsRequest = PaginationPagedRequest & {
+  policyId?: string;
+  status?: DomainPoliciesPolicyRenewalStatus;
+  due?: boolean;
+};
+
+export type PoliciesStartPolicyRenewalRequest = {
+  openingBalance?: number | null;
+  closingBalance?: number | null;
+};
+
+export type PoliciesResolveRenewalFlagRequest = {
+  note: string;
+};
+
+export type PoliciesResolveRenewalDocumentRequest = {
+  reason: string;
+};
+
+export type PoliciesSubmitRenewalDocumentRequest = {
+  documentId?: string;
+};
+
+export type PoliciesRequestRenewalDiscountRequest = {
+  requestedDiscountPercentage?: number;
+  reason: string;
+};
+
+export type PoliciesApplyPolicyRenewalResponse = {
+  policy?: PoliciesPolicyResponse;
+  installments?: PoliciesPremiumInstallmentResponse[];
+  invoices?: InvoicesInvoiceResponse[];
+};
+
+/** GET /api/users */
+export type UsersUserResponse = {
+  id?: number;
+  publicId?: string;
+  userName?: string;
+  email?: string | null;
+  displayName?: string;
+  isActive?: boolean;
+  roles?: string[];
+};
+
+export type PaginationPagedListOfUserResponse = {
+  items?: UsersUserResponse[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+export type UsersListUsersRequest = PaginationPagedRequest & {
+  isActive?: boolean;
+  role?: string;
+};
+
+/** POST /api/users */
+export type UsersCreateUserRequest = {
+  username: string;
+  email: string;
+  password: string;
+  displayName: string;
+  roles: string[];
+};
+
+/** PUT /api/users/{authUserId} */
+export type UsersUpdateUserRequest = {
+  displayName: string;
+  isActive?: boolean;
+  roles: string[];
 };

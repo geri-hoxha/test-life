@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   CoveragesCoverageResponse,
   CoveragesCreateCoverageRequest,
+  CoveragesListCoveragesRequest,
   CoveragesUpdateCoverageRequest,
   PaginationPagedListOfCoverageResponse,
 } from "./types";
@@ -34,11 +35,17 @@ export const useCreateCoverage = () => {
   });
 };
 
-/** GET /api/coverages */
-export const listCoverages = async (query?: {
+export type ListCoveragesQuery = CoveragesListCoveragesRequest & {
+  name?: string;
   pageNumber?: number;
   pageSize?: number;
-}, signal?: AbortSignal): Promise<PaginationPagedListOfCoverageResponse> =>
+};
+
+/** GET /api/coverages */
+export const listCoverages = async (
+  query?: ListCoveragesQuery,
+  signal?: AbortSignal,
+): Promise<PaginationPagedListOfCoverageResponse> =>
   apiRequest<PaginationPagedListOfCoverageResponse>({
     method: "GET",
     path: `/api/coverages`,
@@ -46,14 +53,15 @@ export const listCoverages = async (query?: {
     signal,
   });
 
-export const useListCoverages = (query?: {
-  pageNumber?: number;
-  pageSize?: number;
-}, options?: { enabled?: boolean }) =>
+export const useListCoverages = (
+  query?: ListCoveragesQuery,
+  options?: { enabled?: boolean },
+) =>
   useQuery({
     queryKey: coveragesKeys.list(query as Record<string, unknown> | undefined),
     queryFn: ({ signal }) => listCoverages(query, signal),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 
 /** DELETE /api/coverages/{id} */

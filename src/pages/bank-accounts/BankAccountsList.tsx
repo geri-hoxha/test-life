@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/layout/AppShell";
+import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -53,7 +55,7 @@ import {
 import type { BankAccountsBankAccountResponse } from "@/api/types";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { getCurrencies } from "@/config/currencies";
@@ -120,7 +122,8 @@ const BankAccountsList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListBankAccounts(listQuery);
+  const { data: pageData, isLoading, isFetching, error } = useListBankAccounts(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
@@ -260,12 +263,15 @@ const BankAccountsList = () => {
             Manage bank accounts used for product payment methods and offers.
           </p>
         </div>
-        <Button className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Add bank account
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Add bank account
+          </Button>
+        )}
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -355,11 +361,7 @@ const BankAccountsList = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading data, please wait…
-                    </TableCell>
-                  </TableRow>
+                  <TableLoadingRow colSpan={7} />
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
@@ -418,6 +420,7 @@ const BankAccountsList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
 
       <Dialog
         open={dialogOpen}

@@ -162,7 +162,7 @@ const seed: Template[] = [
   },
 ];
 
-let templates: Template[] = [...seed];
+const templates: Template[] = [...seed];
 
 export const listTemplates = (productId: string, versionId?: string) =>
   templates.filter((t) => t.productId === productId && (!versionId || t.versionId === versionId));
