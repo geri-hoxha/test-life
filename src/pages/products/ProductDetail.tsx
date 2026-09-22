@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
+import { OverlayLoader, PageLoader } from "@/components/Loader";
 import PageHeader from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,20 +22,17 @@ import {
   useGetProduct,
   useUpdateProduct,
   mapApiProduct,
-  useAddProductPaymentMethod,
-  useRemoveProductPaymentMethod,
+  useAddProductBankAccount,
+  useRemoveProductBankAccount,
 } from "@/api/products";
-import type { ProductsPolicyPlanType } from "@/api/types";
+import type { ProductsActuarialCode, ProductsPolicyPlanType } from "@/api/types";
 import { useListProductGroups } from "@/api/product-groups";
-import { useListDocuments } from "@/api/documents";
 import { useListBankAccounts } from "@/api/bank-accounts";
 import { usePolicyPlanTypeOptions } from "@/hooks/usePolicyPlanTypeOptions";
-import {
-  SCHEDULE_BASIS_DESCRIPTIONS,
-  SCHEDULE_BASIS_LABELS,
-} from "@/data/policy-plan-types";
+import { useActuarialCodeOptions } from "@/hooks/useActuarialCodeOptions";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
-import { Save, AlertTriangle } from "lucide-react";
+import { DocumentCombobox } from "@/components/DocumentCombobox";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import CoveragesTab from "./CoveragesTab";
 import DocumentsTab from "./DocumentsTab";
@@ -37,14 +40,20 @@ import CurrenciesTab from "./CurrenciesTab";
 import { getCurrencies } from "@/config/currencies";
 import { useListCoverages } from "@/api/coverages";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 type EditableFields = {
   name: string;
   coverageText: string;
   currencies: string[];
   defaultPrintableTemplateDocumentId: string;
+  defaultTermsTemplateDocumentId: string;
   policyPlanType: ProductsPolicyPlanType | "";
-  maxCoveredYears: string;
+  maximumCoverageTermMonths: string;
+  actuarialCode: ProductsActuarialCode | "";
+  sapProductCode: string;
+  sapChannelCode: string;
+  f5ProductCode: string;
   bankAccountIds: string[];
 };
 
@@ -52,12 +61,12 @@ const ProductDetail = () => {
   const { id } = useParams();
   const { data: apiProduct, isLoading, isError } = useGetProduct(id ?? "", { enabled: Boolean(id) });
   const updateProductMutation = useUpdateProduct();
-  const addPaymentMethod = useAddProductPaymentMethod();
-  const removePaymentMethod = useRemoveProductPaymentMethod();
+  const addProductBankAccount = useAddProductBankAccount();
+  const removeProductBankAccount = useRemoveProductBankAccount();
   const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
-  const { data: documentsPage } = useListDocuments({ pageNumber: 1, pageSize: 200 });
   const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
   const policyPlanTypeOptions = usePolicyPlanTypeOptions();
+  const actuarialCodeOptions = useActuarialCodeOptions();
   const { data: coveragesCatalog } = useListCoverages({ pageNumber: 1, pageSize: 200 });
 
   const product = useMemo(
@@ -96,16 +105,15 @@ const ProductDetail = () => {
       .filter((c) => c.missing.length > 0);
   }, [apiProduct?.coverages, apiProduct?.supportedCurrencies, coverageNameById]);
 
-  const templateDocuments = documentsPage?.items ?? [];
   const bankAccounts = bankAccountsPage?.items ?? [];
-  const paymentMethods = apiProduct?.paymentMethods ?? [];
+  const productBankAccounts = apiProduct?.bankAccounts ?? [];
 
   const currentBankAccountIds = useMemo(
     () =>
-      paymentMethods
-        .map((pm) => pm.bankAccountId)
+      productBankAccounts
+        .map((entry) => entry.bankAccountId)
         .filter((id): id is string => Boolean(id)),
-    [paymentMethods]
+    [productBankAccounts]
   );
   const currentBankAccountIdsKey = useMemo(
     () => [...currentBankAccountIds].sort().join("|"),
@@ -116,7 +124,8 @@ const ProductDetail = () => {
     const gid = product?.productGroupId;
     if (!gid) return "—";
     const match = (groupsPage?.items ?? []).find((g) => g.id === gid);
-    return match?.english?.trim() || match?.name?.trim() || gid;
+    if (!match) return gid;
+    return [match.legacyCode?.trim(), match.name].filter(Boolean).join("  ") || gid;
   }, [product?.productGroupId, groupsPage?.items]);
 
   const [fields, setFields] = useState<EditableFields | null>(null);
@@ -133,24 +142,25 @@ const ProductDetail = () => {
       coverageText: product.coverageText ?? "",
       currencies: [...product.currencies],
       defaultPrintableTemplateDocumentId: product.defaultPrintableTemplateDocumentId ?? "",
+      defaultTermsTemplateDocumentId: product.defaultTermsTemplateDocumentId ?? "",
       policyPlanType: product.policyPlanType ?? "",
-      maxCoveredYears:
-        product.maxCoveredYears != null && product.maxCoveredYears !== undefined
-          ? String(product.maxCoveredYears)
+      maximumCoverageTermMonths:
+        product.maximumCoverageTermMonths != null && product.maximumCoverageTermMonths !== undefined
+          ? String(product.maximumCoverageTermMonths)
           : "",
+      actuarialCode: product.actuarialCode ?? "",
+      sapProductCode: product.sapProductCode ?? "",
+      sapChannelCode: product.sapChannelCode ?? "",
+      f5ProductCode: product.f5ProductCode ?? "",
       bankAccountIds: [...currentBankAccountIds],
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when product or payment method ids change by value
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when product or linked bank account ids change by value
   }, [product, currentBankAccountIdsKey]);
 
   if (isLoading) {
     return (
       <AppShell>
-        <PageHeader
-          breadcrumbs={[{ label: "Products", to: "/products" }, { label: "…" }]}
-          title="Loading…"
-          description="Fetching product."
-        />
+        <PageLoader label="Loading product…" />
       </AppShell>
     );
   }
@@ -179,11 +189,16 @@ const ProductDetail = () => {
     fields.coverageText !== (product.coverageText ?? "") ||
     JSON.stringify(fields.currencies) !== JSON.stringify(product.currencies) ||
     fields.defaultPrintableTemplateDocumentId !== (product.defaultPrintableTemplateDocumentId ?? "") ||
+    fields.defaultTermsTemplateDocumentId !== (product.defaultTermsTemplateDocumentId ?? "") ||
     fields.policyPlanType !== (product.policyPlanType ?? "") ||
-    fields.maxCoveredYears !==
-      (product.maxCoveredYears != null && product.maxCoveredYears !== undefined
-        ? String(product.maxCoveredYears)
+    fields.maximumCoverageTermMonths !==
+      (product.maximumCoverageTermMonths != null && product.maximumCoverageTermMonths !== undefined
+        ? String(product.maximumCoverageTermMonths)
         : "") ||
+    fields.actuarialCode !== (product.actuarialCode ?? "") ||
+    fields.sapProductCode !== (product.sapProductCode ?? "") ||
+    fields.sapChannelCode !== (product.sapChannelCode ?? "") ||
+    fields.f5ProductCode !== (product.f5ProductCode ?? "") ||
     paymentDirty;
 
   const toggleCurrency = (c: string) =>
@@ -198,8 +213,20 @@ const ProductDetail = () => {
       toast.error("Product name is required");
       return;
     }
+    if (!fields.policyPlanType) {
+      toast.error("Policy plan type is required");
+      return;
+    }
     if (fields.currencies.length === 0) {
       toast.error("Select at least one currency");
+      return;
+    }
+
+    const termMonths = fields.maximumCoverageTermMonths.trim() === ""
+      ? null
+      : Number(fields.maximumCoverageTermMonths);
+    if (termMonths != null && (!Number.isInteger(termMonths) || termMonths < 0)) {
+      toast.error("Maximum coverage term must be a whole number of months");
       return;
     }
 
@@ -209,11 +236,16 @@ const ProductDetail = () => {
         id: product.id,
         body: {
           name: fields.name.trim(),
+          policyPlanType: fields.policyPlanType,
           supportedCurrencies: fields.currencies,
           coverageText: fields.coverageText.trim() || undefined,
           defaultPrintableTemplateDocumentId: fields.defaultPrintableTemplateDocumentId || null,
-          policyPlanType: fields.policyPlanType || null,
-          maxCoveredYears: fields.maxCoveredYears === "" ? null : Number(fields.maxCoveredYears),
+          defaultTermsTemplateDocumentId: fields.defaultTermsTemplateDocumentId || null,
+          maximumCoverageTermMonths: termMonths,
+          actuarialCode: fields.actuarialCode || null,
+          sapProductCode: fields.sapProductCode.trim() || null,
+          sapChannelCode: fields.sapChannelCode.trim() || null,
+          f5ProductCode: fields.f5ProductCode.trim() || null,
         },
       });
 
@@ -221,18 +253,18 @@ const ProductDetail = () => {
         const currentSet = new Set(currentBankAccountIds);
         const nextSet = new Set(fields.bankAccountIds);
         const toAdd = fields.bankAccountIds.filter((id) => !currentSet.has(id));
-        const toRemove = paymentMethods.filter(
-          (pm) => pm.bankAccountId && !nextSet.has(pm.bankAccountId) && pm.id != null
+        const toRemove = productBankAccounts.filter(
+          (entry) => entry.bankAccountId && !nextSet.has(entry.bankAccountId) && entry.id != null
         );
 
-        for (const pm of toRemove) {
-          await removePaymentMethod.mutateAsync({
+        for (const entry of toRemove) {
+          await removeProductBankAccount.mutateAsync({
             productId: product.id,
-            paymentMethodEntryId: String(pm.id),
+            productBankAccountId: entry.id!,
           });
         }
         for (const bankAccountId of toAdd) {
-          await addPaymentMethod.mutateAsync({
+          await addProductBankAccount.mutateAsync({
             productId: product.id,
             body: { bankAccountId },
           });
@@ -247,73 +279,31 @@ const ProductDetail = () => {
     }
   };
 
-  const templateLabel = (docId: string) => {
-    if (!docId) return "—";
-    const doc = templateDocuments.find((d) => d.id === docId);
-    return doc?.originalFileName ?? doc?.storedFileName ?? docId;
-  };
-
-  const paymentLabel = () => {
-    if (paymentMethods.length === 0) return "—";
-    const labels = paymentMethods.map((pm) => {
-      const account = bankAccounts.find((a) => a.id === pm.bankAccountId);
-      if (!account) {
-        return [pm.currency, pm.bankAccountId].filter(Boolean).join(" · ") || "—";
-      }
-      return [account.bankName, account.currency ?? pm.currency, account.iban || account.accountNumber]
-        .filter(Boolean)
-        .join(" · ");
-    });
-    if (labels.length === 1) return labels[0];
-    return `${labels.length} accounts`;
-  };
+  const selectedPlan = policyPlanTypeOptions.find((o) => o.value === fields.policyPlanType);
 
   return (
     <AppShell>
+      {saving && (
+        <OverlayLoader
+          label="Saving product…"
+          description="Updating details and linked bank accounts."
+        />
+      )}
+
       <PageHeader
         breadcrumbs={[{ label: "Products", to: "/products" }, { label: product.name }]}
         title={product.name}
         description={product.coverageText?.trim() || undefined}
+        actions={
+          <Button
+            className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            onClick={() => void saveFields()}
+            disabled={!fieldsDirty || saving}
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        }
       />
-
-      <Card className="p-5 mb-6 shadow-card border-border">
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Product family</div>
-            <div className="text-sm mt-0.5">{productGroupName}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Currencies</div>
-            <div className="flex gap-1 mt-0.5">
-              {product.currencies.length === 0 ? (
-                <span className="text-sm text-muted-foreground">—</span>
-              ) : (
-                product.currencies.map((c) => (
-                  <Badge key={c} variant="outline" className="text-[10px] font-mono px-1.5 py-0">{c}</Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Coverages</div>
-            <div className="text-sm mt-0.5">{apiProduct?.coverages?.length ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Document types</div>
-            <div className="text-sm mt-0.5">{apiProduct?.productDocumentTypes?.length ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Payment method</div>
-            <div className="text-sm mt-0.5 max-w-xs truncate" title={paymentLabel()}>{paymentLabel()}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Default template</div>
-            <div className="text-sm mt-0.5 max-w-xs truncate" title={templateLabel(product.defaultPrintableTemplateDocumentId ?? "")}>
-              {templateLabel(product.defaultPrintableTemplateDocumentId ?? "")}
-            </div>
-          </div>
-        </div>
-      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
         <TabsList className="bg-card border border-border h-auto p-1 flex-wrap">
@@ -324,197 +314,295 @@ const ProductDetail = () => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <Card className="shadow-card border-border overflow-hidden">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Product details</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Fields from GET/PUT product, plus payment methods.
+          {incompleteFixedSumInsured.length > 0 && (
+            <Alert className="border-amber-400/70 bg-amber-50 text-amber-950 [&>svg]:text-amber-600">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Missing fixed sum insured amounts</AlertTitle>
+              <AlertDescription>
+                <p className="mb-2">
+                  Coverages with sum insured fixed require a{" "}
+                  <span className="font-medium">fixedSumInsuredAmount</span> currency limit for every
+                  supported currency.
                 </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => void saveFields()}
-                disabled={!fieldsDirty || saving}
-                className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save changes"}
-              </Button>
-            </div>
-
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="p-name">Name</Label>
-                <Input
-                  id="p-name"
-                  value={fields.name}
-                  onChange={(e) => setFields({ ...fields, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Product family</Label>
-                <Input value={productGroupName} readOnly className="bg-muted/40" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="p-coverage">Coverage text</Label>
-                <Textarea
-                  id="p-coverage"
-                  rows={4}
-                  value={fields.coverageText}
-                  onChange={(e) => setFields({ ...fields, coverageText: e.target.value })}
-                  placeholder="Printable coverage text for this product"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Default printable template</Label>
-                <Select
-                  value={fields.defaultPrintableTemplateDocumentId || "none"}
-                  onValueChange={(v) =>
-                    setFields({ ...fields, defaultPrintableTemplateDocumentId: v === "none" ? "" : v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select document…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {templateDocuments.map((doc) => (
-                      <SelectItem key={doc.id} value={doc.id ?? ""}>
-                        {doc.originalFileName ?? doc.storedFileName ?? doc.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-                      <div className="space-y-2">
-                <Label htmlFor="p-max-covered-years">Max covered years</Label>
-                <Input
-                  id="p-max-covered-years"
-                  type="number"
-                  min={0}
-                  step={1}
-                  className="font-mono"
-                  value={fields.maxCoveredYears}
-                  onChange={(e) => setFields({ ...fields, maxCoveredYears: e.target.value })}
-                  placeholder="e.g. 30"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <div className="flex items-center gap-2">
-                  <Label>Policy plan type</Label>
-                  {product.scheduleBasis && (
-                    <Badge variant="outline" title={SCHEDULE_BASIS_DESCRIPTIONS[product.scheduleBasis]}>
-                      {SCHEDULE_BASIS_LABELS[product.scheduleBasis]}
-                    </Badge>
-                  )}
-                </div>
-                <Select
-                  value={fields.policyPlanType || "none"}
-                  onValueChange={(v) =>
-                    setFields({
-                      ...fields,
-                      policyPlanType: v === "none" ? "" : (v as ProductsPolicyPlanType),
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select policy plan type…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {policyPlanTypeOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        <span className="flex flex-col text-left">
-                          <span>{opt.label}</span>
-                          {opt.description && (
-                            <span className="text-xs text-muted-foreground">
-                              {opt.value} — {opt.description}
-                            </span>
-                          )}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {product.scheduleBasis && (
-                  <p className="text-xs text-muted-foreground">
-                    {SCHEDULE_BASIS_DESCRIPTIONS[product.scheduleBasis]}
-                  </p>
-                )}
-              </div>
-      
-              {incompleteFixedSumInsured.length > 0 && (
-                <div className="md:col-span-2">
-                  <Alert className="border-amber-400/70 bg-amber-50 text-amber-950 [&>svg]:text-amber-600">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Missing fixed sum insured amounts</AlertTitle>
-                    <AlertDescription>
-                      <p className="mb-2">
-                        Coverages with sum insured fixed require a{" "}
-                        <span className="font-medium">fixedSumInsuredAmount</span> currency limit for every
-                        supported currency.
-                      </p>
-                      <ul className="list-disc pl-4 space-y-1 mb-3 text-xs">
-                        {incompleteFixedSumInsured.map((c) => (
-                          <li key={String(c.entryId)}>
-                            <span className="font-medium">{c.name}</span>
-                            {" — missing: "}
-                            {c.missing.join(", ")}
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-amber-800 underline underline-offset-2 hover:text-amber-950"
-                        onClick={() => setActiveTab("coverages")}
-                      >
-                        Go to Coverages tab to fill the limits
-                      </button>
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
-              <div className="space-y-2 md:col-span-2">
-                <Label>Payment method</Label>
-                <BankAccountCombobox
-                  multiple
-                  accounts={bankAccounts}
-                  value={fields.bankAccountIds}
-                  onValueChange={(bankAccountIds) => setFields({ ...fields, bankAccountIds })}
-                  placeholder="Select bank accounts…"
-                />
+                <ul className="list-disc pl-4 space-y-1 mb-3 text-xs">
+                  {incompleteFixedSumInsured.map((c) => (
+                    <li key={String(c.entryId)}>
+                      <span className="font-medium">{c.name}</span>
+                      {" — missing: "}
+                      {c.missing.join(", ")}
+                    </li>
+                  ))}
+                </ul>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("currencies")}
-                  className="text-xs text-accent hover:underline mt-1.5"
+                  className="text-sm font-medium text-amber-800 underline underline-offset-2 hover:text-amber-950"
+                  onClick={() => setActiveTab("coverages")}
                 >
-                  View currency bank configurations →
+                  Go to Coverages tab to fill the limits
                 </button>
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Currencies</Label>
-                <div className="flex flex-wrap gap-2">
-                  {getCurrencies().map((c) => {
-                    const on = fields.currencies.includes(c);
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => toggleCurrency(c)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-mono border transition-colors ${
-                          on
-                            ? "bg-accent text-accent-foreground border-accent"
-                            : "bg-background text-muted-foreground border-border hover:border-accent/50"
-                        }`}
-                      >
-                        {c}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2 space-y-6">
+              <Card className="shadow-card border-border">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-base">Identity</CardTitle>
+                  <CardDescription>
+                    How this product is named and printed.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="p-name">Product name *</Label>
+                    <Input
+                      id="p-name"
+                      maxLength={512}
+                      value={fields.name}
+                      onChange={(e) => setFields({ ...fields, name: e.target.value })}
+                      placeholder="e.g. ISP A_Mortgage Standard 07"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Product family</Label>
+                    <Input value={productGroupName} readOnly className="bg-muted/40" />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label htmlFor="p-coverage">Coverage text</Label>
+                    <Textarea
+                      id="p-coverage"
+                      rows={3}
+                      maxLength={4000}
+                      value={fields.coverageText}
+                      onChange={(e) => setFields({ ...fields, coverageText: e.target.value })}
+                      placeholder="Printable coverage description shown on policies"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Default printable template</Label>
+                    <DocumentCombobox
+                      value={fields.defaultPrintableTemplateDocumentId}
+                      onValueChange={(id) =>
+                        setFields({ ...fields, defaultPrintableTemplateDocumentId: id })
+                      }
+                      placeholder="Select document…"
+                      allowClear
+                      clearLabel="None"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Default terms template</Label>
+                    <DocumentCombobox
+                      value={fields.defaultTermsTemplateDocumentId}
+                      onValueChange={(id) =>
+                        setFields({ ...fields, defaultTermsTemplateDocumentId: id })
+                      }
+                      placeholder="Select document…"
+                      allowClear
+                      clearLabel="None"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-card border-border">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-base">Plan</CardTitle>
+                  <CardDescription>
+                    How premium is calculated and how long cover can last.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Policy plan type *</Label>
+                    <Select
+                      value={fields.policyPlanType || undefined}
+                      onValueChange={(v) =>
+                        setFields({
+                          ...fields,
+                          policyPlanType: v as ProductsPolicyPlanType,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        {selectedPlan ? (
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate">{selectedPlan.label}</span>
+                            <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                              {selectedPlan.value}
+                            </span>
+                          </span>
+                        ) : (
+                          <SelectValue placeholder="Select policy plan type…" />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {policyPlanTypeOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <span className="flex flex-col text-left py-0.5">
+                              <span className="flex items-center gap-2">
+                                <span>{opt.label}</span>
+                                <span className="font-mono text-[10px] text-muted-foreground">
+                                  {opt.value}
+                                </span>
+                              </span>
+                              {opt.description && (
+                                <span className="text-xs text-muted-foreground font-normal line-clamp-1">
+                                  {opt.description}
+                                </span>
+                              )}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedPlan?.description && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPlan.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="p-max-coverage-term">
+                      Maximum coverage term (months)
+                    </Label>
+                    <Input
+                      id="p-max-coverage-term"
+                      type="number"
+                      min={0}
+                      step={1}
+                      className="font-mono"
+                      value={fields.maximumCoverageTermMonths}
+                      onChange={(e) =>
+                        setFields({ ...fields, maximumCoverageTermMonths: e.target.value })
+                      }
+                      placeholder="e.g. 360"
+                    />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label>Currencies *</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {getCurrencies().map((c) => {
+                        const active = fields.currencies.includes(c);
+                        return (
+                          <button
+                            type="button"
+                            key={c}
+                            onClick={() => toggleCurrency(c)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-md border text-sm font-mono font-medium transition-colors",
+                              active
+                                ? "bg-accent text-accent-foreground border-accent"
+                                : "bg-card text-foreground border-border hover:border-accent hover:text-accent",
+                            )}
+                          >
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </Card>
+
+            <aside className="space-y-4 xl:self-start">
+              <Card className="shadow-card border-border">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-base">Payment method</CardTitle>
+                  <CardDescription>
+                    Bank accounts used to collect premium for this product.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <BankAccountCombobox
+                    multiple
+                    accounts={bankAccounts}
+                    value={fields.bankAccountIds}
+                    onValueChange={(bankAccountIds) => setFields({ ...fields, bankAccountIds })}
+                    placeholder="Select bank accounts…"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("currencies")}
+                    className="text-xs text-accent hover:underline mt-3"
+                  >
+                    View currency bank configurations →
+                  </button>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-card border-border">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-base">External codes</CardTitle>
+                  <CardDescription>
+                    Optional actuarial, SAP, and F5 identifiers used by downstream
+                    systems.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Actuarial code</Label>
+                    <Select
+                      value={fields.actuarialCode || "none"}
+                      onValueChange={(v) =>
+                        setFields({
+                          ...fields,
+                          actuarialCode: v === "none" ? "" : (v as ProductsActuarialCode),
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select actuarial code…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {!actuarialCodeOptions.some((o) => o.value === fields.actuarialCode) &&
+                          fields.actuarialCode && (
+                            <SelectItem value={fields.actuarialCode}>{fields.actuarialCode}</SelectItem>
+                          )}
+                        {actuarialCodeOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.text === opt.value ? opt.value : `${opt.text} (${opt.value})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="p-f5-code">F5 product code</Label>
+                    <Input
+                      id="p-f5-code"
+                      className="font-mono"
+                      value={fields.f5ProductCode}
+                      onChange={(e) => setFields({ ...fields, f5ProductCode: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="p-sap-product">SAP product code</Label>
+                    <Input
+                      id="p-sap-product"
+                      maxLength={20}
+                      className="font-mono"
+                      value={fields.sapProductCode}
+                      onChange={(e) => setFields({ ...fields, sapProductCode: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="p-sap-channel">SAP channel code</Label>
+                    <Input
+                      id="p-sap-channel"
+                      maxLength={20}
+                      className="font-mono"
+                      value={fields.sapChannelCode}
+                      onChange={(e) => setFields({ ...fields, sapChannelCode: e.target.value })}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
         </TabsContent>
 
         <TabsContent value="coverages">

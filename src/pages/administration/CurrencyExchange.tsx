@@ -1,9 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
+import { TableLoadingRow } from "@/components/Loader";
+import TablePagination from "@/components/TablePagination";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -20,71 +28,63 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Plus, Trash2, RefreshCw, Calculator, Info } from "lucide-react";
-import {
-  convert,
-  deleteFxRate,
-  getRatesForPair,
-  listFxRates,
-} from "@/data/fxRates";
+import { useListCurrencyRates } from "@/api/currency-rates";
+import { compactQuery } from "@/lib/list-query";
 import { getCurrencies } from "@/config/currencies";
-import FxRateDialog from "./FxRateDialog";
-import { toast } from "sonner";
+
+const RATE_CURRENCIES = getCurrencies().filter((code) => code !== "ALL");
+
+const formatUtc = (iso?: string) => {
+  if (!iso) return "—";
+  try {
+    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
+  } catch {
+    return iso;
+  }
+};
+
+const formatRate = (rate?: number) => {
+  if (typeof rate !== "number") return "—";
+  return rate.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+};
 
 const CurrencyExchange = () => {
-  const [, force] = useState(0);
-  const refresh = () => force((n) => n + 1);
+  const [currency, setCurrency] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [filterFrom, setFilterFrom] = useState<string>("ALL");
-  const [filterTo, setFilterTo] = useState<string>("ALL");
-  const [filterSource, setFilterSource] = useState<string>("ALL");
-
-  // Calculation preview state
-  const [calcAmount, setCalcAmount] = useState("1000");
-  const [calcFrom, setCalcFrom] = useState("EUR");
-  const [calcTo, setCalcTo] = useState("USD");
-  const [overrideId, setOverrideId] = useState<string>("auto");
-
-  const rates = useMemo(() => listFxRates(), []);
-  const filtered = rates.filter((r) =>
-    (filterFrom === "ALL" || r.fromCurrency === filterFrom) &&
-    (filterTo === "ALL" || r.toCurrency === filterTo) &&
-    (filterSource === "ALL" || r.source === filterSource)
+  const filters = useMemo(
+    () => compactQuery({ currency: currency.trim() || undefined }),
+    [currency],
   );
 
-  const candidates = getRatesForPair(calcFrom, calcTo);
-  const overrideRate =
-    overrideId === "auto" ? undefined : candidates.find((c) => c.id === overrideId)?.rate;
-  const conv = convert(parseFloat(calcAmount) || 0, calcFrom, calcTo, overrideRate);
+  useEffect(() => {
+    setPage(1);
+  }, [filters, pageSize]);
 
-  const counts = {
-    total: rates.length,
-    manual: rates.filter((r) => r.source === "Manual").length,
-    pairs: new Set(rates.map((r) => `${r.fromCurrency}/${r.toCurrency}`)).size,
+  const listQuery = {
+    ...filters,
+    latestOnly: true,
+    pageNumber: page,
+    pageSize,
   };
+  const {
+    data: pageData,
+    isLoading,
+    isFetching,
+    error,
+  } = useListCurrencyRates(listQuery);
 
-  const handleDelete = (id: string) => {
-    deleteFxRate(id);
-    toast.success("FX rate removed");
-    refresh();
-  };
+  const items = pageData?.items ?? [];
+  const totalCount = pageData?.totalCount ?? 0;
+  const totalPages = Math.max(
+    1,
+    pageData?.totalPages ?? pageData?.pageCount ?? 1,
+  );
+  const hasFilters = Boolean(currency.trim());
 
   return (
     <AppShell>
@@ -94,138 +94,60 @@ const CurrencyExchange = () => {
             Administration
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Currency Exchange
+            Currency rates
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Automatic FX feed with manual override capability for offer pricing.
+            Latest published rates to ALL from the currency feed.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Automatic feed refreshed (demo)")}>
-            <RefreshCw className="h-4 w-4" />
-            Refresh Feed
-          </Button>
-          <Button size="sm" className="gap-2" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Add Manual Rate
-          </Button>
-        </div>
       </div>
 
-      {/* KPI summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2"><CardDescription>Rates on file</CardDescription></CardHeader>
-          <CardContent><div className="text-2xl font-semibold">{counts.total}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardDescription>Manual overrides</CardDescription></CardHeader>
-          <CardContent><div className="text-2xl font-semibold">{counts.manual}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardDescription>Currency pairs tracked</CardDescription></CardHeader>
-          <CardContent><div className="text-2xl font-semibold">{counts.pairs}</div></CardContent>
-        </Card>
-      </div>
-
-      {/* Premium calculation preview */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Calculator className="h-4 w-4" />
-            Offer Conversion Preview
-          </CardTitle>
-          <CardDescription>
-            Simulates how an offer will convert. Defaults to the latest rate; choose a historic
-            entry to apply a manual override.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-          <div>
-            <Label>Amount</Label>
-            <Input type="number" value={calcAmount} onChange={(e) => setCalcAmount(e.target.value)} />
-          </div>
-          <div>
-            <Label>From</Label>
-            <Select value={calcFrom} onValueChange={(v) => { setCalcFrom(v); setOverrideId("auto"); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>To</Label>
-            <Select value={calcTo} onValueChange={(v) => { setCalcTo(v); setOverrideId("auto"); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Rate Source</Label>
-            <Select value={overrideId} onValueChange={setOverrideId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Latest (default)</SelectItem>
-                {candidates.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.date} · {c.rate} · {c.source}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="rounded-md border bg-muted/40 px-3 py-2.5">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Result</div>
-            {isNaN(conv.amount) ? (
-              <div className="text-sm font-medium text-destructive">No rate available</div>
-            ) : (
-              <>
-                <div className="text-base font-semibold">
-                  {conv.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {calcTo}
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  Rate {conv.rate} · {conv.source}
-                </div>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* History */}
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">FX Rate History</CardTitle>
-              <CardDescription>Audit log of automatic feed entries and manual overrides.</CardDescription>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">FX rate history</CardTitle>
+                <CardDescription>
+                  {isLoading
+                    ? "Loading…"
+                    : `${totalCount} total${isFetching && !isLoading ? " · updating…" : ""}`}
+                </CardDescription>
+              </div>
+              {hasFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-muted-foreground"
+                  onClick={() => setCurrency("")}
+                >
+                  Clear filters
+                </Button>
+              )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Select value={filterFrom} onValueChange={setFilterFrom}>
-                <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="From" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All from</SelectItem>
-                  {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterTo} onValueChange={setFilterTo}>
-                <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="To" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All to</SelectItem>
-                  {getCurrencies().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterSource} onValueChange={setFilterSource}>
-                <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All sources</SelectItem>
-                  <SelectItem value="Automatic">Automatic</SelectItem>
-                  <SelectItem value="Manual">Manual</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Currency
+                </Label>
+                <Select
+                  value={currency || "__any__"}
+                  onValueChange={(v) => setCurrency(v === "__any__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All currencies" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__any__">All currencies</SelectItem>
+                    {RATE_CURRENCIES.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -234,85 +156,60 @@ const CurrencyExchange = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Entered By</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  <TableHead>Currency</TableHead>
+                  <TableHead className="text-right">Rate to ALL</TableHead>
+                  <TableHead>Published</TableHead>
+                  <TableHead>Fetched</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {isLoading ? (
+                  <TableLoadingRow colSpan={4} />
+                ) : items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
-                      No FX rates match the selected filters.
+                    <TableCell
+                      colSpan={4}
+                      className="text-center py-10 text-sm text-muted-foreground"
+                    >
+                      No currency rates match the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs">{r.date}</TableCell>
-                      <TableCell className="font-medium">{r.fromCurrency}</TableCell>
-                      <TableCell className="font-medium">{r.toCurrency}</TableCell>
-                      <TableCell className="text-right font-mono">{r.rate}</TableCell>
-                      <TableCell>
-                        <Badge variant={r.source === "Manual" ? "default" : "secondary"}>
-                          {r.source}
-                        </Badge>
+                  items.map((row) => (
+                    <TableRow
+                      key={row.id ?? `${row.currency}-${row.publishedAtUtc}`}
+                    >
+                      <TableCell className="font-medium">
+                        {row.currency ?? "—"}
                       </TableCell>
-                      <TableCell className="text-sm">{r.enteredBy}</TableCell>
-                      <TableCell className="max-w-[260px]">
-                        {r.reason || r.notes ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
-                                <Info className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{r.reason || r.notes}</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              {r.reason && <div><strong>Reason:</strong> {r.reason}</div>}
-                              {r.notes && <div><strong>Notes:</strong> {r.notes}</div>}
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                      <TableCell className="text-right font-mono">
+                        {formatRate(row.rateToAll)}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remove FX rate?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will delete the {r.source.toLowerCase()} rate of {r.rate} {r.fromCurrency}/{r.toCurrency} on {r.date}.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(r.id)}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {formatUtc(row.publishedAtUtc)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {formatUtc(row.fetchedAtUtc)}
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 20, 50]}
+              disabled={isLoading}
+            />
           </div>
         </CardContent>
       </Card>
-
-      <FxRateDialog open={dialogOpen} onOpenChange={setDialogOpen} onSaved={refresh} />
+      </AccessDeniedOr>
     </AppShell>
   );
 };

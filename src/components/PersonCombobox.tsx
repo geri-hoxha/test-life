@@ -60,7 +60,7 @@ export const PersonCombobox = ({
   }, [debouncedSearch]);
 
   const { data: peoplePage, isFetching } = useListPeople(peopleQuery, {
-    enabled: open || Boolean(value),
+    enabled: open,
   });
   const { data: selectedPerson } = useGetPerson(value, { enabled: Boolean(value) });
 

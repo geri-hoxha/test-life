@@ -22,3 +22,15 @@ export const usePolicyPlanTypeOptions = (): PolicyPlanTypeOption[] => {
     }));
   }, [data]);
 };
+
+/** Label lookup for stored `PolicyPlanType` values (lists, detail pages). */
+export const usePolicyPlanTypeLabel = () => {
+  const options = usePolicyPlanTypeOptions();
+  return useMemo(() => {
+    const byValue = new Map(options.map((o) => [o.value as string, o]));
+    return (value?: string | null) => {
+      if (!value) return "—";
+      return byValue.get(value)?.label ?? value;
+    };
+  }, [options]);
+};

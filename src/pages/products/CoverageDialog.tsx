@@ -15,10 +15,13 @@ import {
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Loader } from "@/components/Loader";
 import { toast } from "sonner";
 import { Coverage, newCoverageId } from "@/data/coverages";
 import { useListCoverages } from "@/api/coverages";
 import { useListRatingTables } from "@/api/rating-tables";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { compactQuery } from "@/lib/list-query";
 
 type Props = {
   open: boolean;
@@ -29,7 +32,7 @@ type Props = {
   linkedCoverageIds?: string[];
   /** When set, the dialog edits this coverage link instead of adding a new one. */
   editing?: Coverage | null;
-  onSave: (c: Coverage) => void;
+  onSave: (c: Coverage) => void | Promise<void>;
 };
 
 type FormState = {
@@ -68,7 +71,13 @@ const CoverageDialog = ({
 }: Props) => {
   const [form, setForm] = useState<FormState>(blankForm());
   const [comboOpen, setComboOpen] = useState(false);
-  const { data: catalogPage, isLoading: catalogLoading } = useListCoverages({ pageNumber: 1, pageSize: 200 });
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const debouncedCatalogSearch = useDebouncedValue(catalogSearch.trim());
+  const { data: catalogPage, isLoading: catalogLoading } = useListCoverages({
+    pageNumber: 1,
+    pageSize: 200,
+    ...compactQuery({ name: debouncedCatalogSearch || undefined }),
+  });
   const { data: tablesPage } = useListRatingTables({ pageNumber: 1, pageSize: 200 });
   const ratingTables = tablesPage?.items ?? [];
 
@@ -81,7 +90,10 @@ const CoverageDialog = ({
   }, [catalogPage?.items, linkedCoverageIds]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setCatalogSearch("");
+      return;
+    }
     if (editing) {
       setForm({
         source: "existing",
@@ -93,7 +105,9 @@ const CoverageDialog = ({
         isMandatory: editing.coverageType === "Mandatory",
         isSumInsuredFixed: editing.isSumInsuredFixed ?? true,
         sumInsuredPercentage:
-          editing.sumInsuredPercentage !== undefined ? String(editing.sumInsuredPercentage) : "",
+          editing.sumInsuredPercentage !== undefined
+            ? String(Number((editing.sumInsuredPercentage * 100).toFixed(10)))
+            : "",
       });
     } else {
       setForm(blankForm());
@@ -111,7 +125,9 @@ const CoverageDialog = ({
     }));
   };
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!editing && form.source === "existing" && !form.coverageId) {
       toast.error("Select a coverage");
       return;
@@ -124,33 +140,40 @@ const CoverageDialog = ({
       toast.error("Select a rating table");
       return;
     }
-    onSave({
-      id: editing ? editing.id : newCoverageId(),
-      productId,
-      versionId,
-      name: form.source === "new" ? form.name.trim() : (form.name || form.coverageId),
-      code: form.source === "existing" ? form.coverageId : "N/A",
-      description: form.description.trim() || undefined,
-      coverageType: form.isMandatory ? "Mandatory" : "Optional Rider",
-      sumInsuredType: "Fixed",
-      defaultSumInsured: 0,
-      minSumInsured: 0,
-      maxSumInsured: 0,
-      basePremiumType: "Rate table by age/gender",
-      basePremiumValue: 0,
-      commissionPct: 0,
-      isActive: true,
-      ratingTableId: form.ratingTableId,
-      ratingTableMultiplier: form.ratingTableMultiplier || 1,
-      isSumInsuredFixed: form.isSumInsuredFixed,
-      sumInsuredPercentage: form.isSumInsuredFixed
-        ? undefined
-        : (() => {
-            const parsed = parseFloat(form.sumInsuredPercentage);
-            return Number.isFinite(parsed) ? parsed : undefined;
-          })(),
-    });
-    onOpenChange(false);
+    const parsedPercentage = parseFloat(form.sumInsuredPercentage);
+    if (!form.isSumInsuredFixed && !Number.isFinite(parsedPercentage)) {
+      toast.error("Sum insured percentage is required");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        id: editing ? editing.id : newCoverageId(),
+        productId,
+        versionId,
+        name: form.source === "new" ? form.name.trim() : (form.name || form.coverageId),
+        code: form.source === "existing" ? form.coverageId : "N/A",
+        description: form.description.trim() || undefined,
+        coverageType: form.isMandatory ? "Mandatory" : "Optional Rider",
+        sumInsuredType: "Fixed",
+        defaultSumInsured: 0,
+        minSumInsured: 0,
+        maxSumInsured: 0,
+        basePremiumType: "Rate table by age/gender",
+        basePremiumValue: 0,
+        commissionPct: 0,
+        isActive: true,
+        ratingTableId: form.ratingTableId,
+        ratingTableMultiplier: form.ratingTableMultiplier || 1,
+        isSumInsuredFixed: form.isSumInsuredFixed,
+        sumInsuredPercentage: form.isSumInsuredFixed
+          ? undefined
+          : parsedPercentage / 100,
+      });
+      onOpenChange(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -221,11 +244,19 @@ const CoverageDialog = ({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search coverages…" />
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Filter by name"
+                      value={catalogSearch}
+                      onValueChange={setCatalogSearch}
+                    />
                     <CommandList>
                       <CommandEmpty>
-                        {catalogLoading ? "Loading coverages…" : "No coverage found."}
+                        {catalogLoading ? (
+                          <Loader size="sm" label="Loading coverages…" className="py-4" />
+                        ) : (
+                          "No coverage found."
+                        )}
                       </CommandEmpty>
                       <CommandGroup>
                         {availableCoverages.map((cov) => {
@@ -365,8 +396,12 @@ const CoverageDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            {editing ? "Save changes" : "Add coverage"}
+          <Button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="bg-accent hover:bg-accent/90 text-accent-foreground"
+          >
+            {saving ? "Saving…" : editing ? "Save changes" : "Add coverage"}
           </Button>
         </DialogFooter>
       </DialogContent>

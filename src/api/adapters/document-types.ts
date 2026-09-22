@@ -12,12 +12,14 @@ const deriveAppliesWhen = (rf?: {
   totalExposureOver?: number | null;
   ageOver?: number | null;
   isPep?: boolean | null;
+  isForeignCitizen?: boolean | null;
 }): { appliesWhen: DocumentAppliesWhen; thresholdAmount?: number } => {
   if (!rf) return { appliesWhen: "Always" };
 
   const flags = [
     rf.alwaysRequired,
     rf.isPep,
+    rf.isForeignCitizen,
     rf.insuredAmountOver != null && rf.insuredAmountOver > 0,
     rf.totalExposureOver != null && rf.totalExposureOver > 0,
     rf.ageOver != null && rf.ageOver > 0,
@@ -58,11 +60,15 @@ export const mapProductDocumentType = (
     appliesWhen,
     thresholdAmount,
     documentTypeId: entry.documentTypeId,
-    templateDocumentId: catalog?.templateDocumentId ?? null,
     insuredAmountOver: rf?.insuredAmountOver ?? null,
+    insuredAmountCurrency: rf?.insuredAmountCurrency ?? null,
     totalExposureOver: rf?.totalExposureOver ?? null,
+    totalExposureCurrency: rf?.totalExposureCurrency ?? null,
     ageOver: rf?.ageOver ?? null,
     isPep: rf?.isPep ?? null,
+    isForeignCitizen: rf?.isForeignCitizen ?? null,
+    stages: entry.stages ?? "none",
+    reusePolicy: entry.reusePolicy ?? "requireNewSubmission",
     notes: catalog?.description ?? "",
   };
 };

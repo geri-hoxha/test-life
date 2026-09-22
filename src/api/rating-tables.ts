@@ -4,15 +4,15 @@ import type {
   PaginationPagedListOfRatingTableResponse,
   RatingTablesAddRatingTableRuleRequest,
   RatingTablesCreateRatingTableRequest,
+  RatingTablesListRatingTablesRequest,
   RatingTablesRatingTableResponse,
   RatingTablesRatingTableRuleResponse,
   RatingTablesUpdateRatingTableRequest,
 } from "./types";
 
-export type ListRatingTablesQuery = {
+export type ListRatingTablesQuery = RatingTablesListRatingTablesRequest & {
   pageNumber?: number;
   pageSize?: number;
-  name?: string;
 };
 
 export const ratingTablesKeys = {

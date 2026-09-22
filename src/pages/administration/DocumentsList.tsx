@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
+import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
-import { Badge } from "@/components/ui/badge";
+import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -50,6 +51,7 @@ import {
 import {
   buildCreateDocumentFormData,
   downloadDocumentFile,
+  getDocument,
   useCreateDocument,
   useDeleteDocument,
   useListDocuments,
@@ -59,11 +61,9 @@ import { useDocumentPreview } from "@/components/documents/DocumentPreview";
 import type { DocumentsDocumentResponse } from "@/api/types";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { toastApiError } from "@/lib/api-error";
+import { isApiForbidden, toastApiError } from "@/lib/api-error";
 import { Download, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-
-type DeletedFilter = "all" | "yes" | "no";
 
 const toDate = (isoDay: string) => {
   if (!isoDay) return undefined;
@@ -90,11 +90,13 @@ const formatSize = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+type IsDeletedFilter = "all" | "yes" | "no";
+
 const DocumentsList = () => {
   const [originalFileNameFilter, setOriginalFileNameFilter] = useState("");
-  const [isDeletedFilter, setIsDeletedFilter] = useState<DeletedFilter>("no");
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
+  const [isDeletedFilter, setIsDeletedFilter] = useState<IsDeletedFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -103,6 +105,7 @@ const DocumentsList = () => {
 
   const [editing, setEditing] = useState<DocumentsDocumentResponse | null>(null);
   const [editFileName, setEditFileName] = useState("");
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<DocumentsDocumentResponse | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -116,12 +119,11 @@ const DocumentsList = () => {
     () =>
       compactQuery({
         originalFileName: originalFileNameFilter.trim() || undefined,
-        isDeleted:
-          isDeletedFilter === "all" ? undefined : isDeletedFilter === "yes",
         createdFromUtc: dateToUtcStart(createdFrom),
         createdToUtc: dateToUtcEnd(createdTo),
+        isDeleted: isDeletedFilter === "all" ? undefined : isDeletedFilter === "yes",
       }),
-    [originalFileNameFilter, isDeletedFilter, createdFrom, createdTo],
+    [originalFileNameFilter, createdFrom, createdTo, isDeletedFilter],
   );
   const debouncedFilters = useDebouncedValue(filters);
 
@@ -130,7 +132,8 @@ const DocumentsList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching } = useListDocuments(listQuery);
+  const { data: pageData, isLoading, isFetching, error } = useListDocuments(listQuery);
+  const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? 0;
@@ -138,15 +141,15 @@ const DocumentsList = () => {
 
   const hasFilters =
     Boolean(originalFileNameFilter.trim()) ||
-    isDeletedFilter !== "no" ||
     Boolean(createdFrom) ||
-    Boolean(createdTo);
+    Boolean(createdTo) ||
+    isDeletedFilter !== "all";
 
   const clearFilters = () => {
     setOriginalFileNameFilter("");
-    setIsDeletedFilter("no");
     setCreatedFrom("");
     setCreatedTo("");
+    setIsDeletedFilter("all");
   };
 
   const closeUpload = () => {
@@ -168,14 +171,26 @@ const DocumentsList = () => {
     });
   };
 
-  const openEdit = (row: DocumentsDocumentResponse) => {
+  const openEdit = async (row: DocumentsDocumentResponse) => {
+    if (!row.id) return;
     setEditing(row);
     setEditFileName(row.originalFileName ?? "");
+    setLoadingDetail(true);
+    try {
+      const detail = await getDocument(row.id);
+      setEditing((current) => (current?.id === row.id ? detail : current));
+      setEditFileName(detail.originalFileName ?? "");
+    } catch (err) {
+      toastApiError(err, "Failed to load document");
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   const closeEdit = () => {
     setEditing(null);
     setEditFileName("");
+    setLoadingDetail(false);
   };
 
   const handleUpdate = () => {
@@ -225,6 +240,8 @@ const DocumentsList = () => {
     });
   };
 
+  const editBusy = loadingDetail || updateDocument.isPending;
+
   return (
     <AppShell>
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
@@ -237,12 +254,15 @@ const DocumentsList = () => {
             Upload, rename, download, and manage stored files.
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setUploadOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Upload document
-        </Button>
+        {!accessDenied && (
+          <Button className="gap-2" onClick={() => setUploadOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Upload document
+          </Button>
+        )}
       </div>
 
+      <AccessDeniedOr error={error}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
@@ -277,22 +297,6 @@ const DocumentsList = () => {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Deleted</Label>
-                <Select
-                  value={isDeletedFilter}
-                  onValueChange={(v) => setIsDeletedFilter(v as DeletedFilter)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="no">Active</SelectItem>
-                    <SelectItem value="yes">Deleted</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Created from</Label>
                 <DatePicker
                   value={toDate(createdFrom)}
@@ -310,6 +314,22 @@ const DocumentsList = () => {
                   buttonClassName="h-9"
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Is deleted</Label>
+                <Select
+                  value={isDeletedFilter}
+                  onValueChange={(v) => setIsDeletedFilter(v as IsDeletedFilter)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -321,18 +341,14 @@ const DocumentsList = () => {
                   <TableHead>Original file name</TableHead>
                   <TableHead>MIME type</TableHead>
                   <TableHead>Size</TableHead>
+                  <TableHead>Provider</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="w-[140px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading data, please wait…
-                    </TableCell>
-                  </TableRow>
+                  <TableLoadingRow colSpan={6} />
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
@@ -340,84 +356,73 @@ const DocumentsList = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  items.map((row) => {
-                    const deleted = Boolean(row.deletedOn);
-                    return (
-                      <TableRow key={row.id ?? row.storageKey}>
-                        <TableCell className="font-medium max-w-[260px] truncate" title={row.originalFileName}>
-                          {row.originalFileName ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
-                          {row.mimeType ?? "—"}
-                        </TableCell>
-                        <TableCell className="tabular-nums text-sm">{formatSize(row.sizeBytes)}</TableCell>
-                        <TableCell className="text-sm tabular-nums">{formatCreated(row.createdOn)}</TableCell>
-                        <TableCell>
-                          {deleted ? (
-                            <Badge variant="outline" className="bg-rose-50 text-rose-900 border-rose-200">
-                              Deleted
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-900 border-emerald-200">
-                              Active
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8"
-                              disabled={!row.id || Boolean(fileBusy) || deleted}
-                              onClick={() => handlePreview(row)}
-                              title="View file"
-                            >
-                              {fileBusy?.id === row.id && fileBusy.action === "preview" ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Eye className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8"
-                              disabled={!row.id || downloadingId === row.id || deleted}
-                              onClick={() => void handleDownload(row)}
-                              title="Download file"
-                            >
-                              {downloadingId === row.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Download className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8"
-                              disabled={!row.id || deleted}
-                              onClick={() => openEdit(row)}
-                              title="Rename document"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="h-8 text-destructive hover:text-destructive"
-                              disabled={!row.id || deleted}
-                              onClick={() => setDeleteTarget(row)}
-                              title="Delete document"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  items.map((row) => (
+                    <TableRow key={row.id ?? row.storageKey}>
+                      <TableCell className="font-medium max-w-[260px] truncate" title={row.originalFileName}>
+                        {row.originalFileName ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
+                        {row.mimeType ?? "—"}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-sm">{formatSize(row.sizeBytes)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.storageProvider ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm tabular-nums">{formatCreated(row.createdOn)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            disabled={!row.id || Boolean(fileBusy)}
+                            onClick={() => handlePreview(row)}
+                            title="View file"
+                          >
+                            {fileBusy?.id === row.id && fileBusy.action === "preview" ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            disabled={!row.id || downloadingId === row.id}
+                            onClick={() => void handleDownload(row)}
+                            title="Download file"
+                          >
+                            {downloadingId === row.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            disabled={!row.id}
+                            onClick={() => void openEdit(row)}
+                            title="Rename document"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-8 text-destructive hover:text-destructive"
+                            disabled={!row.id}
+                            onClick={() => setDeleteTarget(row)}
+                            title="Delete document"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
@@ -433,6 +438,7 @@ const DocumentsList = () => {
           </div>
         </CardContent>
       </Card>
+      </AccessDeniedOr>
 
       <Dialog
         open={uploadOpen}
@@ -444,7 +450,7 @@ const DocumentsList = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Upload document</DialogTitle>
-            <DialogDescription>Upload a file to document storage via POST /api/documents.</DialogDescription>
+            <DialogDescription>Upload a file to document storage. File is required.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-1.5">
@@ -490,15 +496,16 @@ const DocumentsList = () => {
                 onChange={(e) => setEditFileName(e.target.value)}
                 placeholder="e.g. schedule.pdf"
                 autoFocus
+                disabled={editBusy}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeEdit} disabled={updateDocument.isPending}>
+            <Button variant="outline" onClick={closeEdit} disabled={editBusy}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={updateDocument.isPending}>
-              {updateDocument.isPending ? "Saving…" : "Save changes"}
+            <Button onClick={handleUpdate} disabled={editBusy}>
+              {updateDocument.isPending ? "Saving…" : loadingDetail ? "Loading…" : "Save changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -516,7 +523,7 @@ const DocumentsList = () => {
               {deleteTarget?.originalFileName
                 ? ` “${deleteTarget.originalFileName}”`
                 : " this document"}
-              . Soft-deleted files can be listed with the Deleted filter.
+              . This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

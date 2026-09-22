@@ -20,7 +20,7 @@ const daysAgo = (n: number) => {
   return iso(d);
 };
 
-let rates: FxRate[] = [
+const rates: FxRate[] = [
   { id: "fx-1", date: daysAgo(0), fromCurrency: "EUR", toCurrency: "USD", rate: 1.0842, source: "Automatic", enteredBy: "ECB Feed" },
   { id: "fx-2", date: daysAgo(0), fromCurrency: "EUR", toCurrency: "GBP", rate: 0.8567, source: "Automatic", enteredBy: "ECB Feed" },
   { id: "fx-3", date: daysAgo(0), fromCurrency: "EUR", toCurrency: "CHF", rate: 0.9612, source: "Automatic", enteredBy: "ECB Feed" },
@@ -36,23 +36,6 @@ let rates: FxRate[] = [
   { id: "fx-13", date: daysAgo(0), fromCurrency: "ALL", toCurrency: "EUR", rate: 0.010157, source: "Automatic", enteredBy: "BoA Feed" },
   { id: "fx-14", date: daysAgo(3), fromCurrency: "EUR", toCurrency: "ALL", rate: 98.10, source: "Manual", enteredBy: "Erin Hoxha", reason: "Bank partner lock rate" },
 ];
-
-export const listFxRates = () => [...rates].sort((a, b) => (a.date < b.date ? 1 : -1));
-
-export const addFxRate = (r: Omit<FxRate, "id" | "source" | "enteredBy"> & { source?: FxSource; enteredBy?: string }) => {
-  const next: FxRate = {
-    id: `fx-${Date.now()}`,
-    source: r.source ?? "Manual",
-    enteredBy: r.enteredBy ?? "Erin Hoxha",
-    ...r,
-  };
-  rates = [next, ...rates];
-  return next;
-};
-
-export const deleteFxRate = (id: string) => {
-  rates = rates.filter((r) => r.id !== id);
-};
 
 /** Latest rate for a pair (Manual takes precedence on the same date). */
 export const getLatestRate = (from: string, to: string): FxRate | undefined => {
@@ -82,27 +65,6 @@ export const resolveRate = (
     return { rate: 1 / inverse.rate, source: inverse.source, inverted: true, entry: inverse };
   }
   return undefined;
-};
-
-/** All candidate rates for a pair (newest first), used for manual override selection on offers. */
-export const getRatesForPair = (from: string, to: string): FxRate[] => {
-  const direct = rates
-    .filter((r) => r.fromCurrency === from && r.toCurrency === to)
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
-  if (direct.length > 0) return direct;
-
-  // Surface inverse quotes as selectable candidates (rate inverted for display/use).
-  return rates
-    .filter((r) => r.fromCurrency === to && r.toCurrency === from && r.rate !== 0)
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .map((r) => ({
-      ...r,
-      id: `${r.id}-inv`,
-      fromCurrency: from,
-      toCurrency: to,
-      rate: 1 / r.rate,
-      notes: r.notes ? `${r.notes} (inverted)` : "Inverted from reverse pair",
-    }));
 };
 
 export const convert = (amount: number, from: string, to: string, overrideRate?: number) => {

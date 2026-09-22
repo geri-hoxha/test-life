@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { Offer } from "@/data/offers";
+import { useGetOffer, useListOffers } from "@/api/offers";
+import type { OffersOfferListItemResponse, OffersOfferResponse } from "@/api/types";
+import { offerListLabel, offerStatusLabel } from "@/pages/offers/offer-ui";
 
 type OfferComboboxProps = {
-  offers: Offer[];
+  /** When omitted, options are loaded when the field is opened. */
+  offers?: OffersOfferListItemResponse[];
   value: string;
   onValueChange: (id: string) => void;
   placeholder?: string;
@@ -25,19 +28,35 @@ type OfferComboboxProps = {
   clearLabel?: string;
 };
 
-const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
-
-const offerLabel = (o: Offer) => {
-  const parts = [shortId(o.id), o.status, o.currency].filter(Boolean);
-  return parts.join(" · ");
-};
-
-const matchesOfferSearch = (o: Offer, search: string) => {
+const matchesOfferSearch = (o: OffersOfferListItemResponse, search: string) => {
   const q = search.trim().toLowerCase();
   if (!q) return true;
-  return [o.id, o.number, o.status, o.currency, o.productId]
+  return [
+    o.id,
+    o.status,
+    offerStatusLabel(o.status),
+    o.currency,
+    o.productId,
+    o.productName,
+    o.policyHolderName,
+    o.insuredName,
+    o.policyPlan,
+    o.salesPartyName,
+  ]
     .filter(Boolean)
     .some((field) => String(field).toLowerCase().includes(q));
+};
+
+const offerFromDetail = (offer?: OffersOfferResponse | null): OffersOfferListItemResponse | undefined => {
+  if (!offer?.id) return undefined;
+  const holder = offer.participants?.find((p) => p.role === "policyHolder");
+  return {
+    id: offer.id,
+    status: offer.status,
+    currency: offer.currency,
+    productId: offer.productId,
+    policyHolderName: holder?.displayName,
+  };
 };
 
 export const OfferCombobox = ({
@@ -53,8 +72,23 @@ export const OfferCombobox = ({
 }: OfferComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const selected = offers.find((o) => o.id === value);
-  const filtered = offers.filter((o) => matchesOfferSearch(o, search));
+  const isRemote = offers === undefined;
+
+  const { data: offersPage, isFetching } = useListOffers(
+    { pageNumber: 1, pageSize: 50 },
+    { enabled: isRemote && open },
+  );
+  const { data: selectedOffer } = useGetOffer(value, {
+    enabled: isRemote && Boolean(value),
+  });
+
+  const source = isRemote ? (offersPage?.items ?? []) : (offers ?? []);
+  const filtered = useMemo(
+    () => source.filter((o) => matchesOfferSearch(o, search)),
+    [search, source],
+  );
+  const selectedFromList = source.find((o) => o.id === value);
+  const selected = selectedFromList ?? (isRemote ? offerFromDetail(selectedOffer) : undefined);
 
   return (
     <Popover
@@ -79,7 +113,7 @@ export const OfferCombobox = ({
           )}
         >
           <span className="truncate font-mono text-xs">
-            {selected ? offerLabel(selected) : placeholder}
+            {selected ? offerListLabel(selected) : placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -92,7 +126,7 @@ export const OfferCombobox = ({
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>No offer found.</CommandEmpty>
+            <CommandEmpty>{isRemote && isFetching ? "Loading…" : "No offer found."}</CommandEmpty>
             <CommandGroup>
               {allowClear && (
                 <CommandItem
@@ -110,8 +144,9 @@ export const OfferCombobox = ({
               {filtered.map((o) => (
                 <CommandItem
                   key={o.id}
-                  value={`${o.id} ${o.number} ${o.status} ${o.currency}`}
+                  value={`${o.id} ${o.status} ${o.currency} ${o.policyHolderName ?? ""} ${o.insuredName ?? ""}`}
                   onSelect={() => {
+                    if (!o.id) return;
                     onValueChange(allowClear && value === o.id ? "" : o.id);
                     setOpen(false);
                     setSearch("");
@@ -123,7 +158,7 @@ export const OfferCombobox = ({
                       value === o.id ? "opacity-100" : "opacity-0",
                     )}
                   />
-                  <span className="truncate font-mono text-xs">{offerLabel(o)}</span>
+                  <span className="truncate font-mono text-xs">{offerListLabel(o)}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

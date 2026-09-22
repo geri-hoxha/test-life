@@ -131,7 +131,7 @@ const seed: Coverage[] = [
   },
 ];
 
-let coverages: Coverage[] = [...seed];
+const coverages: Coverage[] = [...seed];
 
 export const listCoverages = (productId: string, versionId?: string) =>
   coverages.filter((c) => c.productId === productId && (!versionId || c.versionId === versionId));

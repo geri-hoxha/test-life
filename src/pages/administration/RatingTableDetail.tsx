@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
+import { PageLoader } from "@/components/Loader";
+import { FilterGrid } from "@/components/FilterGrid";
 import PageHeader from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,12 +80,33 @@ const RatingTableDetail = () => {
   const [name, setName] = useState("");
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [deleteRule, setDeleteRule] = useState<RatingTablesRatingTableRuleResponse | null>(null);
+  const [genderFilter, setGenderFilter] = useState("ALL");
+  const [rateTypeFilter, setRateTypeFilter] = useState("ALL");
+  const [minAgeFilter, setMinAgeFilter] = useState("");
+  const [maxAgeFilter, setMaxAgeFilter] = useState("");
 
   useEffect(() => {
     setName(table?.name ?? "");
   }, [table?.name]);
 
   const rules = table?.rules ?? [];
+  const filteredRules = useMemo(() => {
+    const minAge = minAgeFilter.trim() === "" ? undefined : Number(minAgeFilter);
+    const maxAge = maxAgeFilter.trim() === "" ? undefined : Number(maxAgeFilter);
+    return rules.filter((rule) => {
+      if (genderFilter !== "ALL" && rule.gender !== genderFilter) return false;
+      if (rateTypeFilter === "flat" && !rule.rate?.isFlat) return false;
+      if (rateTypeFilter === "percentage" && rule.rate?.isFlat) return false;
+      if (minAge != null && Number.isFinite(minAge) && (rule.minAge ?? 0) < minAge) return false;
+      if (maxAge != null && Number.isFinite(maxAge) && (rule.maxAge ?? 0) > maxAge) return false;
+      return true;
+    });
+  }, [rules, genderFilter, rateTypeFilter, minAgeFilter, maxAgeFilter]);
+  const hasRuleFilters =
+    genderFilter !== "ALL" ||
+    rateTypeFilter !== "ALL" ||
+    Boolean(minAgeFilter.trim()) ||
+    Boolean(maxAgeFilter.trim());
 
   const handleRename = () => {
     const trimmed = name.trim();
@@ -125,15 +155,7 @@ const RatingTableDetail = () => {
   if (isLoading) {
     return (
       <AppShell>
-        <PageHeader
-          breadcrumbs={[
-            { label: "Administration" },
-            { label: "Rating tables", to: "/administration/rating-tables" },
-            { label: "…" },
-          ]}
-          title="Loading…"
-          description="Fetching rating table."
-        />
+        <PageLoader label="Loading rating table…" />
       </AppShell>
     );
   }
@@ -194,6 +216,7 @@ const RatingTableDetail = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Rating table name"
+                  maxLength={512}
                 />
               </div>
               <Button
@@ -213,17 +236,84 @@ const RatingTableDetail = () => {
 
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <CardTitle className="text-base">Rules</CardTitle>
-                <CardDescription>
-                  {rules.length} rule{rules.length === 1 ? "" : "s"} defined for this table.
-                </CardDescription>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">Rules</CardTitle>
+                  <CardDescription>
+                    {hasRuleFilters
+                      ? `${filteredRules.length} of ${rules.length} rule${rules.length === 1 ? "" : "s"}`
+                      : `${rules.length} rule${rules.length === 1 ? "" : "s"} defined for this table.`}
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasRuleFilters && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 text-muted-foreground"
+                      onClick={() => {
+                        setGenderFilter("ALL");
+                        setRateTypeFilter("ALL");
+                        setMinAgeFilter("");
+                        setMaxAgeFilter("");
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setRuleDialogOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Add rule
+                  </Button>
+                </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setRuleDialogOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Add rule
-              </Button>
+              <FilterGrid>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Gender</Label>
+                  <Select value={genderFilter} onValueChange={setGenderFilter}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All genders</SelectItem>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Rate type</Label>
+                  <Select value={rateTypeFilter} onValueChange={setRateTypeFilter}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All types</SelectItem>
+                      <SelectItem value="flat">Flat</SelectItem>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Min age from</Label>
+                  <Input
+                    className="h-9"
+                    type="number"
+                    min={0}
+                    value={minAgeFilter}
+                    onChange={(e) => setMinAgeFilter(e.target.value)}
+                    placeholder="Any"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Max age to</Label>
+                  <Input
+                    className="h-9"
+                    type="number"
+                    min={0}
+                    value={maxAgeFilter}
+                    onChange={(e) => setMaxAgeFilter(e.target.value)}
+                    placeholder="Any"
+                  />
+                </div>
+              </FilterGrid>
             </div>
           </CardHeader>
           <CardContent>
@@ -245,8 +335,14 @@ const RatingTableDetail = () => {
                         No rules yet. Add a rule to define rating bands.
                       </TableCell>
                     </TableRow>
+                  ) : filteredRules.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-10 text-sm text-muted-foreground">
+                        No rules match the current filters.
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    rules.map((rule) => (
+                    filteredRules.map((rule) => (
                       <TableRow key={rule.id ?? `${rule.minAge}-${rule.maxAge}-${rule.gender}`}>
                         <TableCell className="font-mono text-sm">
                           {rule.minAge ?? "—"} – {rule.maxAge ?? "—"}
