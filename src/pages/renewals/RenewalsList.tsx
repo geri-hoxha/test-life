@@ -39,7 +39,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isRenewalStatus, useListRenewals, useStartPolicyRenewal } from "@/api/renewals";
+import {
+  isRenewalStatus,
+  useListRenewals,
+  useStartPolicyRenewal,
+} from "@/api/renewals";
 import type {
   DomainPoliciesPolicyRenewalStatus,
   PoliciesRenewalListItemResponse,
@@ -88,7 +92,8 @@ const RenewalsList = () => {
   );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [startTarget, setStartTarget] = useState<PoliciesRenewalListItemResponse | null>(null);
+  const [startTarget, setStartTarget] =
+    useState<PoliciesRenewalListItemResponse | null>(null);
   const startRenewal = useStartPolicyRenewal();
 
   const filters = useMemo(
@@ -200,7 +205,9 @@ const RenewalsList = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Policy</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    Policy
+                  </Label>
                   <PolicyCombobox
                     value={policyId}
                     onValueChange={setPolicyId}
@@ -271,8 +278,6 @@ const RenewalsList = () => {
                     </TableHead>
                     <TableHead className="text-right">Charge premium</TableHead>
                     <TableHead className="text-right">Docs</TableHead>
-                    <TableHead className="text-right">Flags</TableHead>
-                    <TableHead className="text-right">Discounts</TableHead>
                     <TableHead className="w-[110px] text-right">
                       Actions
                     </TableHead>
@@ -368,12 +373,7 @@ const RenewalsList = () => {
                         <TableCell className="text-right font-mono text-sm">
                           {row.outstandingDocumentCount ?? 0}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {row.raisedReviewFlagCount ?? 0}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {row.pendingDiscountRequestCount ?? 0}
-                        </TableCell>
+
                         <TableCell className="text-right">
                           {row.status === "planned" && (
                             <Button
@@ -424,7 +424,9 @@ const RenewalsList = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={startRenewal.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={startRenewal.isPending}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
               disabled={startRenewal.isPending}
