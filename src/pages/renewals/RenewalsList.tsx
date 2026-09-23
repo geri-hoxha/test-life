@@ -54,6 +54,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { toast } from "sonner";
 import { Play, RefreshCw } from "lucide-react";
+import { StartRenewalBalanceFields } from "./StartRenewalBalanceFields";
 import {
   RENEWAL_STATUSES,
   formatRenewalMoney,
@@ -63,6 +64,7 @@ import {
   renewalStatusLabel,
   shortRenewalId,
 } from "./renewal-ui";
+import { startRenewalRequestBody } from "./start-renewal-balances";
 
 const COL_COUNT = 12;
 
@@ -94,7 +96,16 @@ const RenewalsList = () => {
   const [pageSize, setPageSize] = useState(10);
   const [startTarget, setStartTarget] =
     useState<PoliciesRenewalListItemResponse | null>(null);
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [closingBalance, setClosingBalance] = useState("");
+  const [balanceError, setBalanceError] = useState(false);
   const startRenewal = useStartPolicyRenewal();
+
+  const resetStartBalances = () => {
+    setOpeningBalance("");
+    setClosingBalance("");
+    setBalanceError(false);
+  };
 
   const filters = useMemo(
     () =>
@@ -146,16 +157,22 @@ const RenewalsList = () => {
 
   const confirmStart = () => {
     if (!startTarget?.policyId || !startTarget.id) return;
+    const balances = startRenewalRequestBody(openingBalance, closingBalance);
+    if (!balances.ok) {
+      setBalanceError(true);
+      return;
+    }
     startRenewal.mutate(
       {
         policyId: startTarget.policyId,
         renewalId: startTarget.id,
-        body: {},
+        body: balances.body,
       },
       {
         onSuccess: () => {
           toast.success("Renewal started");
           setStartTarget(null);
+          resetStartBalances();
         },
         onError: (err) => toastApiError(err, "Failed to start renewal"),
       },
@@ -382,6 +399,7 @@ const RenewalsList = () => {
                               disabled={!row.id || !row.policyId}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                resetStartBalances();
                                 setStartTarget(row);
                               }}
                             >
@@ -411,7 +429,10 @@ const RenewalsList = () => {
       <AlertDialog
         open={startTarget != null}
         onOpenChange={(open) => {
-          if (!open && !startRenewal.isPending) setStartTarget(null);
+          if (!open && !startRenewal.isPending) {
+            setStartTarget(null);
+            resetStartBalances();
+          }
         }}
       >
         <AlertDialogContent>
@@ -423,6 +444,14 @@ const RenewalsList = () => {
                 : "Start underwriting for this renewal."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <StartRenewalBalanceFields
+            openingBalance={openingBalance}
+            closingBalance={closingBalance}
+            onOpeningBalanceChange={setOpeningBalance}
+            onClosingBalanceChange={setClosingBalance}
+            disabled={startRenewal.isPending}
+            showError={balanceError}
+          />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={startRenewal.isPending}>
               Cancel

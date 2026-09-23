@@ -81,6 +81,8 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import { StartRenewalBalanceFields } from "./StartRenewalBalanceFields";
+import { startRenewalRequestBody } from "./start-renewal-balances";
 import {
   formatRenewalDate,
   formatRenewalDateTime,
@@ -149,6 +151,9 @@ const RenewalDetail = () => {
   const rejectDiscount = useRejectRenewalDiscount();
 
   const [startOpen, setStartOpen] = useState(false);
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [closingBalance, setClosingBalance] = useState("");
+  const [balanceError, setBalanceError] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyResult, setApplyResult] = useState<PoliciesApplyPolicyRenewalResponse | null>(null);
 
@@ -246,13 +251,29 @@ const RenewalDetail = () => {
     requestedOnUtc: row.requestedOnUtc,
   }));
 
+  const resetStartBalances = () => {
+    setOpeningBalance("");
+    setClosingBalance("");
+    setBalanceError(false);
+  };
+
+  const closeStart = () => {
+    setStartOpen(false);
+    resetStartBalances();
+  };
+
   const handleStart = () => {
+    const balances = startRenewalRequestBody(openingBalance, closingBalance);
+    if (!balances.ok) {
+      setBalanceError(true);
+      return;
+    }
     startRenewal.mutate(
-      { ...ids, body: {} },
+      { ...ids, body: balances.body },
       {
         onSuccess: () => {
           toast.success("Renewal started");
-          setStartOpen(false);
+          closeStart();
         },
         onError: (err) => toastApiError(err, "Failed to start renewal"),
       },
@@ -511,7 +532,10 @@ const RenewalDetail = () => {
             <Button
               size="sm"
               className="gap-2"
-              onClick={() => setStartOpen(true)}
+              onClick={() => {
+                resetStartBalances();
+                setStartOpen(true);
+              }}
             >
               <Play className="h-4 w-4" /> Start renewal
             </Button>
@@ -807,7 +831,12 @@ const RenewalDetail = () => {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={startOpen} onOpenChange={setStartOpen}>
+      <Dialog
+        open={startOpen}
+        onOpenChange={(open) => {
+          if (!open && !startRenewal.isPending) closeStart();
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Start renewal</DialogTitle>
@@ -815,8 +844,16 @@ const RenewalDetail = () => {
               Start underwriting for the next coverage period.
             </DialogDescription>
           </DialogHeader>
+          <StartRenewalBalanceFields
+            openingBalance={openingBalance}
+            closingBalance={closingBalance}
+            onOpeningBalanceChange={setOpeningBalance}
+            onClosingBalanceChange={setClosingBalance}
+            disabled={startRenewal.isPending}
+            showError={balanceError}
+          />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStartOpen(false)} disabled={startRenewal.isPending}>
+            <Button variant="outline" onClick={closeStart} disabled={startRenewal.isPending}>
               Cancel
             </Button>
             <Button onClick={handleStart} disabled={startRenewal.isPending}>

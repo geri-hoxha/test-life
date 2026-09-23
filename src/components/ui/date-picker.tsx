@@ -1,5 +1,5 @@
 import * as React from "react";
-import { format, isValid, parse, isSameDay } from "date-fns";
+import { isSameDay } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import type { DayPickerSingleProps, Matcher } from "react-day-picker";
 
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDisplayDate, parseDateInput } from "@/components/ui/date-mask";
 
 type CalendarSingleProps = Omit<
   DayPickerSingleProps,
@@ -21,62 +22,6 @@ type DatePickerProps = CalendarSingleProps & {
   className?: string;
   buttonClassName?: string;
   buttonDisabled?: boolean;
-};
-
-const DISPLAY_FORMAT = "dd/MM/yyyy";
-
-const PARSE_FORMATS = [
-  "dd/MM/yyyy",
-  "d/M/yyyy",
-  "dd-MM-yyyy",
-  "d-M-yyyy",
-  "dd.MM.yyyy",
-  "d.M.yyyy",
-  "yyyy-MM-dd",
-  "yyyy/MM/dd",
-];
-
-const parseDateInput = (raw: string): Date | undefined => {
-  const text = raw.trim();
-  if (!text) return undefined;
-  for (const fmt of PARSE_FORMATS) {
-    const parsed = parse(text, fmt, new Date());
-    if (isValid(parsed) && format(parsed, fmt) === text) {
-      return parsed;
-    }
-  }
-  // Accept loosely typed d/M/yyyy even when zero-padding does not match the format string.
-  const loose = text.match(/^(\d{1,4})[/.\\-](\d{1,2})[/.\\-](\d{1,4})$/);
-  if (loose) {
-    const a = Number(loose[1]);
-    const b = Number(loose[2]);
-    const c = Number(loose[3]);
-    let year: number;
-    let month: number;
-    let day: number;
-    if (loose[1].length === 4) {
-      year = a;
-      month = b;
-      day = c;
-    } else if (loose[3].length === 4) {
-      day = a;
-      month = b;
-      year = c;
-    } else {
-      return undefined;
-    }
-    if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1000) return undefined;
-    const date = new Date(year, month - 1, day);
-    if (
-      isValid(date) &&
-      date.getFullYear() === year &&
-      date.getMonth() === month - 1 &&
-      date.getDate() === day
-    ) {
-      return date;
-    }
-  }
-  return undefined;
 };
 
 const isDateDisabled = (date: Date, disabled: Matcher | Matcher[] | undefined): boolean => {
@@ -101,51 +46,61 @@ function DatePicker({
   disabled,
   ...calendarProps
 }: DatePickerProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const focusedRef = React.useRef(false);
   const [open, setOpen] = React.useState(false);
-  const [text, setText] = React.useState(() => (value ? format(value, DISPLAY_FORMAT) : ""));
+  const valueKey = formatDisplayDate(value);
+  const initialText = React.useState(valueKey)[0];
+
+  const write = (next: string) => {
+    const el = inputRef.current;
+    if (el && el.value !== next) el.value = next;
+  };
 
   React.useEffect(() => {
-    setText(value ? format(value, DISPLAY_FORMAT) : "");
-  }, [value]);
+    if (focusedRef.current) return;
+    write(valueKey);
+  }, [valueKey]);
 
-  const commit = (raw: string) => {
+  const commit = () => {
+    const raw = inputRef.current?.value ?? "";
     const trimmed = raw.trim();
     if (!trimmed) {
-      onChange(undefined);
-      setText("");
+      if (valueKey) onChange(undefined);
+      write("");
       return;
     }
     const parsed = parseDateInput(trimmed);
     if (!parsed || isDateDisabled(parsed, disabled)) {
-      setText(value ? format(value, DISPLAY_FORMAT) : "");
+      write(valueKey);
       return;
     }
-    onChange(parsed);
-    setText(format(parsed, DISPLAY_FORMAT));
+    const display = formatDisplayDate(parsed);
+    write(display);
+    if (display !== valueKey) onChange(parsed);
   };
 
   return (
     <div className="flex w-full items-center gap-1">
       <Input
-        value={text}
+        ref={inputRef}
+        // The browser owns the text while typing, so the caret stays on the digit you edit.
         disabled={buttonDisabled}
         placeholder={placeholder}
-        inputMode="numeric"
         autoComplete="off"
+        spellCheck={false}
         className={cn("flex-1", buttonClassName)}
-        onChange={(e) => {
-          const next = e.target.value;
-          setText(next);
-          const parsed = parseDateInput(next.trim());
-          if (parsed && !isDateDisabled(parsed, disabled)) {
-            onChange(parsed);
-          }
+        onFocus={() => {
+          focusedRef.current = true;
         }}
-        onBlur={() => commit(text)}
+        onBlur={() => {
+          focusedRef.current = false;
+          commit();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            commit(text);
+            e.currentTarget.blur();
           }
         }}
         aria-label={placeholder}
@@ -168,6 +123,8 @@ function DatePicker({
             selected={value}
             defaultMonth={defaultMonth ?? value}
             onSelect={(date) => {
+              focusedRef.current = false;
+              write(formatDisplayDate(date));
               onChange(date);
               setOpen(false);
             }}
