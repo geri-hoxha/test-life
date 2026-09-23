@@ -693,9 +693,14 @@ const CustomerForm = ({
 
   const formBody = (
     <div
-      className={cn("grid grid-cols-1 gap-6", !embedded && "lg:grid-cols-3")}
+      className={cn(
+        "grid grid-cols-1 gap-6",
+        !embedded && isCompany && "lg:grid-cols-3",
+      )}
     >
-      <div className={cn("space-y-6", !embedded && "lg:col-span-2")}>
+      <div
+        className={cn("space-y-6", !embedded && isCompany && "lg:col-span-2")}
+      >
         {!forcedType && (
           <Card className="p-4 shadow-card border-border">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
@@ -982,14 +987,12 @@ const CustomerForm = ({
         )}
       </div>
 
-      <div className="space-y-6">
-        {isCompany ? (
-          <>
-            {addressListSection}
-            {addAddressSection}
-          </>
-        ) : null}
-      </div>
+      {isCompany && (
+        <div className="space-y-6">
+          {addressListSection}
+          {addAddressSection}
+        </div>
+      )}
     </div>
   );
 
