@@ -48,6 +48,22 @@ const invalidateOffers = (queryClient: ReturnType<typeof useQueryClient>) => {
   void queryClient.invalidateQueries({ queryKey: offersKeys.all });
 };
 
+/**
+ * Invalidates offer caches and resolves once GET /api/offers/{id} has refetched.
+ * Returned from a mutation's onSuccess so the mutation stays pending (and the
+ * page loader visible) until the fresh offer is on screen.
+ */
+const refreshOffer = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  offerId: string,
+) => {
+  invalidateOffers(queryClient);
+  return queryClient.invalidateQueries({
+    queryKey: offersKeys.detail(offerId),
+    exact: true,
+  });
+};
+
 const mapPremiumPreviewRows = (
   rows: OffersOfferPeriodResponse[] | null | undefined,
 ): OffersOfferPremiumPreview[] =>
@@ -106,10 +122,7 @@ export const useAddOfferInsuredPerson = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; body: OffersAddOfferInsuredPersonRequest }) =>
       addOfferInsuredPerson(vars.offerId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -131,10 +144,7 @@ export const useAddOfferParticipant = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; body: OffersAddOfferParticipantRequest }) =>
       addOfferParticipant(vars.offerId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -160,10 +170,7 @@ export const useAddOfferPartnerParticipants = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; body: OffersAddOfferPartnerParticipantRequest }) =>
       addOfferPartnerParticipants(vars.offerId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -300,10 +307,7 @@ export const useSubmitOfferLoan = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; body: OffersSubmitOfferLoanRequest }) =>
       submitOfferLoan(vars.offerId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -368,10 +372,7 @@ export const useRemoveOfferInsuredPerson = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; insuredPersonId: string }) =>
       removeOfferInsuredPerson(vars.offerId, vars.insuredPersonId),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -392,10 +393,7 @@ export const useRemoveOfferParticipant = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; participantId: string }) =>
       removeOfferParticipant(vars.offerId, vars.participantId),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -421,10 +419,7 @@ export const useApproveOfferReviewFlag = () => {
       flagId: string;
       body: OffersResolveOfferReviewFlagRequest;
     }) => approveOfferReviewFlag(vars.offerId, vars.flagId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -450,10 +445,7 @@ export const useRejectOfferReviewFlag = () => {
       flagId: string;
       body: OffersResolveOfferReviewFlagRequest;
     }) => rejectOfferReviewFlag(vars.offerId, vars.flagId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -474,10 +466,7 @@ export const useAcceptOfferDocument = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; requirementId: string }) =>
       acceptOfferDocument(vars.offerId, vars.requirementId),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -503,10 +492,7 @@ export const useRefuseOfferDocument = () => {
       requirementId: string;
       body: OffersRefuseOfferDocumentRequest;
     }) => refuseOfferDocument(vars.offerId, vars.requirementId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -532,10 +518,7 @@ export const useSubmitOfferDocument = () => {
       requirementId: string;
       body: OffersSubmitOfferDocumentRequest;
     }) => submitOfferDocument(vars.offerId, vars.requirementId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -561,10 +544,7 @@ export const useWaiveOfferDocument = () => {
       requirementId: string;
       body: OffersWaiveOfferDocumentRequest;
     }) => waiveOfferDocument(vars.offerId, vars.requirementId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -585,10 +565,7 @@ export const useApproveOfferDiscount = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; requestId: string }) =>
       approveOfferDiscount(vars.offerId, vars.requestId),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -609,10 +586,7 @@ export const useRejectOfferDiscount = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; requestId: string }) =>
       rejectOfferDiscount(vars.offerId, vars.requestId),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 
@@ -634,10 +608,7 @@ export const useRequestOfferDiscount = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; body: OffersRequestOfferDiscountRequest }) =>
       requestOfferDiscount(vars.offerId, vars.body),
-    onSuccess: (_data, vars) => {
-      invalidateOffers(queryClient);
-      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
-    },
+    onSuccess: (_data, vars) => refreshOffer(queryClient, vars.offerId),
   });
 };
 

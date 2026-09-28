@@ -5,6 +5,7 @@ import { OverlayLoader, PageLoader } from "@/components/Loader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popconfirm } from "@/components/ui/popconfirm";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -312,16 +313,23 @@ const OfferParticipantFields = ({
   }
   return (
     <div className="space-y-3">
-      {canRemove ? (
+      {canRemove && onRemove ? (
         <div className="flex justify-end">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 -mt-1 -mr-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={onRemove}
+          <Popconfirm
+            title="Remove this participant?"
+            description={`${party.displayName || "This participant"} will be removed from the offer.`}
+            confirmLabel="Remove"
+            destructive
+            onConfirm={onRemove}
           >
-            Remove
-          </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 -mt-1 -mr-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              Remove
+            </Button>
+          </Popconfirm>
         </div>
       ) : null}
       <div className="grid grid-cols-2 gap-3">
@@ -382,6 +390,10 @@ const OfferParticipantFields = ({
   );
 };
 
+const insuredPersonName = (person: OfferInsuredPerson) =>
+  [person.firstName, person.lastName].filter(Boolean).join(" ") ||
+  person.personalIdentifier;
+
 const OfferInsuredPersonFields = ({
   person,
   countryLabel,
@@ -393,21 +405,26 @@ const OfferInsuredPersonFields = ({
   canRemove?: boolean;
   onRemove?: () => void;
 }) => {
-  const name =
-    [person.firstName, person.lastName].filter(Boolean).join(" ") ||
-    person.personalIdentifier;
+  const name = insuredPersonName(person);
   return (
     <div className="space-y-3">
-      {canRemove ? (
+      {canRemove && onRemove ? (
         <div className="flex justify-end">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 -mt-1 -mr-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={onRemove}
+          <Popconfirm
+            title="Remove this insured person?"
+            description={`${name || "This insured person"} will be removed from the offer.`}
+            confirmLabel="Remove"
+            destructive
+            onConfirm={onRemove}
           >
-            Remove
-          </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 -mt-1 -mr-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              Remove
+            </Button>
+          </Popconfirm>
         </div>
       ) : null}
       <div className="grid grid-cols-2 gap-3">
@@ -2752,14 +2769,21 @@ const OfferDetail = () => {
                     </Button>
                   ) : null}
                   {canEditParties && holder?.id ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => void handleRemoveParticipant(holder.id)}
+                    <Popconfirm
+                      title="Remove the policy holder?"
+                      description={`${holder.displayName || "The policy holder"} will be removed from the offer.`}
+                      confirmLabel="Remove"
+                      destructive
+                      onConfirm={() => void handleRemoveParticipant(holder.id)}
                     >
-                      Remove
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        Remove
+                      </Button>
+                    </Popconfirm>
                   ) : null}
                 </div>
               </CardHeader>
@@ -2796,16 +2820,23 @@ const OfferDetail = () => {
                     </Button>
                   ) : null}
                   {canEditParties && offer.insuredPersons[0]?.id ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() =>
+                    <Popconfirm
+                      title="Remove this insured person?"
+                      description={`${insuredPersonName(offer.insuredPersons[0]) || "This insured person"} will be removed from the offer.`}
+                      confirmLabel="Remove"
+                      destructive
+                      onConfirm={() =>
                         void handleRemoveInsured(offer.insuredPersons[0].id)
                       }
                     >
-                      Remove
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        Remove
+                      </Button>
+                    </Popconfirm>
                   ) : null}
                 </div>
               </CardHeader>
@@ -2858,14 +2889,21 @@ const OfferDetail = () => {
                     </Button>
                   ) : null}
                   {canEditParties && payer?.id ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => void handleRemoveParticipant(payer.id)}
+                    <Popconfirm
+                      title="Remove the payer?"
+                      description={`${payer.displayName || "The payer"} will be removed from the offer.`}
+                      confirmLabel="Remove"
+                      destructive
+                      onConfirm={() => void handleRemoveParticipant(payer.id)}
                     >
-                      Remove
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        Remove
+                      </Button>
+                    </Popconfirm>
                   ) : null}
                 </div>
               </CardHeader>
@@ -2925,16 +2963,23 @@ const OfferDetail = () => {
                     </Button>
                   ) : null}
                   {canEditParties && beneficiaryParties[0]?.id ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() =>
+                    <Popconfirm
+                      title="Remove this beneficiary?"
+                      description={`${beneficiaryParties[0].displayName || "This beneficiary"} will be removed from the offer.`}
+                      confirmLabel="Remove"
+                      destructive
+                      onConfirm={() =>
                         void handleRemoveParticipant(beneficiaryParties[0].id)
                       }
                     >
-                      Remove
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        Remove
+                      </Button>
+                    </Popconfirm>
                   ) : null}
                 </div>
               </CardHeader>
