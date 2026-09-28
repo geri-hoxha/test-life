@@ -645,7 +645,11 @@ export type PoliciesPolicyListItemResponse = {
   firstPeriodChargePremium?: number | null;
   policyHolderName?: string | null;
   insuredName?: string | null;
+  insuredFirstName?: string | null;
+  insuredLastName?: string | null;
+  insuredPersonalIdentifier?: string | null;
   insuredAge?: number | null;
+  partnerName?: string | null;
   salesChannel?: DomainDistributionSalesChannel | null;
   salesPartyName?: string | null;
   periodCount?: number;
@@ -1035,6 +1039,10 @@ export type OffersOfferListItemResponse = {
   currency?: string;
   sumInsured?: number | null;
   firstPeriodChargePremium?: number | null;
+  insuredFirstName?: string | null;
+  insuredLastName?: string | null;
+  insuredPersonalIdentifier?: string | null;
+  partnerName?: string | null;
   policyHolderName?: string | null;
   insuredName?: string | null;
   insuredAge?: number | null;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { FilterGrid } from "@/components/FilterGrid";
@@ -42,16 +42,27 @@ import { getCurrencies } from "@/config/currencies";
 import { openPolicyPrint, openPolicyPrintWindow, useListPolicies } from "@/api/policies";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
+import type { PoliciesPolicyListItemResponse } from "@/api/types";
 import {
-  formatCoverageTerm,
-  formatPolicyDate,
+  formatPolicyLocalDate,
+  formatPolicyLocalDateTime,
   formatPolicyMoney,
   policyNumberLabel,
   policyStatusClass,
   policyStatusLabel,
+  shortPolicyId,
 } from "./policy-ui";
 
-const COL_COUNT = 9;
+const COL_COUNT = 16;
+
+const insuredFullName = (p: PoliciesPolicyListItemResponse) =>
+  [p.insuredFirstName, p.insuredLastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ") || p.insuredName?.trim() || "";
+
+const Empty = () => <span className="text-muted-foreground">—</span>;
 
 const toDate = (isoDay: string) => {
   if (!isoDay) return undefined;
@@ -64,6 +75,7 @@ const toDate = (isoDay: string) => {
 
 const PoliciesList = () => {
   const navigate = useNavigate();
+  const policyPlanTypeLabel = usePolicyPlanTypeLabel();
   const [productId, setProductId] = useState("");
   const [offerId, setOfferId] = useState("");
   const [currency, setCurrency] = useState("__all__");
@@ -301,17 +313,24 @@ const PoliciesList = () => {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
-            <Table>
+            <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
               <TableHeader>
                 <TableRow>
                   <TableHead>Serial</TableHead>
                   <TableHead>Legacy policy no.</TableHead>
                   <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Sum Insured</TableHead>
-                  <TableHead className="text-right">Premium</TableHead>
-                  <TableHead>Coverage</TableHead>
-                  <TableHead>Issued</TableHead>
+                  <TableHead>Policy plan</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Premium</TableHead>
+                  <TableHead className="text-right">Sum Insured</TableHead>
+                  <TableHead>Insured</TableHead>
+                  <TableHead>Personal ID</TableHead>
+                  <TableHead>Partner</TableHead>
+                  <TableHead>Currency</TableHead>
+                  <TableHead>Coverage start</TableHead>
+                  <TableHead>Coverage end</TableHead>
+                  <TableHead>Issued</TableHead>
+                  <TableHead>Offer</TableHead>
                   <TableHead className="w-[88px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -343,26 +362,13 @@ const PoliciesList = () => {
                         {policyNumberLabel(p.serial, p.id)}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {p.legacyPolicyNumber?.trim() || (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        {p.legacyPolicyNumber?.trim() || <Empty />}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {p.productName?.trim() || (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        {p.productName?.trim() || <Empty />}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatPolicyMoney(p.sumInsured, p.currency)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        {formatPolicyMoney(p.firstPeriodChargePremium, p.currency)}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono">
-                        {formatCoverageTerm(p.coverageTerm)}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono">
-                        {formatPolicyDate(p.issuedOnUtc)}
+                      <TableCell className="text-sm" title={p.policyPlan}>
+                        {p.policyPlan ? policyPlanTypeLabel(p.policyPlan) : <Empty />}
                       </TableCell>
                       <TableCell>
                         <span
@@ -370,6 +376,46 @@ const PoliciesList = () => {
                         >
                           {policyStatusLabel(p.status)}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatPolicyMoney(p.firstPeriodChargePremium, p.currency)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatPolicyMoney(p.sumInsured, p.currency)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {insuredFullName(p) || <Empty />}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {p.insuredPersonalIdentifier?.trim() || <Empty />}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {p.partnerName?.trim() || <Empty />}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {p.currency?.trim() || <Empty />}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatPolicyLocalDate(p.coverageTerm?.startDate)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatPolicyLocalDate(p.coverageTerm?.endDate)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatPolicyLocalDateTime(p.issuedOnUtc)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {p.offerId ? (
+                          <Link
+                            to={`/offers/${p.offerId}`}
+                            className="text-primary hover:underline"
+                            title={p.offerId}
+                          >
+                            {shortPolicyId(p.offerId)}
+                          </Link>
+                        ) : (
+                          <Empty />
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="inline-flex items-center justify-end">

@@ -42,15 +42,20 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { DomainOffersOfferStatus } from "@/api/types";
 import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { isApiForbidden } from "@/lib/api-error";
+import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import {
   OFFER_STATUSES,
-  formatCoverageTerm,
+  formatOfferLocalDate,
+  formatOfferLocalDateTime,
   formatOfferMoney,
   offerStatusClass,
   offerStatusLabel,
 } from "./offer-ui";
 
-const COL_COUNT = 8;
+const COL_COUNT = 17;
+
+const orDash = (value?: string | null) =>
+  value?.trim() || <span className="text-muted-foreground">—</span>;
 
 const toDate = (isoDay: string) => {
   if (!isoDay) return undefined;
@@ -63,6 +68,7 @@ const toDate = (isoDay: string) => {
 
 const OffersList = () => {
   const navigate = useNavigate();
+  const policyPlanTypeLabel = usePolicyPlanTypeLabel();
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [productId, setProductId] = useState("");
   const [currency, setCurrency] = useState("__all__");
@@ -291,14 +297,23 @@ const OffersList = () => {
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="[&>th]:whitespace-nowrap">
+                    <TableHead>ID</TableHead>
                     <TableHead>Product</TableHead>
-                    <TableHead>Insured</TableHead>
-                    <TableHead className="text-right">Sum Insured</TableHead>
-                    <TableHead className="text-right">Premium</TableHead>
+                    <TableHead>Product ID</TableHead>
+                    <TableHead>Policy plan</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Policy ID</TableHead>
+                    <TableHead>Coverage start</TableHead>
+                    <TableHead>Coverage end</TableHead>
                     <TableHead>Currency</TableHead>
-                    <TableHead>Coverage</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Premium</TableHead>
+                    <TableHead className="text-right">Sum Insured</TableHead>
+                    <TableHead>Insured first name</TableHead>
+                    <TableHead>Insured last name</TableHead>
+                    <TableHead>Personal ID</TableHead>
+                    <TableHead>Partner</TableHead>
                     <TableHead className="w-[80px] text-right">
                       Actions
                     </TableHead>
@@ -344,25 +359,47 @@ const OffersList = () => {
                       return (
                         <TableRow
                           key={o.id}
-                          className={o.id ? "cursor-pointer" : undefined}
+                          className={`[&>td]:whitespace-nowrap ${o.id ? "cursor-pointer" : ""}`}
                           onClick={() => o.id && navigate(`/offers/${o.id}`)}
                         >
+                          <TableCell className="font-mono text-xs">
+                            {orDash(o.id)}
+                          </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {productCell}
                           </TableCell>
-                          <TableCell className="text-sm">
-                            {o.insuredName?.trim() || (
-                              <span className="text-muted-foreground">—</span>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {orDash(o.productId)}
+                          </TableCell>
+                          <TableCell
+                            className="font-mono text-xs"
+                            title={policyPlanTypeLabel(o.policyPlan)}
+                          >
+                            {orDash(o.policyPlan)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatOfferLocalDateTime(o.createdOnUtc)}
+                          </TableCell>
+                          <TableCell
+                            className="font-mono text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {o.policyId ? (
+                              <Link
+                                to={`/policies/${o.policyId}`}
+                                className="text-primary hover:underline"
+                              >
+                                {o.policyId}
+                              </Link>
+                            ) : (
+                              orDash(null)
                             )}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {formatOfferMoney(o.sumInsured, o.currency)}
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatOfferLocalDate(o.coverageTerm?.startDate)}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm font-bold text-success">
-                            {formatOfferMoney(
-                              o.firstPeriodChargePremium,
-                              o.currency,
-                            )}
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatOfferLocalDate(o.coverageTerm?.endDate)}
                           </TableCell>
                           <TableCell>
                             {o.currency ? (
@@ -373,11 +410,8 @@ const OffersList = () => {
                                 {o.currency}
                               </Badge>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              orDash(null)
                             )}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground font-mono">
-                            {formatCoverageTerm(o.coverageTerm)}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -386,6 +420,27 @@ const OffersList = () => {
                             >
                               {offerStatusLabel(o.status)}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-bold text-success">
+                            {formatOfferMoney(
+                              o.firstPeriodChargePremium,
+                              o.currency,
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {formatOfferMoney(o.sumInsured, o.currency)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {orDash(o.insuredFirstName)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {orDash(o.insuredLastName)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {orDash(o.insuredPersonalIdentifier)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {orDash(o.partnerName)}
                           </TableCell>
                           <TableCell
                             className="text-right"

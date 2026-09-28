@@ -124,7 +124,27 @@ export const formatPolicyDateTime = (iso?: string | null) => {
   }
 };
 
-export const formatCoverageTerm = (term?: OffersDateOnlyRangeResponse | null) => {
+const localDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const localDateTimeFormat = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+/** Date-only values (e.g. `2032-06-23`) in the browser's locale; parseISO keeps them on the same calendar day. */
+export const formatPolicyLocalDate = (iso?: string | null) => {
+  if (!iso) return "—";
+  const date = parseISO(iso);
+  return Number.isNaN(date.getTime()) ? iso : localDateFormat.format(date);
+};
+
+/** UTC timestamps converted to the browser's time zone and locale. */
+export const formatPolicyLocalDateTime = (iso?: string | null) => {
+  if (!iso) return "—";
+  const date = parseISO(iso);
+  return Number.isNaN(date.getTime()) ? iso : localDateTimeFormat.format(date);
+};
+
+export const formatCoverageTerm =(term?: OffersDateOnlyRangeResponse | null) => {
   if (!term?.startDate && !term?.endDate) return "—";
   return `${formatPolicyDate(term.startDate)} → ${formatPolicyDate(term.endDate)}`;
 };

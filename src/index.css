@@ -92,9 +92,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-loader-spin,
-  .animate-loader-spin-reverse,
-  .animate-loader-pulse {
+  .animate-loader-orbit,
+  .animate-loader-dash,
+  .animate-loader-bar,
+  .animate-loader-sheen {
     animation: none !important;
   }
 }

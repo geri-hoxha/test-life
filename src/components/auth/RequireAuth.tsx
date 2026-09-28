@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMySalesAccess } from "@/api/auth";
 import { ApiError, clearSession } from "@/api/client";
-import { Loader } from "@/components/Loader";
+import { GlobalLoader } from "@/components/Loader";
 import { Button } from "@/components/ui/button";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { isAuthenticated, LOGIN_PATH, msUntilExpiry, readAuthSession } from "@/lib/auth";
@@ -51,7 +51,7 @@ const RequireAuth = () => {
   if (salesAccess.isPending || unauthorized || (salesAccess.isError && salesAccess.isFetching)) {
     return (
       <FullScreen>
-        <Loader size="lg" label="Loading your access…" />
+        <GlobalLoader label="Loading your access…" description="Preparing your workspace" />
       </FullScreen>
     );
   }

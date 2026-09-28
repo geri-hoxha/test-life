@@ -146,6 +146,26 @@ export const formatOfferDateTime = (iso?: string | null) => {
   }
 };
 
+const localDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const localDateTimeFormat = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+/** Date-only values (e.g. `2027-04-29`) in the browser's locale; parseISO keeps them on the same calendar day. */
+export const formatOfferLocalDate = (iso?: string | null) => {
+  if (!iso) return "—";
+  const date = parseISO(iso);
+  return Number.isNaN(date.getTime()) ? iso : localDateFormat.format(date);
+};
+
+/** UTC timestamps converted to the browser's time zone and locale. */
+export const formatOfferLocalDateTime = (iso?: string | null) => {
+  if (!iso) return "—";
+  const date = parseISO(iso);
+  return Number.isNaN(date.getTime()) ? iso : localDateTimeFormat.format(date);
+};
+
 export const formatCoverageTerm = (term?: OffersDateOnlyRangeResponse | null) => {
   if (!term?.startDate && !term?.endDate) return "—";
   return `${formatOfferDate(term.startDate)} → ${formatOfferDate(term.endDate)}`;
