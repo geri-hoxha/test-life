@@ -43,8 +43,8 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { policyPlanTypeDescription, policyRenewalFlow } from "@/data/policy-plan-types";
-import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
+import { policyRenewalFlow } from "@/data/policy-plan-types";
+import { usePolicyPlanTypeDescription, usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { ageFromDob } from "@/data/customers";
 import {
   openPolicyPrint,
@@ -130,19 +130,24 @@ const TemplateDownloadButton = ({
 
 const PartyLink = ({
   partyId,
+  partnerId,
   partyType,
   displayName,
 }: {
-  partyId?: string;
+  partyId?: string | null;
+  partnerId?: string | null;
   partyType?: "person" | "company";
   displayName?: string;
 }) => {
-  if (!partyId || !displayName) return <span className="text-muted-foreground">—</span>;
+  if (!displayName) return <span className="text-muted-foreground">—</span>;
+  const to = partnerId
+    ? `/partners/${encodeURIComponent(partnerId)}`
+    : partyId
+      ? customerPath(partyId, partyType ?? "person")
+      : undefined;
+  if (!to) return <>{displayName}</>;
   return (
-    <Link
-      to={customerPath(partyId, partyType ?? "person")}
-      className="text-primary hover:underline"
-    >
+    <Link to={to} className="text-primary hover:underline">
       {displayName}
     </Link>
   );
@@ -167,6 +172,7 @@ const ParticipantFields = ({
         value={
           <PartyLink
             partyId={party.partyId}
+            partnerId={party.partnerId}
             partyType={party.partyType}
             displayName={party.displayName}
           />
@@ -178,6 +184,12 @@ const ParticipantFields = ({
       />
       <Field label="Party type" value={titleCase(party.partyType)} />
       <Field label="Country" value={countryLabel(party.countryCode)} />
+      {party.partnerId ? (
+        <>
+          <Field label="Partner office" value={party.partnerOfficeName} />
+          <Field label="Office address" value={party.partnerOfficeAddress} />
+        </>
+      ) : null}
       <Field
         label="Leader"
         value={party.isLeader == null ? undefined : party.isLeader ? "Yes" : "No"}
@@ -353,6 +365,7 @@ const PolicyDetail = () => {
   const countryLabel = (code?: string) => countryDisplayName(code, countryOptions) ?? code;
   const relationshipLabel = (value?: string | null) => smartEnumLabel(relationshipOptions, value);
   const policyPlanTypeLabel = usePolicyPlanTypeLabel();
+  const policyPlanTypeDescription = usePolicyPlanTypeDescription();
 
   const { data: apiProduct, isFetched: productFetched } = useGetProduct(policy?.productId ?? "", {
     enabled: Boolean(policy?.productId),
@@ -834,6 +847,7 @@ const PolicyDetail = () => {
                         <TableHead className="text-right">Closing</TableHead>
                         <TableHead className="text-right">Charge premium</TableHead>
                         <TableHead className="text-right">Coverages</TableHead>
+                        <TableHead>Legacy policy no.</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -909,10 +923,13 @@ const PolicyDetail = () => {
                               <TableCell className="text-right font-mono text-sm">
                                 {periodCoverages.length}
                               </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {y.legacyPolicyNumber || "—"}
+                              </TableCell>
                             </TableRow>
                             {isExpanded && (
                               <TableRow className="hover:bg-transparent border-0">
-                                <TableCell colSpan={9} className="p-0">
+                                <TableCell colSpan={10} className="p-0">
                                   <CoverageNestedPanel
                                     coverages={periodCoverages}
                                     currency={currency}

@@ -165,12 +165,15 @@ const ProductsList = () => {
     productGroupId: effectiveProductGroupId,
   });
 
-  const { data: productsPage, isLoading: productsLoading } = useListProducts(
-    productsQuery,
-    {
-      enabled: Boolean(activeCode) ? Boolean(activeGroupMeta?.id) : false,
-    },
-  );
+  const {
+    data: productsPage,
+    isLoading: productsLoading,
+    isPlaceholderData: productsPlaceholder,
+  } = useListProducts(productsQuery, {
+    enabled: Boolean(activeCode) ? Boolean(activeGroupMeta?.id) : false,
+  });
+  // Also true while the previous page is shown as placeholder during a page change.
+  const productsPageLoading = productsLoading || productsPlaceholder;
 
   const { data: catalogPage, isLoading: catalogLoading } = useListProducts(
     { pageNumber: 1, pageSize: 200 },
@@ -222,7 +225,10 @@ const ProductsList = () => {
     return (allGroupsPage?.items ?? groupsPage?.items ?? [])
       .map((g) => ({
         id: g.id ?? "",
-        label: g.name?.trim() || g.id || "—",
+        label:
+          [g.legacyCode?.trim(), g.name?.trim() || g.id]
+            .filter(Boolean)
+            .join("  ") || "—",
         routeKey: groupRouteKey(g),
       }))
       .filter((g) => g.id);
@@ -665,7 +671,7 @@ const ProductsList = () => {
               </tr>
             </thead>
             <tbody>
-              {products.map((p) => {
+              {!productsPageLoading && products.map((p) => {
                 const actuarialLabel = p.actuarialCode
                   ? (actuarialCodeOptions.find(
                       (o) => o.value === p.actuarialCode,
@@ -754,7 +760,7 @@ const ProductsList = () => {
                   </tr>
                 );
               })}
-              {!productsLoading && products.length === 0 && (
+              {!productsPageLoading && products.length === 0 && (
                 <tr>
                   <td
                     colSpan={9}
@@ -764,7 +770,7 @@ const ProductsList = () => {
                   </td>
                 </tr>
               )}
-              {productsLoading && (
+              {productsPageLoading && (
                 <tr>
                   <td colSpan={9} className="p-12">
                     <Loader label="Loading products…" />
@@ -781,7 +787,7 @@ const ProductsList = () => {
           totalPages={productTotalPages}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
-          disabled={productsLoading}
+          disabled={productsPageLoading}
         />
       </Card>
 

@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
 import { useGetOffer, useListOffers } from "@/api/offers";
 import type { OffersOfferListItemResponse, OffersOfferResponse } from "@/api/types";
 import { offerListLabel, offerStatusLabel } from "@/pages/offers/offer-ui";
@@ -87,6 +87,7 @@ export const OfferCombobox = ({
     () => source.filter((o) => matchesOfferSearch(o, search)),
     [search, source],
   );
+  const isLoading = isRemote && isFetching;
   const selectedFromList = source.find((o) => o.id === value);
   const selected = selectedFromList ?? (isRemote ? offerFromDetail(selectedOffer) : undefined);
 
@@ -124,9 +125,14 @@ export const OfferCombobox = ({
             placeholder="Search offers…"
             value={search}
             onValueChange={setSearch}
+            loading={isLoading && filtered.length > 0}
           />
           <CommandList>
-            <CommandEmpty>{isRemote && isFetching ? "Loading…" : "No offer found."}</CommandEmpty>
+            {filtered.length === 0 && (
+              <ComboboxStatus loading={isLoading} label="Loading…">
+                No offer found.
+              </ComboboxStatus>
+            )}
             <CommandGroup>
               {allowClear && (
                 <CommandItem

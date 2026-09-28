@@ -1,20 +1,52 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
+import {
+  useGetBankAccounts,
+  useListBankAccounts,
+  type ListBankAccountsQuery,
+} from "@/api/bank-accounts";
 import type { BankAccountsBankAccountResponse } from "@/api/types";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+
+const SEARCH_DEBOUNCE_MS = 300;
+const PAGE_SIZE = 50;
+
+type BankAccountSearchQueries = {
+  primary: ListBankAccountsQuery;
+  /** Second lookup so a 3-letter term matches a bank acronym ("BKT") or a currency ("EUR"). */
+  byCurrency?: ListBankAccountsQuery;
+};
+
+/**
+ * Maps a search term to list-endpoint filters:
+ * - "AL47 2121…" (contains a digit) → IBAN
+ * - "EUR" / "BKT" (three letters)   → bank name OR currency
+ * - "Raiffeisen"                    → bank name
+ */
+const bankAccountSearchQueries = (term: string): BankAccountSearchQueries => {
+  const page = { pageNumber: 1, pageSize: PAGE_SIZE };
+  if (!term) return { primary: page };
+  if (/\d/.test(term)) return { primary: { ...page, iban: term.replace(/\s+/g, "") } };
+
+  const primary = { ...page, bankName: term };
+  if (/^[a-z]{3}$/i.test(term)) {
+    return { primary, byCurrency: { ...page, currency: term.toUpperCase() } };
+  }
+  return { primary };
+};
 
 type BankAccountComboboxBaseProps = {
-  accounts: BankAccountsBankAccountResponse[];
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -39,17 +71,9 @@ export type BankAccountComboboxProps =
 const accountLabel = (a: BankAccountsBankAccountResponse) =>
   [a.bankName, a.currency, a.iban || a.accountNumber].filter(Boolean).join(" · ") || a.id || "—";
 
-const matchesAccountSearch = (a: BankAccountsBankAccountResponse, search: string) => {
-  const q = search.trim().toLowerCase();
-  if (!q) return true;
-  return [a.bankName, a.bankCode, a.accountNumber, a.iban, a.swiftCode, a.currency, a.id]
-    .filter(Boolean)
-    .some((field) => String(field).toLowerCase().includes(q));
-};
-
+/** Bank accounts are searched on the backend (debounced) once the field is opened. */
 export const BankAccountCombobox = (props: BankAccountComboboxProps) => {
   const {
-    accounts,
     placeholder = "Select bank account…",
     className,
     disabled,
@@ -63,14 +87,35 @@ export const BankAccountCombobox = (props: BankAccountComboboxProps) => {
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const selectedAccounts = accounts.filter((a) => a.id && selectedIds.includes(a.id));
-  const filtered = accounts.filter((a) => matchesAccountSearch(a, search));
+  const term = search.trim();
+  const debouncedTerm = useDebouncedValue(term, SEARCH_DEBOUNCE_MS);
+  const queries = useMemo(() => bankAccountSearchQueries(debouncedTerm), [debouncedTerm]);
+  const byCurrencyEnabled = open && queries.byCurrency !== undefined;
+
+  const primary = useListBankAccounts(queries.primary, { enabled: open });
+  const byCurrency = useListBankAccounts(queries.byCurrency, { enabled: byCurrencyEnabled });
+
+  const results = useMemo(() => {
+    const first = primary.data?.items ?? [];
+    // A disabled lookup can still expose keepPreviousData results from an earlier term.
+    const second = byCurrencyEnabled ? (byCurrency.data?.items ?? []) : [];
+    const seen = new Set(first.map((a) => a.id));
+    return [...first, ...second.filter((a) => !seen.has(a.id))];
+  }, [primary.data?.items, byCurrency.data?.items, byCurrencyEnabled]);
+  const isSearching =
+    term !== debouncedTerm || primary.isFetching || (byCurrencyEnabled && byCurrency.isFetching);
+
+  // Selected ids are resolved by id so their labels don't depend on the current results.
+  const selectedDetails = useGetBankAccounts(selectedIds);
+  const selectedAccounts = selectedIds.flatMap((id, i) => {
+    const account = results.find((a) => a.id === id) ?? selectedDetails[i]?.data;
+    return account ? [account] : [];
+  });
 
   const triggerLabel = () => {
-    if (selectedAccounts.length === 0) return placeholder;
-    if (!multiple) return accountLabel(selectedAccounts[0]);
-    if (selectedAccounts.length === 1) return accountLabel(selectedAccounts[0]);
-    return `${selectedAccounts.length} accounts selected`;
+    if (selectedIds.length === 0) return placeholder;
+    if (selectedIds.length > 1) return `${selectedIds.length} accounts selected`;
+    return selectedAccounts[0] ? accountLabel(selectedAccounts[0]) : selectedIds[0];
   };
 
   const toggleId = (id: string) => {
@@ -113,7 +158,7 @@ export const BankAccountCombobox = (props: BankAccountComboboxProps) => {
           disabled={disabled}
           className={cn(
             "w-full justify-between font-normal",
-            selectedAccounts.length === 0 && "text-muted-foreground",
+            selectedIds.length === 0 && "text-muted-foreground",
             className,
           )}
         >
@@ -126,12 +171,15 @@ export const BankAccountCombobox = (props: BankAccountComboboxProps) => {
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search bank, IBAN, account…"
+            placeholder="Search by bank, IBAN or currency…"
             value={search}
             onValueChange={setSearch}
+            loading={isSearching && results.length > 0}
           />
           <CommandList>
-            <CommandEmpty>No bank account found.</CommandEmpty>
+            {results.length === 0 && (
+              <ComboboxStatus loading={isSearching}>No bank account found.</ComboboxStatus>
+            )}
             <CommandGroup>
               <CommandItem
                 value="__none__"
@@ -145,7 +193,7 @@ export const BankAccountCombobox = (props: BankAccountComboboxProps) => {
                 />
                 <span className="text-muted-foreground">{multiple ? "Clear all" : "None"}</span>
               </CommandItem>
-              {filtered.map((a) => {
+              {results.map((a) => {
                 const id = a.id ?? "";
                 const selected = Boolean(id && selectedIds.includes(id));
                 return (

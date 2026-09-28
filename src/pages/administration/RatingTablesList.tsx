@@ -80,7 +80,7 @@ const RatingTablesList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, error } = useListRatingTables(listQuery);
+  const { data: pageData, isLoading, isFetching, isPlaceholderData, error } = useListRatingTables(listQuery);
   const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
@@ -222,7 +222,7 @@ const RatingTablesList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={4} />
                 ) : items.length === 0 ? (
                   <TableRow>
@@ -297,7 +297,7 @@ const RatingTablesList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

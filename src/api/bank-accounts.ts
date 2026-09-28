@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type {
   BankAccountsBankAccountResponse,
@@ -103,6 +103,16 @@ export const useGetBankAccount = (id: string, options?: { enabled?: boolean }) =
     queryKey: bankAccountsKeys.detail(id),
     queryFn: ({ signal }) => getBankAccount(id, signal),
     enabled: Boolean(id) && (options?.enabled ?? true),
+  });
+
+/** GET /api/bank-accounts/{id} for several ids, e.g. to label already selected accounts. */
+export const useGetBankAccounts = (ids: string[]) =>
+  useQueries({
+    queries: ids.map((id) => ({
+      queryKey: bankAccountsKeys.detail(id),
+      queryFn: ({ signal }: { signal: AbortSignal }) => getBankAccount(id, signal),
+      enabled: Boolean(id),
+    })),
   });
 
 /** PUT /api/bank-accounts/{id} */

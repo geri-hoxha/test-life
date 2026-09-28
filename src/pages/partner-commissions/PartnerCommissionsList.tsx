@@ -111,7 +111,7 @@ const PartnerCommissionsList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, isError, error } = useListPartnerCommissions(listQuery);
+  const { data: pageData, isLoading, isFetching, isPlaceholderData, isError, error } = useListPartnerCommissions(listQuery);
   const { data: partnersPage } = useListPartners({ pageNumber: 1, pageSize: 200 });
 
   const items = pageData?.items ?? [];
@@ -298,7 +298,7 @@ const PartnerCommissionsList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={COL_COUNT} />
                 ) : isError ? (
                   <TableRow>
@@ -412,7 +412,7 @@ const PartnerCommissionsList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

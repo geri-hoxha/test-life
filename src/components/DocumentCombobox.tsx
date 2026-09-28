@@ -10,6 +10,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
 import { useGetDocument, useListDocuments } from "@/api/documents";
 import type { DocumentsDocumentResponse } from "@/api/types";
 import { compactQuery } from "@/lib/list-query";
@@ -64,6 +65,7 @@ export const DocumentCombobox = ({
     [documentsPage?.items],
   );
 
+  const isSearching = isFetching || search.trim() !== debouncedSearch;
   const selectedFromList = documents.find((doc) => doc.id === value);
   const selected = selectedFromList ?? selectedDocument;
   const selectedLabel = selected ? documentLabel(selected) : null;
@@ -101,14 +103,11 @@ export const DocumentCombobox = ({
             placeholder="Search by file name…"
             value={search}
             onValueChange={setSearch}
+            loading={isSearching && documents.length > 0}
           />
           <CommandList>
             {documents.length === 0 && (
-              <div className="px-2 py-3 text-center text-sm text-muted-foreground">
-                {isFetching || search.trim() !== debouncedSearch
-                  ? "Searching…"
-                  : "No documents found."}
-              </div>
+              <ComboboxStatus loading={isSearching}>No documents found.</ComboboxStatus>
             )}
             <CommandGroup>
               {allowClear && (

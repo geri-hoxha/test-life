@@ -108,6 +108,7 @@ const OffersList = () => {
     data: offersPage,
     isLoading,
     isFetching,
+    isPlaceholderData,
     isError,
     error,
   } = useListOffers(listQuery);
@@ -304,7 +305,7 @@ const OffersList = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
+                  {isLoading || isPlaceholderData ? (
                     <TableLoadingRow
                       colSpan={COL_COUNT}
                       label="Loading offers…"
@@ -416,7 +417,7 @@ const OffersList = () => {
                 totalPages={totalPages}
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
-                disabled={isLoading}
+                disabled={isLoading || isPlaceholderData}
               />
             </div>
           </CardContent>

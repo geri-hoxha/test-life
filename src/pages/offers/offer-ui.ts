@@ -8,7 +8,6 @@ import type {
   DomainUnderwritingDocumentSubmissionSource,
   OffersDateOnlyRangeResponse,
   OffersOfferListItemResponse,
-  OffersSalesAttributionResponse,
   RatingTablesRateResponse,
 } from "@/api/types";
 
@@ -110,20 +109,6 @@ export const salesChannelLabel = (channel?: DomainDistributionSalesChannel | str
   return channel ? humanizeOfferEnum(channel) : "—";
 };
 
-export const participantRoleLabel = (role?: string | null) => {
-  if (role === "policyHolder") return "Policy holder";
-  if (role === "invoiced") return "Payer";
-  if (role === "beneficiary") return "Beneficiary";
-  return role ? humanizeOfferEnum(role) : "—";
-};
-
-export const participantRoleClass = (role?: string | null) => {
-  if (role === "policyHolder") return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
-  if (role === "invoiced") return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
-  if (role === "beneficiary") return "bg-violet-500/15 text-violet-700 dark:text-violet-300";
-  return "bg-muted text-muted-foreground";
-};
-
 export const formatSharePct = (share?: number | null) => {
   if (share == null || Number.isNaN(share)) return null;
   return `${Math.round(share * 10000) / 100}%`;
@@ -185,19 +170,6 @@ export const formatDiscountPct = (fraction?: number | null) => {
 export const shortOfferId = (id?: string | null) => {
   if (!id) return "—";
   return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
-};
-
-export const salesPartyLabel = (attribution?: OffersSalesAttributionResponse | null) => {
-  if (!attribution) return null;
-  return (
-    attribution.partnerName?.trim() ||
-    attribution.agentDisplayName?.trim() ||
-    attribution.partnerOfficeName?.trim() ||
-    attribution.internalOfficeName?.trim() ||
-    attribution.internalBranchName?.trim() ||
-    attribution.createdByUserName?.trim() ||
-    null
-  );
 };
 
 export const offerListLabel = (o: OffersOfferListItemResponse) => {

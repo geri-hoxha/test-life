@@ -72,12 +72,13 @@ const CoverageDialog = ({
   const [form, setForm] = useState<FormState>(blankForm());
   const [comboOpen, setComboOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
-  const debouncedCatalogSearch = useDebouncedValue(catalogSearch.trim());
-  const { data: catalogPage, isLoading: catalogLoading } = useListCoverages({
-    pageNumber: 1,
-    pageSize: 200,
-    ...compactQuery({ name: debouncedCatalogSearch || undefined }),
-  });
+  const debouncedCatalogSearch = useDebouncedValue(catalogSearch.trim(), 300);
+  // Searched by name on the backend, only while the coverage picker is open.
+  const { data: catalogPage, isFetching: catalogFetching } = useListCoverages(
+    compactQuery({ pageNumber: 1, pageSize: 50, name: debouncedCatalogSearch }),
+    { enabled: open && comboOpen },
+  );
+  const catalogSearching = catalogFetching || catalogSearch.trim() !== debouncedCatalogSearch;
   const { data: tablesPage } = useListRatingTables({ pageNumber: 1, pageSize: 200 });
   const ratingTables = tablesPage?.items ?? [];
 
@@ -236,9 +237,7 @@ const CoverageDialog = ({
                     className="w-full justify-between font-normal"
                   >
                     <span className="truncate">
-                      {form.coverageId
-                        ? availableCoverages.find((x) => x.id === form.coverageId)?.name ?? form.coverageId
-                        : "Select coverage…"}
+                      {form.coverageId ? form.name || form.coverageId : "Select coverage…"}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -249,10 +248,11 @@ const CoverageDialog = ({
                       placeholder="Filter by name"
                       value={catalogSearch}
                       onValueChange={setCatalogSearch}
+                      loading={catalogSearching && availableCoverages.length > 0}
                     />
                     <CommandList>
                       <CommandEmpty>
-                        {catalogLoading ? (
+                        {catalogSearching ? (
                           <Loader size="sm" label="Loading coverages…" className="py-4" />
                         ) : (
                           "No coverage found."

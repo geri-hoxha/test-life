@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
-import { PageLoader } from "@/components/Loader";
+import { PageLoader, TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { ProductCombobox } from "@/components/ProductCombobox";
 import { Badge } from "@/components/ui/badge";
@@ -162,6 +162,7 @@ const AgentDetail = () => {
     data: configurations,
     isLoading: configsLoading,
     isFetching: configsFetching,
+    isPlaceholderData: configsPlaceholder,
     isError: configsFailed,
   } = useListAgentProductConfigurations(agentId, configQuery, {
     enabled: Boolean(agentId) && !isError,
@@ -453,12 +454,8 @@ const AgentDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {configsLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading product configurations…
-                    </TableCell>
-                  </TableRow>
+                {configsLoading || configsPlaceholder ? (
+                  <TableLoadingRow colSpan={6} label="Loading product configurations…" />
                 ) : configsFailed ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
@@ -539,7 +536,7 @@ const AgentDetail = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={configsLoading}
+              disabled={configsLoading || configsPlaceholder}
             />
           </div>
         </CardContent>
@@ -594,7 +591,6 @@ const AgentDetail = () => {
             <div className="space-y-1.5">
               <Label>Product</Label>
               <ProductCombobox
-                products={products.map((p) => ({ id: p.id, name: p.name }))}
                 value={configForm.productId}
                 onValueChange={(productId) => setConfigForm((prev) => ({ ...prev, productId }))}
                 disabled={editing}

@@ -27,7 +27,6 @@ import {
 } from "@/api/products";
 import type { ProductsActuarialCode, ProductsPolicyPlanType } from "@/api/types";
 import { useListProductGroups } from "@/api/product-groups";
-import { useListBankAccounts } from "@/api/bank-accounts";
 import { usePolicyPlanTypeOptions } from "@/hooks/usePolicyPlanTypeOptions";
 import { useActuarialCodeOptions } from "@/hooks/useActuarialCodeOptions";
 import { BankAccountCombobox } from "@/components/BankAccountCombobox";
@@ -64,7 +63,6 @@ const ProductDetail = () => {
   const addProductBankAccount = useAddProductBankAccount();
   const removeProductBankAccount = useRemoveProductBankAccount();
   const { data: groupsPage } = useListProductGroups({ pageNumber: 1, pageSize: 200 });
-  const { data: bankAccountsPage } = useListBankAccounts({ pageNumber: 1, pageSize: 200 });
   const policyPlanTypeOptions = usePolicyPlanTypeOptions();
   const actuarialCodeOptions = useActuarialCodeOptions();
   const { data: coveragesCatalog } = useListCoverages({ pageNumber: 1, pageSize: 200 });
@@ -105,7 +103,6 @@ const ProductDetail = () => {
       .filter((c) => c.missing.length > 0);
   }, [apiProduct?.coverages, apiProduct?.supportedCurrencies, coverageNameById]);
 
-  const bankAccounts = bankAccountsPage?.items ?? [];
   const productBankAccounts = apiProduct?.bankAccounts ?? [];
 
   const currentBankAccountIds = useMemo(
@@ -518,7 +515,6 @@ const ProductDetail = () => {
                 <CardContent>
                   <BankAccountCombobox
                     multiple
-                    accounts={bankAccounts}
                     value={fields.bankAccountIds}
                     onValueChange={(bankAccountIds) => setFields({ ...fields, bankAccountIds })}
                     placeholder="Select bank accounts…"

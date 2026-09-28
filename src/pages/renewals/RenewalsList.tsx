@@ -131,6 +131,7 @@ const RenewalsList = () => {
     data: pageData,
     isLoading,
     isFetching,
+    isPlaceholderData,
     error,
   } = useListRenewals(listQuery);
 
@@ -301,7 +302,7 @@ const RenewalsList = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
+                  {isLoading || isPlaceholderData ? (
                     <TableLoadingRow colSpan={COL_COUNT} />
                   ) : items.length === 0 ? (
                     <TableRow>
@@ -420,7 +421,7 @@ const RenewalsList = () => {
                 totalPages={totalPages}
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
-                disabled={isLoading}
+                disabled={isLoading || isPlaceholderData}
               />
             </div>
           </CardContent>

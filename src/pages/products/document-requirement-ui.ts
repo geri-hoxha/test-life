@@ -12,9 +12,3 @@ export const DOCUMENT_REUSE_POLICIES: { value: ProductsDocumentReusePolicy; labe
   { value: "requireNewSubmission", label: "Require new submission" },
   { value: "reuseAcceptedWithinPolicy", label: "Reuse accepted within policy" },
 ];
-
-export const documentStageLabel = (value?: string | null) =>
-  DOCUMENT_STAGES.find((s) => s.value === value)?.label ?? value ?? "—";
-
-export const documentReusePolicyLabel = (value?: string | null) =>
-  DOCUMENT_REUSE_POLICIES.find((s) => s.value === value)?.label ?? value ?? "—";

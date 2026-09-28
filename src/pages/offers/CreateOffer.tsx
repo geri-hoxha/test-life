@@ -47,21 +47,19 @@ import {
   Package,
   Calendar as CalendarNavIcon,
   FileSpreadsheet,
+  Landmark,
 } from "lucide-react";
 import { Beneficiary } from "@/data/offers";
-import { useGetProduct, useListProducts, mapApiProduct } from "@/api/products";
+import { useGetProduct, mapApiProduct } from "@/api/products";
 import { useListProductGroups } from "@/api/product-groups";
-import { useListPeople, useGetPerson } from "@/api/people";
-import { useListCompanies, useGetCompany } from "@/api/companies";
-import {
-  mapCompanyToCustomer,
-  mapPersonToCustomer,
-  mergeCustomers,
-  parseCustomerPartyType,
-} from "@/api/adapters/customers";
+import { useGetPerson } from "@/api/people";
+import { useGetCompany } from "@/api/companies";
+import { parseCustomerPartyType } from "@/api/adapters/customers";
+import type { Customer, CustomerType } from "@/data/customers";
 import {
   useCreateOffer,
   useAddOfferParticipant,
+  useAddOfferPartnerParticipants,
   useAddOfferInsuredPerson,
   useSubmitOfferLoan,
   useRateOffer,
@@ -235,6 +233,7 @@ const CreateOffer = () => {
   const prefillPartyType = parseCustomerPartyType(searchParams.get("type"));
   const createOffer = useCreateOffer();
   const addParticipant = useAddOfferParticipant();
+  const addPartnerParticipants = useAddOfferPartnerParticipants();
   const addInsured = useAddOfferInsuredPerson();
   const submitLoan = useSubmitOfferLoan();
   const rateOffer = useRateOffer();
@@ -246,12 +245,17 @@ const CreateOffer = () => {
   const [productId, setProductId] = useState("");
   const [currency, setCurrency] = useState("");
 
-  // Step 2
-  const { data: peoplePage } = useListPeople({ pageNumber: 1, pageSize: 200 });
-  const { data: companiesPage } = useListCompanies({
-    pageNumber: 1,
-    pageSize: 200,
-  });
+  // Step 2 — parties are searched on the backend as the user types, so the
+  // type of each selected party is remembered to post the right partyType.
+  const [partyTypes, setPartyTypes] = useState<Record<string, CustomerType>>(
+    {},
+  );
+  const rememberPartyType = (id: string, type: CustomerType | undefined) => {
+    if (!id || !type) return;
+    setPartyTypes((prev) =>
+      prev[id] === type ? prev : { ...prev, [id]: type },
+    );
+  };
   const prefillPersonQ = useGetPerson(prefillCustomerId, {
     enabled: Boolean(prefillCustomerId) && prefillPartyType !== "company",
   });
@@ -262,88 +266,73 @@ const CreateOffer = () => {
     pageNumber: 1,
     pageSize: 200,
   });
-  const { data: productsPage } = useListProducts({
-    pageNumber: 1,
-    pageSize: 200,
-  });
   const { data: selectedApiProduct, isLoading: productDetailLoading } =
     useGetProduct(productId, {
       enabled: Boolean(productId),
     });
-  const customers = useMemo(() => {
-    const merged = mergeCustomers(peoplePage?.items, companiesPage?.items);
-    const byId = new Map(merged.map((c) => [c.id, c]));
-    if (prefillPartyType !== "company" && prefillPersonQ.data?.id) {
-      const mapped = mapPersonToCustomer(prefillPersonQ.data);
-      if (!byId.has(mapped.id)) byId.set(mapped.id, mapped);
-    }
-    if (prefillPartyType === "company" && prefillCompanyQ.data?.id) {
-      const mapped = mapCompanyToCustomer(prefillCompanyQ.data);
-      if (!byId.has(mapped.id)) byId.set(mapped.id, mapped);
-    }
-    return Array.from(byId.values());
-  }, [
-    peoplePage?.items,
-    companiesPage?.items,
-    prefillPartyType,
-    prefillPersonQ.data,
-    prefillCompanyQ.data,
-  ]);
-  /** Insured persons API only accepts people (not companies). */
-  const peopleOnly = useMemo(
-    () => customers.filter((c) => c.customerType === "Individual"),
-    [customers],
-  );
   const productGroups = useMemo(
     () => (productGroupsPage?.items ?? []).filter((g) => g.id),
     [productGroupsPage?.items],
   );
-  const products = useMemo(() => {
-    const mapped = (productsPage?.items ?? []).map(mapApiProduct);
-    if (
-      selectedApiProduct?.id &&
-      !mapped.some((p) => p.id === selectedApiProduct.id)
-    ) {
-      mapped.unshift(mapApiProduct(selectedApiProduct));
-    }
-    return mapped;
-  }, [productsPage?.items, selectedApiProduct]);
-  const productsInGroup = useMemo(
-    () => products.filter((p) => p.productGroupId === productGroupId),
-    [products, productGroupId],
+  // Products are searched on the backend by the picker; the selected one is loaded by id.
+  const product = useMemo(
+    () => (selectedApiProduct ? mapApiProduct(selectedApiProduct) : undefined),
+    [selectedApiProduct],
   );
-  const getCustomerLocal = (cid: string) => customers.find((c) => c.id === cid);
   const partyTypeOf = (customerId: string): "person" | "company" =>
-    getCustomerLocal(customerId)?.customerType === "Company"
-      ? "company"
-      : "person";
+    partyTypes[customerId] === "Company" ? "company" : "person";
   const [policyHolderId, setPolicyHolderId] = useState("");
   const [payerId, setPayerId] = useState("");
   const [payerRelationship, setPayerRelationship] = useState("");
   const [insuredId, setInsuredId] = useState("");
   const prefillApplied = useRef(false);
+  /** Combobox change handler that also records the picked party's type. */
+  const selectParty =
+    (setId: (id: string) => void) => (id: string, customer?: Customer) => {
+      rememberPartyType(id, customer?.customerType);
+      setId(id);
+    };
 
   useEffect(() => {
     if (prefillApplied.current || !prefillCustomerId) return;
-    const customer = getCustomerLocal(prefillCustomerId);
-    if (!customer) return;
+    const isCompany = prefillPartyType === "company";
+    const found = isCompany ? prefillCompanyQ.data : prefillPersonQ.data;
+    if (!found?.id) return;
 
     prefillApplied.current = true;
-    setPolicyHolderId(customer.id);
-    setPayerId(customer.id);
-    if (customer.customerType === "Individual") {
-      setInsuredId(customer.id);
+    rememberPartyType(found.id, isCompany ? "Company" : "Individual");
+    setPolicyHolderId(found.id);
+    setPayerId(found.id);
+    if (!isCompany) {
+      setInsuredId(found.id);
     }
-  }, [prefillCustomerId, customers]);
+  }, [
+    prefillCustomerId,
+    prefillPartyType,
+    prefillPersonQ.data,
+    prefillCompanyQ.data,
+  ]);
 
+  // "The same" relationship means the invoice recipient is the insured person,
+  // and picking the insured as payer implies "The same".
   useEffect(() => {
-    if (payerId && insuredId && payerId === insuredId) {
+    if (payerRelationship === SAME_AS_INSURED) {
+      setPayerId(insuredId);
+    } else if (payerId && payerId === insuredId) {
       setPayerRelationship(SAME_AS_INSURED);
     }
-  }, [payerId, insuredId]);
+  }, [payerRelationship, payerId, insuredId]);
+  const payerIsInsured = payerRelationship === SAME_AS_INSURED;
+  const onPayerRelationshipChange = (value: string) => {
+    setPayerRelationship(value);
+    // Leaving "The same" frees the payer, who can no longer be the insured.
+    if (value !== SAME_AS_INSURED && payerId === insuredId) setPayerId("");
+  };
 
   type BeneficiaryDraft = Omit<Beneficiary, "percentage"> & {
     percentage: number | "";
+    /** The offer's partner is the beneficiary instead of a customer. */
+    isPartner?: boolean;
   };
   const [beneficiaries, setBeneficiaries] = useState<BeneficiaryDraft[]>([
     {
@@ -365,7 +354,8 @@ const CreateOffer = () => {
   // Step 3
   const [startDate, setStartDate] = useState(todayIso);
   const [endDate, setEndDate] = useState(() => defaultEndFromStart(todayIso()));
-  const { data: salesAccess } = useMySalesAccess();
+  // Refresh on every visit so newly granted/revoked offices and agents show up without a reload.
+  const { data: salesAccess } = useMySalesAccess({ refetchOnMount: "always" });
   const grantedOffices = useMemo(
     () =>
       (salesAccess?.partnerOffices ?? []).filter(
@@ -407,6 +397,18 @@ const CreateOffer = () => {
       return "";
     });
   }, [grantedAgents]);
+
+  // Policy holder and beneficiary can each be a customer or the offer's partner,
+  // which the backend resolves from the offer's partner office.
+  const [holderSource, setHolderSource] = useState<"customer" | "partner">(
+    "customer",
+  );
+  const holderIsPartner = holderSource === "partner" && Boolean(partnerOfficeId);
+  const beneficiaryIsPartner = (b: BeneficiaryDraft) =>
+    Boolean(b.isPartner && partnerOfficeId);
+  const partnerName =
+    grantedOffices.find((office) => office.partnerOfficeId === partnerOfficeId)
+      ?.partnerName || "Partner";
   const [hasLoan, setHasLoan] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
@@ -442,8 +444,7 @@ const CreateOffer = () => {
         return false;
       }
       setHasLoan(false);
-      const selectedProduct = products.find((p) => p.id === productId);
-      const maxYears = selectedProduct?.maxCoveredYears;
+      const maxYears = product?.maxCoveredYears;
       const requested = offerTermYears(startDate, endDate);
       const capped = cappedLoanYears(requested, maxYears);
       setManualLoanRows(
@@ -517,9 +518,6 @@ const CreateOffer = () => {
 
   // Derived
   const productGroup = productGroups.find((g) => g.id === productGroupId);
-  const product =
-    (selectedApiProduct ? mapApiProduct(selectedApiProduct) : undefined) ??
-    products.find((p) => p.id === productId);
   const maxEndDate = maxCoverageEndDate(
     startDate,
     product?.maximumCoverageTermMonths,
@@ -556,6 +554,19 @@ const CreateOffer = () => {
   );
 
   const loanRequired = Boolean(product?.requiresLoanBalances);
+
+  // Drop any loan input when the selected product doesn't take loan balances.
+  useEffect(() => {
+    if (loanRequired) return;
+    setHasLoan(false);
+    setManualLoans(false);
+    setManualLoanRows([]);
+    setLoanFileName(null);
+    setLoanAmount("");
+    setInterestRate("");
+    setOutstandingBalance("");
+  }, [loanRequired]);
+
   const beneficiaryTotal = beneficiaries.reduce(
     (s, b) => s + (Number(b.percentage) || 0),
     0,
@@ -570,9 +581,10 @@ const CreateOffer = () => {
     setCurrency("");
   };
   const onProductChange = (id: string) => {
+    if (id === productId) return;
     setProductId(id);
-    const p = products.find((x) => x.id === id);
-    setCurrency(p?.currencies[0] ?? "");
+    // Filled with the product's first currency once its details load.
+    setCurrency("");
   };
 
   const updateBeneficiary = (id: string, patch: Partial<BeneficiaryDraft>) => {
@@ -588,20 +600,26 @@ const CreateOffer = () => {
     termWithinLimit;
 
   const peopleStarted =
+    holderIsPartner ||
     Boolean(policyHolderId || payerId || insuredId) ||
-    beneficiaries.some((b) => b.customerId);
+    beneficiaries.some((b) => b.customerId || beneficiaryIsPartner(b));
 
   const peopleOk =
-    !!(policyHolderId && payerId && insuredId && payerRelationship) &&
-    (peopleOnly.some((p) => p.id === insuredId) || Boolean(insuredId)) &&
+    !!(payerId && insuredId && payerRelationship) &&
+    payerIsInsured === (payerId === insuredId) &&
+    (holderIsPartner || Boolean(policyHolderId)) &&
     beneficiariesValid &&
-    beneficiaries.every((b) => b.customerId && Number(b.percentage) > 0);
+    beneficiaries.every(
+      (b) =>
+        (beneficiaryIsPartner(b) || b.customerId) && Number(b.percentage) > 0,
+    );
 
   const canSave = productOk && (!peopleStarted || peopleOk);
 
   const saving =
     createOffer.isPending ||
     addParticipant.isPending ||
+    addPartnerParticipants.isPending ||
     addInsured.isPending ||
     submitLoan.isPending ||
     rateOffer.isPending ||
@@ -620,6 +638,7 @@ const CreateOffer = () => {
     }
 
     let offerId = "";
+    let insuredAttachedOnCreate = false;
     try {
       const body: OffersCreateOfferRequest = {
         productId,
@@ -630,11 +649,16 @@ const CreateOffer = () => {
           ? { partnerOfficeId: partnerOfficeId.trim() }
           : {}),
         ...(agentId.trim() ? { agentId: agentId.trim() } : {}),
+        insuredPersonId: insuredId || null,
       };
       const created = await createOffer.mutateAsync(body);
       if (!created.id) throw new Error("Offer created without id");
       offerId = created.id;
       createdOfferIdRef.current = offerId;
+      insuredAttachedOnCreate = Boolean(
+        insuredId &&
+          created.insuredPersons?.some((p) => p.personId === insuredId),
+      );
     } catch (err) {
       toastApiError(err, "Failed to create offer");
       return;
@@ -645,16 +669,23 @@ const CreateOffer = () => {
         // Participants: policyHolder / invoiced / beneficiary via /participants
         // share is always 1 except beneficiaries (UI % → fraction, e.g. 50 → 0.5)
         // relationshipToInsured is only valid on role "invoiced"
-        await addParticipant.mutateAsync({
-          offerId,
-          body: {
-            partyId: policyHolderId,
-            partyType: partyTypeOf(policyHolderId),
-            role: "policyHolder",
-            isLeader: true,
-            share: 1,
-          },
-        });
+        if (holderIsPartner) {
+          await addPartnerParticipants.mutateAsync({
+            offerId,
+            body: { role: "policyHolder", isLeader: true, share: 1 },
+          });
+        } else {
+          await addParticipant.mutateAsync({
+            offerId,
+            body: {
+              partyId: policyHolderId,
+              partyType: partyTypeOf(policyHolderId),
+              role: "policyHolder",
+              isLeader: true,
+              share: 1,
+            },
+          });
+        }
 
         await addParticipant.mutateAsync({
           offerId,
@@ -669,40 +700,54 @@ const CreateOffer = () => {
           },
         });
 
-        for (const b of beneficiaries.filter((x) => x.customerId)) {
-          await addParticipant.mutateAsync({
-            offerId,
-            body: {
-              partyId: b.customerId,
-              partyType: partyTypeOf(b.customerId),
-              role: "beneficiary",
-              isLeader: true,
-              share: (Number(b.percentage) || 0) / 100,
-            },
-          });
+        for (const b of beneficiaries) {
+          const share = (Number(b.percentage) || 0) / 100;
+          if (beneficiaryIsPartner(b)) {
+            await addPartnerParticipants.mutateAsync({
+              offerId,
+              body: { role: "beneficiary", isLeader: true, share },
+            });
+          } else if (b.customerId) {
+            await addParticipant.mutateAsync({
+              offerId,
+              body: {
+                partyId: b.customerId,
+                partyType: partyTypeOf(b.customerId),
+                role: "beneficiary",
+                isLeader: true,
+                share,
+              },
+            });
+          }
         }
 
-        // Insured person is always a person (never company) via /insured-persons
-        await addInsured.mutateAsync({
-          offerId,
-          body: { personId: insuredId },
-        });
+        // Insured person is always a person (never company). It is sent on create;
+        // only fall back to /insured-persons if the created offer doesn't list it.
+        if (!insuredAttachedOnCreate) {
+          await addInsured.mutateAsync({
+            offerId,
+            body: { personId: insuredId },
+          });
+        }
       }
 
-      const loanRows = manualLoans
-        ? manualLoanRows.map((r) => ({
-            periodStart: r.periodStart,
-            periodEnd: r.periodEnd,
-            remainingLoanAmount: Number(r.remainingLoanAmount) || 0,
-          }))
-        : hasLoan
-          ? buildLoanDisbursements({
-              startDate,
-              endDate,
-              loanTermYears: termYears,
-              principal: Number(outstandingBalance) || Number(loanAmount) || 0,
-            })
-          : [];
+      const loanRows = !loanRequired
+        ? []
+        : manualLoans
+          ? manualLoanRows.map((r) => ({
+              periodStart: r.periodStart,
+              periodEnd: r.periodEnd,
+              remainingLoanAmount: Number(r.remainingLoanAmount) || 0,
+            }))
+          : hasLoan
+            ? buildLoanDisbursements({
+                startDate,
+                endDate,
+                loanTermYears: termYears,
+                principal:
+                  Number(outstandingBalance) || Number(loanAmount) || 0,
+              })
+            : [];
 
       if (loanRows.length > 0) {
         setLoanSubmitProgress(true);
@@ -803,7 +848,7 @@ const CreateOffer = () => {
               <CardTitle className="text-base">Product Selection</CardTitle>
               <CardDescription>
                 CreateOfferRequest: productId, currency, periodStart, periodEnd,
-                optional partnerOfficeId and agentId.
+                insuredPersonId, optional partnerOfficeId and agentId.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
@@ -819,7 +864,9 @@ const CreateOffer = () => {
                   <SelectContent>
                     {productGroups.map((g) => (
                       <SelectItem key={g.id!} value={g.id!}>
-                        {g.name || g.id}
+                        {[g.legacyCode?.trim(), g.name || g.id]
+                          .filter(Boolean)
+                          .join("  ")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -828,7 +875,7 @@ const CreateOffer = () => {
               <div>
                 <Label>Product</Label>
                 <ProductCombobox
-                  products={productsInGroup}
+                  productGroupId={productGroupId}
                   value={productId}
                   onValueChange={onProductChange}
                   disabled={!productGroupId}
@@ -837,11 +884,7 @@ const CreateOffer = () => {
                       ? "Select product"
                       : "Pick product group first"
                   }
-                  emptyMessage={
-                    productsInGroup.length === 0
-                      ? "No products for this group."
-                      : "No product found."
-                  }
+                  emptyMessage="No product found in this group."
                 />
               </div>
 
@@ -983,65 +1026,93 @@ const CreateOffer = () => {
             <CardHeader>
               <CardTitle className="text-base">People</CardTitle>
               <CardDescription>
-                Define who holds the policy, who pays, who is insured, and
-                beneficiaries.
+                Start with the insured person, then who holds the policy, who
+                pays, and the beneficiaries.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-4">
               <div>
-                <Label>Policy Holder</Label>
+                <Label>Insured Person</Label>
+                {/* Insured persons API only accepts people (not companies). */}
                 <CustomerCombobox
-                  customers={customers}
-                  value={policyHolderId}
-                  onValueChange={setPolicyHolderId}
-                  placeholder="Select holder"
+                  requireSearch
+                  includeCompanies={false}
+                  value={insuredId}
+                  onValueChange={selectParty(setInsuredId)}
+                  placeholder="Select insured person"
                 />
                 <Button
                   variant="link"
                   size="sm"
                   className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
-                  onClick={() => setCreateCustomerTarget("policyHolder")}
+                  onClick={() => setCreateCustomerTarget("insured")}
                 >
                   Create a new customer
                 </Button>
               </div>
               <div>
-                <Label>Invoice Recipient / Payer</Label>
-                <CustomerCombobox
-                  customers={customers}
-                  value={payerId}
-                  onValueChange={setPayerId}
-                  placeholder="Select payer"
-                />
-                <div className="flex flex-wrap items-center gap-x-3">
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
-                    onClick={() => setCreateCustomerTarget("payer")}
-                  >
-                    Create a new customer
-                  </Button>
-                  {policyHolderId && (
+                <Label>Policy Holder</Label>
+                {holderIsPartner ? (
+                  <>
+                    <div className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm">
+                      <Landmark className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{partnerName}</span>
+                    </div>
                     <Button
                       variant="link"
                       size="sm"
                       className="px-0 h-7 text-xs"
-                      onClick={() => setPayerId(policyHolderId)}
+                      onClick={() => setHolderSource("customer")}
                     >
-                      Same as policy holder
+                      Use a customer instead
                     </Button>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <CustomerCombobox
+                      requireSearch
+                      value={policyHolderId}
+                      onValueChange={selectParty(setPolicyHolderId)}
+                      placeholder="Select holder"
+                    />
+                    <div className="flex flex-wrap items-center gap-x-3">
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                        onClick={() => setCreateCustomerTarget("policyHolder")}
+                      >
+                        Create a new customer
+                      </Button>
+                      {insuredId && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="px-0 h-7 text-xs"
+                          onClick={() => setPolicyHolderId(insuredId)}
+                        >
+                          Same as insured person
+                        </Button>
+                      )}
+                      {partnerOfficeId && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="px-0 h-7 text-xs"
+                          onClick={() => setHolderSource("partner")}
+                        >
+                          Use partner
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
               <div>
                 <Label>Relationship to insured</Label>
                 <Select
                   value={payerRelationship || undefined}
-                  onValueChange={setPayerRelationship}
-                  disabled={Boolean(
-                    payerId && insuredId && payerId === insuredId,
-                  )}
+                  onValueChange={onPayerRelationshipChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select relationship" />
@@ -1054,37 +1125,57 @@ const CreateOffer = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="text-[11px] text-muted-foreground mt-1.5">
+                  Of the invoice recipient to the insured person.
+                </div>
               </div>
               <div>
-                <Label>Insured Person</Label>
+                <Label>Invoice Recipient / Payer</Label>
                 <CustomerCombobox
-                  customers={peopleOnly}
-                  value={insuredId}
-                  onValueChange={setInsuredId}
-                  placeholder="Select insured person"
+                  requireSearch
+                  value={payerId}
+                  onValueChange={selectParty(setPayerId)}
+                  placeholder={
+                    payerIsInsured ? "Select insured person first" : "Select payer"
+                  }
+                  disabled={payerIsInsured}
                 />
-                <div className="flex flex-wrap items-center gap-x-3">
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
-                    onClick={() => setCreateCustomerTarget("insured")}
-                  >
-                    Create a new customer
-                  </Button>
-                  {policyHolderId &&
-                    getCustomerLocal(policyHolderId)?.customerType ===
-                      "Individual" && (
+                {payerIsInsured ? (
+                  <div className="text-[11px] text-muted-foreground mt-1.5">
+                    Same as the insured person.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-x-3">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                      onClick={() => setCreateCustomerTarget("payer")}
+                    >
+                      Create a new customer
+                    </Button>
+                    {insuredId && (
                       <Button
                         variant="link"
                         size="sm"
                         className="px-0 h-7 text-xs"
-                        onClick={() => setInsuredId(policyHolderId)}
+                        onClick={() => onPayerRelationshipChange(SAME_AS_INSURED)}
+                      >
+                        Same as insured person
+                      </Button>
+                    )}
+                    {policyHolderId && !holderIsPartner && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="px-0 h-7 text-xs"
+                        onClick={() => setPayerId(policyHolderId)}
                       >
                         Same as policy holder
                       </Button>
                     )}
-                </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1101,7 +1192,7 @@ const CreateOffer = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Customer</TableHead>
+                      <TableHead>Beneficiary</TableHead>
                       <TableHead className="w-[140px]">Percentage</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1110,41 +1201,61 @@ const CreateOffer = () => {
                       <TableRow key={b.id}>
                         <TableCell className="h-24">
                           <div className="relative">
-                            <CustomerCombobox
-                              customers={customers}
-                              value={b.customerId}
-                              onValueChange={(v) =>
-                                updateBeneficiary(b.id, { customerId: v })
-                              }
-                              placeholder="Select customer"
-                              triggerClassName="h-9"
-                            />
+                            {beneficiaryIsPartner(b) ? (
+                              <div className="flex h-9 items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm">
+                                <Landmark className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <span className="truncate">{partnerName}</span>
+                              </div>
+                            ) : (
+                              <CustomerCombobox
+                                requireSearch
+                                value={b.customerId}
+                                onValueChange={selectParty((id) =>
+                                  updateBeneficiary(b.id, { customerId: id }),
+                                )}
+                                placeholder="Select customer"
+                                triggerClassName="h-9"
+                              />
+                            )}
                             <div className="absolute left-0 top-full flex flex-wrap items-center gap-x-3">
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
-                                onClick={() =>
-                                  setCreateCustomerTarget({
-                                    beneficiaryId: b.id,
-                                  })
-                                }
-                              >
-                                Create a new customer
-                              </Button>
-                              {policyHolderId && (
+                              {beneficiaryIsPartner(b) ? (
                                 <Button
                                   variant="link"
                                   size="sm"
                                   className="px-0 h-7 text-xs"
                                   onClick={() =>
-                                    updateBeneficiary(b.id, {
-                                      customerId: policyHolderId,
-                                    })
+                                    updateBeneficiary(b.id, { isPartner: false })
                                   }
                                 >
-                                  Same as policy holder
+                                  Use a customer instead
                                 </Button>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="px-0 h-7 text-xs text-blue-400 hover:text-blue-500"
+                                    onClick={() =>
+                                      setCreateCustomerTarget({
+                                        beneficiaryId: b.id,
+                                      })
+                                    }
+                                  >
+                                    Create a new customer
+                                  </Button>
+                                  {partnerOfficeId && (
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="px-0 h-7 text-xs"
+                                      onClick={() =>
+                                        updateBeneficiary(b.id, { isPartner: true })
+                                      }
+                                    >
+                                      Use partner
+                                    </Button>
+                                  )}
+                                </>
                               )}
                             </div>
                           </div>
@@ -1246,8 +1357,10 @@ const CreateOffer = () => {
                   <CardTitle className="text-base">Mortgage / Loan</CardTitle>
                   <CardDescription>
                     {loanRequired
-                      ? "This product requires loan balances for each coverage period."
-                      : "Optional — only required for loan-protection policies. You can also import details from an Excel file."}
+                      ? "This product requires loan balances for each coverage period. You can also import details from an Excel file."
+                      : product
+                        ? "This product does not use loan balances."
+                        : "Select a product to add loan details."}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1266,6 +1379,7 @@ const CreateOffer = () => {
                     size="sm"
                     variant="outline"
                     onClick={() => loanFileRef.current?.click()}
+                    disabled={!loanRequired}
                     className="gap-2"
                   >
                     <FileSpreadsheet className="h-4 w-4" />
@@ -1275,6 +1389,7 @@ const CreateOffer = () => {
                     size="sm"
                     variant={hasLoan ? "secondary" : "outline"}
                     onClick={toggleLoanDetails}
+                    disabled={!loanRequired}
                   >
                     {hasLoan ? "Remove loan details" : "Add loan details"}
                   </Button>
@@ -1282,6 +1397,7 @@ const CreateOffer = () => {
                     size="sm"
                     variant={manualLoans ? "secondary" : "outline"}
                     onClick={toggleManualLoans}
+                    disabled={!loanRequired}
                     className="gap-2"
                   >
                     <Plus className="h-4 w-4" />
@@ -1568,9 +1684,10 @@ const CreateOffer = () => {
             <CustomerForm
               embedded
               onCancel={() => setCreateCustomerTarget(null)}
-              onSuccess={({ id }) => {
+              onSuccess={({ id, customerType }) => {
                 const target = createCustomerTarget;
                 setCreateCustomerTarget(null);
+                rememberPartyType(id, customerType);
                 if (target === "policyHolder") setPolicyHolderId(id);
                 else if (target === "payer") setPayerId(id);
                 else if (target === "insured") setInsuredId(id);

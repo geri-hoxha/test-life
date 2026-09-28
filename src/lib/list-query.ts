@@ -15,7 +15,3 @@ export const dateToUtcStart = (date: string) =>
 /** Date input (YYYY-MM-DD) → end of day UTC ISO string. */
 export const dateToUtcEnd = (date: string) =>
   date.trim() ? `${date.trim()}T23:59:59.999Z` : undefined;
-
-/** Single-day date → noon UTC (for effectiveOnUtc-style filters). */
-export const dateToUtcDay = (date: string) =>
-  date.trim() ? `${date.trim()}T00:00:00.000Z` : undefined;

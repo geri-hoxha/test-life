@@ -1,9 +1,6 @@
 import { format, parseISO } from "date-fns";
 import type {
   DomainPoliciesPolicyRenewalStatus,
-  DomainUnderwritingDiscountRequestStatus,
-  DomainUnderwritingDocumentStatus,
-  DomainUnderwritingReviewFlagStatus,
   OffersDateOnlyRangeResponse,
 } from "@/api/types";
 
@@ -36,52 +33,6 @@ export const renewalStatusClass = (status?: DomainPoliciesPolicyRenewalStatus | 
   if (status === "draft") return "bg-amber-500/15 text-amber-800 dark:text-amber-300";
   if (status === "priced") return "bg-sky-500/15 text-sky-800 dark:text-sky-300";
   if (status === "applied") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300";
-  return "bg-muted text-muted-foreground";
-};
-
-export const documentStatusLabel = (status?: DomainUnderwritingDocumentStatus | string) => {
-  if (status === "required") return "Required";
-  if (status === "submitted") return "Submitted";
-  if (status === "accepted") return "Accepted";
-  if (status === "refused") return "Refused";
-  if (status === "waived") return "Waived";
-  return status ? humanizeRenewalEnum(status) : "—";
-};
-
-export const documentStatusClass = (status?: DomainUnderwritingDocumentStatus | string) => {
-  if (status === "required") return "bg-amber-500/15 text-amber-800 dark:text-amber-300";
-  if (status === "submitted") return "bg-sky-500/15 text-sky-800 dark:text-sky-300";
-  if (status === "accepted") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300";
-  if (status === "refused") return "bg-destructive/15 text-destructive";
-  if (status === "waived") return "bg-muted text-muted-foreground";
-  return "bg-muted text-muted-foreground";
-};
-
-export const flagStatusLabel = (status?: DomainUnderwritingReviewFlagStatus | string) => {
-  if (status === "raised") return "Raised";
-  if (status === "approved") return "Approved";
-  if (status === "rejected") return "Rejected";
-  return status ? humanizeRenewalEnum(status) : "—";
-};
-
-export const flagStatusClass = (status?: DomainUnderwritingReviewFlagStatus | string) => {
-  if (status === "raised") return "bg-amber-500/15 text-amber-800 dark:text-amber-300";
-  if (status === "approved") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300";
-  if (status === "rejected") return "bg-destructive/15 text-destructive";
-  return "bg-muted text-muted-foreground";
-};
-
-export const discountStatusLabel = (status?: DomainUnderwritingDiscountRequestStatus | string) => {
-  if (status === "requested") return "Requested";
-  if (status === "approved") return "Approved";
-  if (status === "rejected") return "Rejected";
-  return status ? humanizeRenewalEnum(status) : "—";
-};
-
-export const discountStatusClass = (status?: DomainUnderwritingDiscountRequestStatus | string) => {
-  if (status === "requested") return "bg-amber-500/15 text-amber-800 dark:text-amber-300";
-  if (status === "approved") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300";
-  if (status === "rejected") return "bg-destructive/15 text-destructive";
   return "bg-muted text-muted-foreground";
 };
 
@@ -120,14 +71,6 @@ export const formatRenewalDateTime = (iso?: string | null) => {
 export const formatRenewalPeriod = (period?: OffersDateOnlyRangeResponse | null) => {
   if (!period?.startDate && !period?.endDate) return "—";
   return `${formatRenewalDate(period.startDate)} → ${formatRenewalDate(period.endDate)}`;
-};
-
-export const formatDiscountPct = (value?: number | null) => {
-  if (value == null || Number.isNaN(value)) return "—";
-  return `${(value * 100).toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
-  })}%`;
 };
 
 export const shortRenewalId = (id: string) =>

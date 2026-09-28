@@ -92,7 +92,7 @@ const PartnersList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, isError, error } = useListPartners(listQuery);
+  const { data: pageData, isLoading, isFetching, isPlaceholderData, isError, error } = useListPartners(listQuery);
   const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
@@ -243,7 +243,7 @@ const PartnersList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={3} />
                 ) : isError ? (
                   <TableRow>
@@ -317,7 +317,7 @@ const PartnersList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

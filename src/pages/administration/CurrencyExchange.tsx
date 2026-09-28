@@ -75,6 +75,7 @@ const CurrencyExchange = () => {
     data: pageData,
     isLoading,
     isFetching,
+    isPlaceholderData,
     error,
   } = useListCurrencyRates(listQuery);
 
@@ -163,7 +164,7 @@ const CurrencyExchange = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={4} />
                 ) : items.length === 0 ? (
                   <TableRow>
@@ -204,7 +205,7 @@ const CurrencyExchange = () => {
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
               pageSizeOptions={[10, 20, 50]}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

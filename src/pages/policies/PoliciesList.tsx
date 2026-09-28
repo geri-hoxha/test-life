@@ -11,6 +11,7 @@ import { CustomerCombobox } from "@/components/CustomerCombobox";
 import { OfferCombobox } from "@/components/OfferCombobox";
 import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -50,7 +51,7 @@ import {
   policyStatusLabel,
 } from "./policy-ui";
 
-const COL_COUNT = 8;
+const COL_COUNT = 9;
 
 const toDate = (isoDay: string) => {
   if (!isoDay) return undefined;
@@ -71,6 +72,7 @@ const PoliciesList = () => {
   const [coverageOn, setCoverageOn] = useState("");
   const [partyId, setPartyId] = useState("");
   const [personId, setPersonId] = useState("");
+  const [legacyPolicyNumber, setLegacyPolicyNumber] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [printingId, setPrintingId] = useState<string | null>(null);
@@ -86,8 +88,19 @@ const PoliciesList = () => {
         coverageOn: coverageOn.trim() || undefined,
         partyId: partyId.trim() || undefined,
         personId: personId.trim() || undefined,
+        legacyPolicyNumber: legacyPolicyNumber.trim() || undefined,
       }),
-    [productId, offerId, currency, issuedFrom, issuedTo, coverageOn, partyId, personId],
+    [
+      productId,
+      offerId,
+      currency,
+      issuedFrom,
+      issuedTo,
+      coverageOn,
+      partyId,
+      personId,
+      legacyPolicyNumber,
+    ],
   );
   const debouncedFilters = useDebouncedValue(filters);
 
@@ -97,7 +110,7 @@ const PoliciesList = () => {
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
 
-  const { data: policiesPage, isLoading, isFetching, isError, error } = useListPolicies(listQuery);
+  const { data: policiesPage, isLoading, isFetching, isPlaceholderData, isError, error } = useListPolicies(listQuery);
 
   const items = policiesPage?.items ?? [];
 
@@ -113,6 +126,7 @@ const PoliciesList = () => {
     setCoverageOn("");
     setPartyId("");
     setPersonId("");
+    setLegacyPolicyNumber("");
   };
 
   const handlePrint = (policyId?: string) => {
@@ -146,7 +160,8 @@ const PoliciesList = () => {
     issuedTo ||
     coverageOn ||
     partyId ||
-    personId;
+    personId ||
+    legacyPolicyNumber;
 
   return (
     <AppShell>
@@ -246,6 +261,15 @@ const PoliciesList = () => {
                 />
               </div>
               <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Legacy policy number</Label>
+                <Input
+                  className="h-9 font-mono text-xs"
+                  value={legacyPolicyNumber}
+                  onChange={(e) => setLegacyPolicyNumber(e.target.value)}
+                  placeholder="Filter by legacy policy number"
+                />
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Issued from</Label>
                 <DatePicker
                   value={toDate(issuedFrom)}
@@ -281,6 +305,7 @@ const PoliciesList = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Serial</TableHead>
+                  <TableHead>Legacy policy no.</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead className="text-right">Sum Insured</TableHead>
                   <TableHead className="text-right">Premium</TableHead>
@@ -291,7 +316,7 @@ const PoliciesList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={COL_COUNT} label="Loading policies…" />
                 ) : isError ? (
                   <TableRow>
@@ -316,6 +341,11 @@ const PoliciesList = () => {
                     <TableRow key={p.id ?? `${p.serial}-${p.issuedOnUtc}`}>
                       <TableCell className="font-mono text-sm font-medium">
                         {policyNumberLabel(p.serial, p.id)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {p.legacyPolicyNumber?.trim() || (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm">
                         {p.productName?.trim() || (
@@ -381,7 +411,7 @@ const PoliciesList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

@@ -3,6 +3,7 @@ import { apiKeys, apiRequest } from "./client";
 import type {
   OffersAddOfferInsuredPersonRequest,
   OffersAddOfferParticipantRequest,
+  OffersAddOfferPartnerParticipantRequest,
   OffersCreateOfferRequest,
   OffersOfferInsuredPersonResponse,
   OffersOfferListItemResponse,
@@ -130,6 +131,35 @@ export const useAddOfferParticipant = () => {
   return useMutation({
     mutationFn: (vars: { offerId: string; body: OffersAddOfferParticipantRequest }) =>
       addOfferParticipant(vars.offerId, vars.body),
+    onSuccess: (_data, vars) => {
+      invalidateOffers(queryClient);
+      void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });
+    },
+  });
+};
+
+/**
+ * POST /api/offers/{offerId}/partner-participants — adds the partner in the given role
+ * (e.g. policy holder or beneficiary). The partner and office are resolved server-side
+ * from the offer's sales attribution.
+ */
+export const addOfferPartnerParticipants = async (
+  offerId: string,
+  body: OffersAddOfferPartnerParticipantRequest,
+  signal?: AbortSignal,
+): Promise<void> =>
+  apiRequest<void>({
+    method: "POST",
+    path: `/api/offers/${encodeURIComponent(offerId)}/partner-participants`,
+    body,
+    signal,
+  });
+
+export const useAddOfferPartnerParticipants = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { offerId: string; body: OffersAddOfferPartnerParticipantRequest }) =>
+      addOfferPartnerParticipants(vars.offerId, vars.body),
     onSuccess: (_data, vars) => {
       invalidateOffers(queryClient);
       void queryClient.invalidateQueries({ queryKey: offersKeys.detail(vars.offerId) });

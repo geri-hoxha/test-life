@@ -2,7 +2,6 @@
 
 import type {
   DomainOffersOfferStatus,
-  OffersOfferListItemResponse,
   OffersOfferPeriodResponse,
   OffersOfferResponse,
 } from "../types";
@@ -11,7 +10,6 @@ import type {
   OfferDiscountRequest,
   OfferDocumentRequirement,
   OfferInsuredPerson,
-  OfferListItem,
   OfferLoanDisbursement,
   OfferLoanSubmission,
   OfferParticipant,
@@ -47,6 +45,10 @@ const shareToPercentage = (share?: number | null) =>
 const mapParticipant = (p: NonNullable<OffersOfferResponse["participants"]>[number]): OfferParticipant => ({
   id: String(p.id ?? ""),
   partyId: p.partyId ?? "",
+  partnerId: p.partnerId ?? undefined,
+  partnerOfficeId: p.partnerOfficeId ?? undefined,
+  partnerOfficeName: p.partnerOfficeName ?? undefined,
+  partnerOfficeAddress: p.partnerOfficeAddress ?? undefined,
   role: p.role ?? "policyHolder",
   partyType: p.partyType,
   uniqueIdentifier: p.uniqueIdentifier,
@@ -255,34 +257,5 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     partnerOfficeId: sales?.partnerOfficeId ?? null,
     salesOfficeName:
       sales?.partnerOfficeName ?? sales?.internalOfficeName ?? null,
-  };
-};
-
-export const mapApiOfferListItem = (o: OffersOfferListItemResponse): OfferListItem => {
-  const start = o.coverageTerm?.startDate?.slice(0, 10) ?? "";
-  const end = o.coverageTerm?.endDate?.slice(0, 10) ?? "";
-  return {
-    id: o.id ?? "",
-    number: o.id ?? "",
-    productId: o.productId ?? "",
-    productName: o.productName,
-    policyPlan: o.policyPlan,
-    currency: o.currency ?? "EUR",
-    status: statusFromApi(o.status),
-    createdDate: o.createdOnUtc?.slice(0, 10) ?? "",
-    expiresOnUtc: o.expiresOnUtc ?? null,
-    policyId: o.policyId ?? null,
-    startDate: start,
-    endDate: end,
-    premium: o.firstPeriodChargePremium ?? 0,
-    sumInsured: o.sumInsured ?? null,
-    policyHolderName: o.policyHolderName,
-    insuredName: o.insuredName,
-    insuredAge: o.insuredAge,
-    salesChannel: o.salesChannel,
-    salesPartyName: o.salesPartyName,
-    outstandingDocumentCount: o.outstandingDocumentCount ?? 0,
-    raisedReviewFlagCount: o.raisedReviewFlagCount ?? 0,
-    pendingDiscountRequestCount: o.pendingDiscountRequestCount ?? 0,
   };
 };

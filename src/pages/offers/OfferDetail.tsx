@@ -113,6 +113,7 @@ import {
   useRateOffer,
   useQuoteOffer,
   useAddOfferParticipant,
+  useAddOfferPartnerParticipants,
   useAddOfferInsuredPerson,
   useRemoveOfferParticipant,
   useRemoveOfferInsuredPerson,
@@ -184,20 +185,24 @@ const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
 
 const PartyLink = ({
   partyId,
+  partnerId,
   partyType,
   displayName,
 }: {
   partyId?: string;
+  partnerId?: string;
   partyType?: "person" | "company";
   displayName?: string;
 }) => {
-  if (!partyId || !displayName)
-    return <span className="text-muted-foreground">—</span>;
+  if (!displayName) return <span className="text-muted-foreground">—</span>;
+  const to = partnerId
+    ? `/partners/${encodeURIComponent(partnerId)}`
+    : partyId
+      ? customerPath(partyId, partyType ?? "person")
+      : undefined;
+  if (!to) return <>{displayName}</>;
   return (
-    <Link
-      to={customerPath(partyId, partyType ?? "person")}
-      className="text-primary hover:underline"
-    >
+    <Link to={to} className="text-primary hover:underline">
       {displayName}
     </Link>
   );
@@ -325,6 +330,7 @@ const OfferParticipantFields = ({
           value={
             <PartyLink
               partyId={party.partyId}
+              partnerId={party.partnerId}
               partyType={party.partyType}
               displayName={party.displayName}
             />
@@ -338,6 +344,12 @@ const OfferParticipantFields = ({
         />
         <Field label="Party type" value={titleCase(party.partyType)} />
         <Field label="Country" value={countryLabel(party.countryCode)} />
+        {party.partnerId ? (
+          <>
+            <Field label="Partner office" value={party.partnerOfficeName} />
+            <Field label="Office address" value={party.partnerOfficeAddress} />
+          </>
+        ) : null}
         <Field
           label="Leader"
           value={
@@ -701,6 +713,7 @@ const OfferDetail = () => {
   const rateOffer = useRateOffer();
   const quoteOffer = useQuoteOffer();
   const addParticipant = useAddOfferParticipant();
+  const addPartnerParticipants = useAddOfferPartnerParticipants();
   const addInsuredPerson = useAddOfferInsuredPerson();
   const removeParticipant = useRemoveOfferParticipant();
   const removeInsuredPerson = useRemoveOfferInsuredPerson();
@@ -1028,6 +1041,25 @@ const OfferDetail = () => {
     }
   };
 
+  const handleAddPartnerParticipants = async (
+    role: "policyHolder" | "beneficiary",
+  ) => {
+    try {
+      // A partner beneficiary is only offered when there are none yet, so it owns 100%.
+      await addPartnerParticipants.mutateAsync({
+        offerId: offer.id,
+        body: { role, isLeader: true, share: 1 },
+      });
+      toast.success(
+        role === "policyHolder"
+          ? "Partner added as policy holder"
+          : "Partner added as beneficiary",
+      );
+    } catch (err) {
+      toastApiError(err, "Failed to add partner");
+    }
+  };
+
   const handleAddInsured = async () => {
     if (!newPersonId) {
       toast.error("Select an insured person");
@@ -1307,6 +1339,7 @@ const OfferDetail = () => {
     issuancePending != null ||
     discountActionPending ||
     addParticipant.isPending ||
+    addPartnerParticipants.isPending ||
     addInsuredPerson.isPending ||
     removeParticipant.isPending ||
     removeInsuredPerson.isPending ||
@@ -1326,7 +1359,9 @@ const OfferDetail = () => {
                 ? "Rejecting discount…"
                 : submitLoan.isPending
                   ? "Submitting loan balances…"
-                  : addParticipant.isPending || addInsuredPerson.isPending
+                  : addParticipant.isPending ||
+                      addPartnerParticipants.isPending ||
+                      addInsuredPerson.isPending
                     ? "Updating parties…"
                     : "Working…";
 
@@ -2694,6 +2729,18 @@ const OfferDetail = () => {
                   <CardDescription>Owner of the policy</CardDescription>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  {canEditParties && offer.partnerId && !holder ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5 h-8 text-primary hover:text-primary hover:bg-primary/10"
+                      title="Adds your partner as policy holder"
+                      onClick={() => void handleAddPartnerParticipants("policyHolder")}
+                      disabled={addPartnerParticipants.isPending}
+                    >
+                      <Landmark className="h-3.5 w-3.5" /> Add partner
+                    </Button>
+                  ) : null}
                   {canEditParties ? (
                     <Button
                       size="sm"
@@ -2853,6 +2900,20 @@ const OfferDetail = () => {
                   </CardDescription>
                 </div>
                 <div className="flex flex-row flex-nowrap items-center gap-1 shrink-0">
+                  {canEditParties &&
+                  offer.partnerId &&
+                  beneficiaryParties.length === 0 ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5 h-8 text-primary hover:text-primary hover:bg-primary/10"
+                      title="Adds your partner as beneficiary with 100% share"
+                      onClick={() => void handleAddPartnerParticipants("beneficiary")}
+                      disabled={addPartnerParticipants.isPending}
+                    >
+                      <Landmark className="h-3.5 w-3.5" /> Add partner
+                    </Button>
+                  ) : null}
                   {canEditParties ? (
                     <Button
                       size="sm"

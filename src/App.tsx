@@ -24,14 +24,12 @@ import PoliciesList from "./pages/policies/PoliciesList.tsx";
 import RenewalsList from "./pages/renewals/RenewalsList.tsx";
 import RenewalDetail from "./pages/renewals/RenewalDetail.tsx";
 import PolicyDetail from "./pages/policies/PolicyDetail.tsx";
-import PaymentsList from "./pages/payments/PaymentsList.tsx";
-import RecordPayment from "./pages/payments/RecordPayment.tsx";
 import Reports from "./pages/reports/Reports.tsx";
-import PermissionMatrix from "./pages/administration/PermissionMatrix.tsx";
 import RatingTablesList from "./pages/administration/RatingTablesList.tsx";
 import RatingTableDetail from "./pages/administration/RatingTableDetail.tsx";
 import DocumentTypesList from "./pages/administration/DocumentTypesList.tsx";
 import DocumentsList from "./pages/administration/DocumentsList.tsx";
+import PolicyPlanTypesList from "./pages/administration/PolicyPlanTypesList.tsx";
 import RiskList from "./pages/risk-list/RiskList.tsx";
 import BankAccountsList from "./pages/bank-accounts/BankAccountsList.tsx";
 import InvoicesList from "./pages/invoices/InvoicesList.tsx";
@@ -107,16 +105,14 @@ const App = () => (
             <Route path="/partner-commissions/:id" element={<PartnerCommissionDetail />} />
             <Route path="/risk-list" element={<RiskList />} />
             <Route path="/bank-accounts" element={<BankAccountsList />} />
-            <Route path="/payments" element={<PaymentsList />} />
-            <Route path="/payments/new" element={<RecordPayment />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/administration" element={<CurrencyExchange />} />
             <Route path="/administration/currency-exchange" element={<CurrencyExchange />} />
-            <Route path="/administration/permission-matrix" element={<PermissionMatrix />} />
             <Route path="/administration/rating-tables" element={<RatingTablesList />} />
             <Route path="/administration/rating-tables/:id" element={<RatingTableDetail />} />
             <Route path="/administration/document-types" element={<DocumentTypesList />} />
             <Route path="/administration/documents" element={<DocumentsList />} />
+            <Route path="/administration/policy-plan-types" element={<PolicyPlanTypesList />} />
             <Route path="/administration/users" element={<UsersList />} />
             <Route path="/administration/users/:authUserId" element={<UserDetail />} />
             <Route path="*" element={<NotFound />} />

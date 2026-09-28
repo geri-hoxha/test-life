@@ -1,13 +1,11 @@
 import { format, parseISO } from "date-fns";
 import type {
   DomainBillingPremiumInstallmentStatus,
-  DomainDistributionSalesChannel,
   DomainPoliciesCancellationKind,
   DomainPoliciesPolicyCancellationStatus,
   DomainPoliciesPolicyPeriodStatus,
   DomainPoliciesPolicyStatus,
   OffersDateOnlyRangeResponse,
-  OffersSalesAttributionResponse,
 } from "@/api/types";
 
 export const POLICY_STATUSES: DomainPoliciesPolicyStatus[] = [
@@ -94,13 +92,6 @@ export const installmentStatusClass = (
   return "bg-muted text-muted-foreground";
 };
 
-export const salesChannelLabel = (channel?: DomainDistributionSalesChannel | string | null) => {
-  if (channel === "partnerApi") return "Partner API";
-  if (channel === "internalDirect") return "Internal direct";
-  if (channel === "internalForPartner") return "Internal for partner";
-  return channel ? humanizePolicyEnum(channel) : "—";
-};
-
 export const formatPolicyMoney = (value?: number | null, currency?: string) => {
   if (value == null || Number.isNaN(value)) return "—";
   const ccy = currency?.trim() || "ALL";
@@ -159,14 +150,3 @@ export const policyNumberLabel = (serial?: number | null, id?: string | null) =>
 
 export const shareToPercentage = (share?: number | null) =>
   Math.round((share ?? 0) * 10000) / 100;
-
-export const salesPartyLabel = (attribution?: OffersSalesAttributionResponse | null) => {
-  if (!attribution) return null;
-  return (
-    attribution.agentDisplayName?.trim() ||
-    attribution.partnerName?.trim() ||
-    attribution.internalOfficeName?.trim() ||
-    attribution.internalBranchName?.trim() ||
-    null
-  );
-};

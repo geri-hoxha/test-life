@@ -10,6 +10,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
 import { useGetAgent, useListAgents } from "@/api/agents";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
@@ -55,6 +56,7 @@ export const AgentCombobox = ({
     });
   }, [agentsPage?.items, debouncedSearch]);
 
+  const isSearching = isFetching || search.trim().toLowerCase() !== debouncedSearch;
   const selectedFromList = agents.find((a) => a.id === value);
   const selected = selectedFromList ?? selectedAgent;
   const selectedLabel = selected ? agentLabel(selected.displayName, selected.id) : null;
@@ -91,14 +93,13 @@ export const AgentCombobox = ({
             placeholder="Search by agent name…"
             value={search}
             onValueChange={setSearch}
+            loading={isSearching && agents.length > 0}
           />
           <CommandList>
             {agents.length === 0 && (
-              <div className="px-2 py-3 text-center text-sm text-muted-foreground">
-                {isFetching || search.trim().toLowerCase() !== debouncedSearch
-                  ? "Loading…"
-                  : "No agent found."}
-              </div>
+              <ComboboxStatus loading={isSearching} label="Loading…">
+                No agent found.
+              </ComboboxStatus>
             )}
             <CommandGroup>
               {allowClear && (

@@ -92,7 +92,7 @@ const InvoicesList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, error } = useListInvoices(listQuery);
+  const { data: pageData, isLoading, isFetching, isPlaceholderData, error } = useListInvoices(listQuery);
 
   const items = pageData?.items ?? [];
   const totalCount = pageData?.totalCount ?? items.length;
@@ -220,7 +220,7 @@ const InvoicesList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={COL_COUNT} />
                 ) : items.length === 0 ? (
                   <TableRow>
@@ -326,7 +326,7 @@ const InvoicesList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

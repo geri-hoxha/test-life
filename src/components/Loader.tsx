@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { TableCell, TableRow } from "@/components/ui/table";
 
@@ -122,6 +123,20 @@ export function TableLoadingRow({
       </TableCell>
     </TableRow>
   );
+}
+
+/** Status row inside a search dropdown: spinner while results load, otherwise the message. */
+export function ComboboxStatus({
+  loading,
+  label = "Searching…",
+  children,
+}: {
+  loading: boolean;
+  label?: string;
+  children?: ReactNode;
+}) {
+  if (loading) return <Loader size="sm" label={label} className="py-4" />;
+  return <div className="px-2 py-3 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
 /** Full-screen overlay for mutations and other blocking API waits. */

@@ -4,27 +4,27 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
 import { useGetProduct, useListProducts } from "@/api/products";
+import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
-export type ProductComboboxOption = {
+type ProductComboboxOption = {
   id: string;
   name: string;
-  code?: string;
 };
 
 type ProductComboboxProps = {
-  /** When omitted, options are loaded when the field is opened. */
-  products?: ProductComboboxOption[];
   value: string;
   onValueChange: (id: string) => void;
+  /** Only list products of this product group. */
+  productGroupId?: string;
   placeholder?: string;
   searchPlaceholder?: string;
   emptyMessage?: string;
@@ -35,27 +35,20 @@ type ProductComboboxProps = {
   clearLabel?: string;
 };
 
-const matchesProductSearch = (p: ProductComboboxOption, search: string) => {
-  const q = search.trim().toLowerCase();
-  if (!q) return true;
-  return [p.name, p.code, p.id]
-    .filter(Boolean)
-    .some((field) => String(field).toLowerCase().includes(q));
-};
-
 const toOption = (p: { id?: string | null; name?: string | null }): ProductComboboxOption | null => {
   const id = p.id?.trim() ?? "";
   if (!id) return null;
   return { id, name: p.name?.trim() || "—" };
 };
 
+/** Products are searched by name on the backend (debounced) once the field is opened. */
 export const ProductCombobox = ({
-  products,
   value,
   onValueChange,
-  placeholder = "Select package",
-  searchPlaceholder,
-  emptyMessage = "No package found.",
+  productGroupId,
+  placeholder = "Select product",
+  searchPlaceholder = "Search by product name…",
+  emptyMessage = "No product found.",
   className,
   triggerClassName,
   disabled,
@@ -64,43 +57,27 @@ export const ProductCombobox = ({
 }: ProductComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const isRemote = products === undefined;
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
   const { data: productsPage, isFetching } = useListProducts(
-    { pageNumber: 1, pageSize: 50, name: debouncedSearch || undefined },
-    { enabled: isRemote && open },
+    compactQuery({ pageNumber: 1, pageSize: 50, name: debouncedSearch, productGroupId }),
+    { enabled: open },
   );
-  const { data: selectedProduct } = useGetProduct(value, {
-    enabled: isRemote && Boolean(value),
-  });
+  const { data: selectedProduct } = useGetProduct(value, { enabled: Boolean(value) });
 
-  const remoteOptions = useMemo(() => {
-    if (!isRemote) return [];
-    return (productsPage?.items ?? []).flatMap((p) => {
-      const option = toOption(p);
-      return option ? [option] : [];
-    });
-  }, [isRemote, productsPage?.items]);
+  const options = useMemo(
+    () =>
+      (productsPage?.items ?? []).flatMap((p) => {
+        // keepPreviousData can still hold another group's page while the new one loads.
+        if (productGroupId && p.productGroupId !== productGroupId) return [];
+        const option = toOption(p);
+        return option ? [option] : [];
+      }),
+    [productGroupId, productsPage?.items],
+  );
+  const selected = options.find((p) => p.id === value) ?? toOption(selectedProduct ?? {}) ?? undefined;
 
-  const localOptions = useMemo(() => {
-    if (isRemote) return [];
-    return (products ?? []).filter((p) => matchesProductSearch(p, search));
-  }, [isRemote, products, search]);
-
-  const options = isRemote ? remoteOptions : localOptions;
-  const selectedFromList = options.find((p) => p.id === value);
-  const selected =
-    selectedFromList ??
-    (!isRemote ? products?.find((p) => p.id === value) : toOption(selectedProduct ?? {})) ??
-    undefined;
-
-  const remoteStatus =
-    isRemote && options.length === 0
-      ? isFetching || search.trim() !== debouncedSearch
-        ? "Loading…"
-        : "No product found."
-      : null;
+  const isSearching = isFetching || search.trim() !== debouncedSearch;
 
   return (
     <Popover
@@ -131,15 +108,15 @@ export const ProductCombobox = ({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder={searchPlaceholder ?? (isRemote ? "Search by product name…" : "Search packages…")}
+            placeholder={searchPlaceholder}
             value={search}
             onValueChange={setSearch}
+            loading={isSearching && options.length > 0}
           />
           <CommandList>
-            {remoteStatus && (
-              <div className="px-2 py-3 text-center text-sm text-muted-foreground">{remoteStatus}</div>
+            {options.length === 0 && (
+              <ComboboxStatus loading={isSearching}>{emptyMessage}</ComboboxStatus>
             )}
-            {!isRemote && <CommandEmpty>{emptyMessage}</CommandEmpty>}
             <CommandGroup>
               {allowClear && (
                 <CommandItem
@@ -157,7 +134,7 @@ export const ProductCombobox = ({
               {options.map((p) => (
                 <CommandItem
                   key={p.id}
-                  value={`${p.name} ${p.code ?? ""} ${p.id}`}
+                  value={`${p.name} ${p.id}`}
                   onSelect={() => {
                     onValueChange(allowClear && value === p.id ? "" : p.id);
                     setOpen(false);

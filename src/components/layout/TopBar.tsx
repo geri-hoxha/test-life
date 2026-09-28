@@ -25,8 +25,11 @@ import {
   FileType,
   Files,
   UserCog,
+  ListChecks,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +50,7 @@ import { clearSession } from "@/api/client";
 import { LOGIN_PATH, readDisplayUsername } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Loader } from "@/components/Loader";
+import { ChangePasswordDialog } from "@/components/auth/ChangePasswordDialog";
 
 type NavLink = { label: string; to: string; icon: LucideIcon };
 type NavGroup = { label: string; icon: LucideIcon; items: NavLink[] };
@@ -74,9 +78,7 @@ const navEntries: NavEntry[] = [
     label: "Finance",
     icon: Wallet,
     items: [
-      { label: "Agents", to: "/agents", icon: Briefcase },
       { label: "Agent commissions", to: "/agent-commissions", icon: Percent },
-      { label: "Partners", to: "/partners", icon: Handshake },
       { label: "Partner commissions", to: "/partner-commissions", icon: Percent },
       { label: "Bank accounts", to: "/bank-accounts", icon: Landmark },
     ],
@@ -85,10 +87,13 @@ const navEntries: NavEntry[] = [
     label: "Administration",
     icon: Settings,
     items: [
+      { label: "Agents", to: "/agents", icon: Briefcase },
+      { label: "Partners", to: "/partners", icon: Handshake },
       { label: "Rating tables", to: "/administration/rating-tables", icon: Table2 },
       { label: "Currency rates", to: "/administration/currency-exchange", icon: ArrowLeftRight },
       { label: "Document types", to: "/administration/document-types", icon: FileType },
       { label: "Documents", to: "/administration/documents", icon: Files },
+      { label: "Policy plan types", to: "/administration/policy-plan-types", icon: ListChecks },
       { label: "Users", to: "/administration/users", icon: UserCog },
     ],
   },
@@ -165,6 +170,7 @@ const TopBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const eurRates = useListCurrencyRates({
     currency: "EUR",
     latestOnly: true,
@@ -256,13 +262,9 @@ const TopBar = () => {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="h-4 w-4 mr-2" />
-                Preferences
+              <DropdownMenuItem onSelect={() => setChangePasswordOpen(true)}>
+                <KeyRound className="h-4 w-4 mr-2" />
+                Change password
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -278,6 +280,10 @@ const TopBar = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <ChangePasswordDialog
+            open={changePasswordOpen}
+            onOpenChange={setChangePasswordOpen}
+          />
         </div>
       </div>
 

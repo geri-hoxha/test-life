@@ -10,6 +10,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
 import { useGetPolicy, useListPolicies } from "@/api/policies";
 import type { PoliciesPolicyListItemResponse, PoliciesPolicyResponse } from "@/api/types";
 import { policyNumberLabel } from "@/pages/policies/policy-ui";
@@ -88,14 +89,8 @@ export const PolicyCombobox = ({
       : source.filter((policy) => String(policy.serial ?? "").startsWith(String(serial)));
   const selectedFromList = source.find((policy) => policy.id === value);
   const selected = selectedFromList ?? policyFromDetail(selectedPolicy);
-  const listStatus =
-    filtered.length > 0
-      ? null
-      : serial === undefined
-        ? "Type a policy serial"
-        : isFetching
-          ? "Searching…"
-          : "No policy found.";
+  const isSearching = serial !== undefined && isFetching;
+  const emptyMessage = serial === undefined ? "Type a policy serial" : "No policy found.";
 
   return (
     <Popover
@@ -134,10 +129,11 @@ export const PolicyCombobox = ({
             placeholder="Search by serial…"
             value={search}
             onValueChange={handleSearchChange}
+            loading={isSearching && filtered.length > 0}
           />
           <CommandList>
-            {listStatus && (
-              <div className="px-2 py-3 text-center text-sm text-muted-foreground">{listStatus}</div>
+            {filtered.length === 0 && (
+              <ComboboxStatus loading={isSearching}>{emptyMessage}</ComboboxStatus>
             )}
             <CommandGroup>
               {allowClear && (

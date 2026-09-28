@@ -322,7 +322,7 @@ const IssuePolicy = () => {
                         const c = getCustomerLocal(b.customerId);
                         return (
                           <TableRow key={b.id}>
-                            <TableCell>{c ? fullName(c) : "—"}</TableCell>
+                            <TableCell>{b.displayName ?? (c ? fullName(c) : "—")}</TableCell>
                             <TableCell className="text-right font-mono">{b.percentage}%</TableCell>
                           </TableRow>
                         );

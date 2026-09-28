@@ -25,7 +25,12 @@ export type Beneficiary = {
 
 export type OfferParticipant = {
   id: string;
+  /** Empty for a partner participant — use displayName for the name, partnerId to tell them apart. */
   partyId: string;
+  partnerId?: string;
+  partnerOfficeId?: string;
+  partnerOfficeName?: string;
+  partnerOfficeAddress?: string;
   role: "policyHolder" | "invoiced" | "beneficiary";
   partyType?: "person" | "company";
   uniqueIdentifier?: string;
@@ -125,31 +130,6 @@ export type OfferLoanSubmission = {
   receivedOnUtc?: string;
 };
 
-export type OfferListItem = {
-  id: string;
-  number: string;
-  productId: string;
-  productName?: string | null;
-  policyPlan?: string;
-  currency: string;
-  status: OfferStatus;
-  createdDate: string;
-  expiresOnUtc?: string | null;
-  policyId?: string | null;
-  startDate: string;
-  endDate: string;
-  premium: number;
-  sumInsured?: number | null;
-  policyHolderName?: string | null;
-  insuredName?: string | null;
-  insuredAge?: number | null;
-  salesChannel?: string | null;
-  salesPartyName?: string | null;
-  outstandingDocumentCount: number;
-  raisedReviewFlagCount: number;
-  pendingDiscountRequestCount: number;
-};
-
 export type Offer = {
   id: string;
   number: string;
@@ -208,13 +188,4 @@ export const statusColor: Record<OfferStatus, string> = {
   Bound: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   Cancelled: "bg-destructive/15 text-destructive",
   Expired: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-};
-
-/** API query value ↔ UI label */
-export const offerStatusToApi: Record<OfferStatus, string> = {
-  Draft: "draft",
-  Quoted: "quoted",
-  Bound: "bound",
-  Cancelled: "cancelled",
-  Expired: "expired",
 };

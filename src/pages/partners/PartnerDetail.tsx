@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
-import { PageLoader } from "@/components/Loader";
+import { PageLoader, TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { ProductCombobox } from "@/components/ProductCombobox";
 import { Badge } from "@/components/ui/badge";
@@ -185,6 +185,12 @@ const PartnerDetail = () => {
   const [productFilter, setProductFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [officePage, setOfficePage] = useState(1);
+  const [officePageSize, setOfficePageSize] = useState(10);
+
+  useEffect(() => {
+    setOfficePage(1);
+  }, [officePageSize]);
 
   const configQuery = useMemo(
     () => compactQuery({ productId: productFilter.trim() || undefined }),
@@ -203,6 +209,7 @@ const PartnerDetail = () => {
     data: configurations,
     isLoading: configsLoading,
     isFetching: configsFetching,
+    isPlaceholderData: configsPlaceholder,
     isError: configsFailed,
   } = useListPartnerProductConfigurations(partnerId, configQuery, {
     enabled: Boolean(partnerId) && !isError,
@@ -236,7 +243,14 @@ const PartnerDetail = () => {
   const [configForm, setConfigForm] = useState<ConfigForm>(emptyConfigForm);
   const [deleteTarget, setDeleteTarget] = useState<PartnersPartnerProductConfigurationResponse | null>(null);
 
-  const officeItems = offices ?? [];
+  const allOfficeItems = offices ?? [];
+  const officeTotalCount = allOfficeItems.length;
+  const officeTotalPages = Math.max(1, Math.ceil(officeTotalCount / officePageSize));
+  const officeCurrentPage = Math.min(officePage, officeTotalPages);
+  const officeItems = allOfficeItems.slice(
+    (officeCurrentPage - 1) * officePageSize,
+    officeCurrentPage * officePageSize,
+  );
   const allConfigItems = configurations ?? [];
   const totalCount = allConfigItems.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -548,6 +562,15 @@ const PartnerDetail = () => {
                 )}
               </TableBody>
             </Table>
+            <TablePagination
+              page={officeCurrentPage}
+              pageSize={officePageSize}
+              totalCount={officeTotalCount}
+              totalPages={officeTotalPages}
+              onPageChange={setOfficePage}
+              onPageSizeChange={setOfficePageSize}
+              disabled={officesLoading}
+            />
           </div>
         </CardContent>
       </Card>
@@ -610,12 +633,8 @@ const PartnerDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {configsLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
-                      Loading product configurations…
-                    </TableCell>
-                  </TableRow>
+                {configsLoading || configsPlaceholder ? (
+                  <TableLoadingRow colSpan={6} label="Loading product configurations…" />
                 ) : configsFailed ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
@@ -696,7 +715,7 @@ const PartnerDetail = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={configsLoading}
+              disabled={configsLoading || configsPlaceholder}
             />
           </div>
         </CardContent>
@@ -816,7 +835,6 @@ const PartnerDetail = () => {
             <div className="space-y-1.5">
               <Label>Product</Label>
               <ProductCombobox
-                products={products.map((p) => ({ id: p.id, name: p.name }))}
                 value={configForm.productId}
                 onValueChange={(productId) => setConfigForm((prev) => ({ ...prev, productId }))}
                 disabled={editingConfigOpen}

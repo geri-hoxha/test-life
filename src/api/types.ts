@@ -252,6 +252,43 @@ export type ProductsPolicyPlanType =
   | "VOLUNTARY"
   | "PROTECT-55";
 
+export type PolicyPlansLocalizedText = {
+  sq?: string;
+  en?: string;
+};
+
+export type PolicyPlansPolicyPlanRuleSetting = {
+  name?: PolicyPlansLocalizedText;
+  description?: PolicyPlansLocalizedText;
+};
+
+/** One rule slot on a policy plan: the setting it configures, plus the chosen value's label/description. */
+export type PolicyPlansPolicyPlanRule<TValue extends string = string> = {
+  setting?: PolicyPlansPolicyPlanRuleSetting;
+  value?: TValue;
+  name?: PolicyPlansLocalizedText;
+  description?: PolicyPlansLocalizedText;
+};
+
+export type PolicyPlansPolicyPlanRules = {
+  offerSchedule?: PolicyPlansPolicyPlanRule<ProductsOfferScheduleMode>;
+  continuation?: PolicyPlansPolicyPlanRule<ProductsPolicyContinuationMode>;
+  coverageCadence?: PolicyPlansPolicyPlanRule<ProductsCoveragePeriodCadence>;
+  billingCadence?: PolicyPlansPolicyPlanRule<ProductsBillingCadence>;
+  premiumCalculation?: PolicyPlansPolicyPlanRule<ProductsPremiumCalculationMethod>;
+  maturityRule?: PolicyPlansPolicyPlanRule;
+  renewalPlanning?: PolicyPlansPolicyPlanRule;
+};
+
+/** GET /api/policy-plans — policy plan type catalog with localized labels and rule breakdown. */
+export type PolicyPlansPolicyPlanResponse = {
+  value: ProductsPolicyPlanType;
+  text?: string;
+  name?: PolicyPlansLocalizedText;
+  description?: PolicyPlansLocalizedText;
+  rules?: PolicyPlansPolicyPlanRules;
+};
+
 export type ProductsCreateProductRequest = {
   name: string;
   productGroupId?: string;
@@ -445,7 +482,13 @@ export type OffersSalesAttributionResponse = {
 
 export type PoliciesPolicyParticipantResponse = {
   id?: number;
-  partyId?: string;
+  /** Set for a person/company participant; null for a partner participant. */
+  partyId?: string | null;
+  /** Set instead of partyId when the participant is a partner (e.g. the bank on a bank-held policy). */
+  partnerId?: string | null;
+  partnerOfficeId?: string | null;
+  partnerOfficeName?: string | null;
+  partnerOfficeAddress?: string | null;
   role?: DomainOffersParticipantRole;
   partyType?: DomainPartiesEnumsPartyType;
   uniqueIdentifier?: string;
@@ -505,6 +548,7 @@ export type PoliciesPolicyPeriodResponse = {
   status?: DomainPoliciesPolicyPeriodStatus;
   sourceOfferPeriodSequence?: number | null;
   sourceRenewalId?: string | null;
+  legacyPolicyNumber?: string | null;
   coverages?: PoliciesPolicyPeriodCoverageResponse[];
 };
 
@@ -586,6 +630,7 @@ export type PoliciesApplyPolicyCancellationResponse = {
 export type PoliciesPolicyListItemResponse = {
   id?: string;
   serial?: number;
+  legacyPolicyNumber?: string | null;
   productId?: string;
   productName?: string | null;
   policyPlan?: DomainPoliciesPolicyPlan;
@@ -655,6 +700,7 @@ export type PoliciesListPoliciesRequest = PaginationPagedRequest & {
   partyId?: string;
   personId?: string;
   serial?: number;
+  legacyPolicyNumber?: string;
   pageNumber?: number;
   pageSize?: number;
 };
@@ -818,7 +864,13 @@ export type OffersDateOnlyRangeResponse = {
 
 export type OffersOfferParticipantResponse = {
   id?: number;
-  partyId?: string;
+  /** Set for a person/company participant; null for a partner participant. */
+  partyId?: string | null;
+  /** Set instead of partyId when the participant is a partner (e.g. the bank on a bank-held policy). */
+  partnerId?: string | null;
+  partnerOfficeId?: string | null;
+  partnerOfficeName?: string | null;
+  partnerOfficeAddress?: string | null;
   role?: DomainOffersParticipantRole;
   partyType?: DomainPartiesEnumsPartyType;
   uniqueIdentifier?: string;
@@ -836,6 +888,14 @@ export type OffersAddOfferParticipantRequest = {
   isLeader?: boolean;
   share?: number | null;
   relationshipToInsured?: DomainPoliciesRelationshipToInsured | null;
+};
+
+/** The partner itself is resolved server-side from the offer's sales attribution. */
+export type OffersAddOfferPartnerParticipantRequest = {
+  role: DomainOffersParticipantRole;
+  isLeader: boolean;
+  /** 1 for a policy holder; a beneficiary's fraction (e.g. 0.5 for 50%). */
+  share: number;
 };
 
 export type DomainOffersOfferPeriodStatus = "draft" | "quoted" | "appliedToPolicy" | "cancelled";
@@ -995,6 +1055,8 @@ export type OffersCreateOfferRequest = {
   periodEnd?: string;
   partnerOfficeId?: string | null;
   agentId?: string | null;
+  /** Always sent (null when not chosen yet); the backend may reject it with a validation error. */
+  insuredPersonId: string | null;
 };
 
 export type OffersGetOfferRequest = Record<string, unknown>;
@@ -1254,6 +1316,12 @@ export type AuthTokenRequest = {
 export type AuthTokenResponse = {
   accessToken: string;
   expiresOnUtc: string;
+};
+
+/** PUT /api/me/password */
+export type MeChangePasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
 };
 
 /** GET /api/me/sales-access */
@@ -1792,4 +1860,9 @@ export type UsersUpdateUserRequest = {
   displayName: string;
   isActive?: boolean;
   roles: string[];
+};
+
+/** PUT /api/users/{authUserId}/password */
+export type UsersResetPasswordRequest = {
+  newPassword: string;
 };

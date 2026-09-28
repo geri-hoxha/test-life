@@ -4,18 +4,17 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useGetPerson, useListPeople } from "@/api/people";
+import { ComboboxStatus } from "@/components/Loader";
+import { useGetPerson } from "@/api/people";
 import { mapPersonToCustomer } from "@/api/adapters/customers";
 import { fullName } from "@/data/customers";
-import { compactQuery } from "@/lib/list-query";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePartySearch } from "@/hooks/usePartySearch";
 
 type PersonComboboxProps = {
   value: string;
@@ -45,29 +44,13 @@ export const PersonCombobox = ({
 }: PersonComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebouncedValue(search.trim(), 500);
-
-  const peopleQuery = useMemo(() => {
-    const parts = debouncedSearch.split(/\s+/).filter(Boolean);
-    const firstName = parts[0];
-    const lastName = parts.length > 1 ? parts.slice(1).join(" ") : undefined;
-    return compactQuery({
-      pageNumber: 1,
-      pageSize: 50,
-      firstName: firstName || undefined,
-      lastName: lastName || undefined,
-    });
-  }, [debouncedSearch]);
-
-  const { data: peoplePage, isFetching } = useListPeople(peopleQuery, {
+  const { people: peopleItems, isSearching } = usePartySearch(search, {
     enabled: open,
+    includeCompanies: false,
   });
   const { data: selectedPerson } = useGetPerson(value, { enabled: Boolean(value) });
 
-  const people = useMemo(
-    () => (peoplePage?.items ?? []).map(mapPersonToCustomer),
-    [peoplePage?.items]
-  );
+  const people = useMemo(() => peopleItems.map(mapPersonToCustomer), [peopleItems]);
 
   const selectedFromList = people.find((p) => p.id === value);
   const selectedMapped = selectedPerson ? mapPersonToCustomer(selectedPerson) : undefined;
@@ -106,12 +89,15 @@ export const PersonCombobox = ({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search by name…"
+            placeholder="Search by name or personal ID…"
             value={search}
             onValueChange={setSearch}
+            loading={isSearching && people.length > 0}
           />
           <CommandList>
-            <CommandEmpty>{isFetching ? "Searching…" : "No person found."}</CommandEmpty>
+            {people.length === 0 && (
+              <ComboboxStatus loading={isSearching}>No person found.</ComboboxStatus>
+            )}
             <CommandGroup>
               {allowClear && (
                 <CommandItem

@@ -148,7 +148,7 @@ const DocumentTypesList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, error } = useListDocumentTypes(listQuery);
+  const { data: pageData, isLoading, isFetching, isPlaceholderData, error } = useListDocumentTypes(listQuery);
   const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
@@ -360,7 +360,7 @@ const DocumentTypesList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={3} />
                 ) : items.length === 0 ? (
                   <TableRow>
@@ -429,7 +429,7 @@ const DocumentTypesList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

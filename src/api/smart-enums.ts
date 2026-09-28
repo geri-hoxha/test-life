@@ -1,17 +1,6 @@
-import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiKeys, apiRequest } from "./client";
 import type { SmartEnumsEnumItem } from "./types";
-
-export const SMART_ENUM_NAMES = [
-  "ActuarialCode",
-  "CancellationReason",
-  "Country",
-  "PolicyPlanType",
-  "RelationshipToInsured",
-] as const;
-
-export type SmartEnumName = (typeof SMART_ENUM_NAMES)[number];
 
 export const smartEnumsKeys = {
   all: [...apiKeys.all, "smart-enums"] as const,
@@ -56,19 +45,8 @@ export const smartEnumLabel = (
   return smartEnumText(items, value) || value;
 };
 
-export const useSmartEnumLabel = (name: string, options?: { enabled?: boolean }) => {
-  const { data } = useSmartEnum(name, options);
-  return useCallback(
-    (value?: string | null) => smartEnumLabel(data, value),
-    [data],
-  );
-};
-
 export const useCountryEnum = (options?: { enabled?: boolean }) =>
   useSmartEnum("Country", options);
-
-export const usePolicyPlanTypeEnum = (options?: { enabled?: boolean }) =>
-  useSmartEnum("PolicyPlanType", options);
 
 export const useActuarialCodeEnum = (options?: { enabled?: boolean }) =>
   useSmartEnum("ActuarialCode", options);

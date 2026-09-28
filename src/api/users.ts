@@ -5,6 +5,7 @@ import type {
   UserSalesAccessResponse,
   UsersCreateUserRequest,
   UsersListUsersRequest,
+  UsersResetPasswordRequest,
   UsersUpdateUserRequest,
   UsersUserResponse,
 } from "./types";
@@ -156,6 +157,28 @@ export const useUpdateUser = () => {
     },
   });
 };
+
+/**
+ * PUT /api/users/{authUserId}/password — administrator reset. No old password needed;
+ * clears any lockout and revokes every existing token of that account.
+ */
+export const resetUserPassword = async (
+  authUserId: number,
+  body: UsersResetPasswordRequest,
+  signal?: AbortSignal,
+): Promise<void> =>
+  apiRequest<void>({
+    method: "PUT",
+    path: `/api/users/${encodeURIComponent(String(authUserId))}/password`,
+    body,
+    signal,
+  });
+
+export const useResetUserPassword = () =>
+  useMutation({
+    mutationFn: (vars: { authUserId: number; body: UsersResetPasswordRequest }) =>
+      resetUserPassword(vars.authUserId, vars.body),
+  });
 
 /** GET /api/users/{authUserId}/sales-access */
 export const getUserSalesAccess = async (

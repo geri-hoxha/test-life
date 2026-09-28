@@ -67,6 +67,29 @@ type ProblemDetails = {
   status?: number;
 };
 
+/**
+ * Flattens validation `errors` — either `{ field: string[] }` (ValidationProblemDetails)
+ * or `[{ reason | message }]` — into one line.
+ */
+const validationErrorsText = (errors: unknown): string | undefined => {
+  const messages: string[] = [];
+  const push = (value: unknown) => {
+    if (typeof value === "string" && value.trim()) messages.push(value.trim());
+    else if (value && typeof value === "object") {
+      const v = value as Record<string, unknown>;
+      push(v.reason ?? v.message ?? v.errorMessage);
+    }
+  };
+  if (Array.isArray(errors)) errors.forEach(push);
+  else if (errors && typeof errors === "object") {
+    for (const value of Object.values(errors)) {
+      if (Array.isArray(value)) value.forEach(push);
+      else push(value);
+    }
+  }
+  return messages.length ? messages.join(" ") : undefined;
+};
+
 const parseProblemDetails = (body: unknown): ProblemDetails => {
   if (typeof body === "string" && body.trim()) {
     return { detail: body.trim() };
@@ -78,9 +101,8 @@ const parseProblemDetails = (body: unknown): ProblemDetails => {
     detail:
       typeof o.detail === "string"
         ? o.detail
-        : typeof o.message === "string"
-          ? o.message
-          : undefined,
+        : (validationErrorsText(o.errors) ??
+          (typeof o.message === "string" ? o.message : undefined)),
     status: typeof o.status === "number" ? o.status : undefined,
   };
 };

@@ -109,7 +109,7 @@ const UsersList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, isError, error } = useListUsers(listQuery);
+  const { data: pageData, isLoading, isFetching, isPlaceholderData, isError, error } = useListUsers(listQuery);
   const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
@@ -301,7 +301,7 @@ const UsersList = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
+                  {isLoading || isPlaceholderData ? (
                     <TableLoadingRow colSpan={6} />
                   ) : isError ? (
                     <TableRow>
@@ -388,7 +388,7 @@ const UsersList = () => {
                 totalPages={totalPages}
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
-                disabled={isLoading}
+                disabled={isLoading || isPlaceholderData}
               />
             </div>
           </CardContent>

@@ -141,6 +141,7 @@ const AgentCommissionsList = () => {
     data: pageData,
     isLoading,
     isFetching,
+    isPlaceholderData,
     isError,
     error,
   } = useListAgentCommissions(listQuery);
@@ -355,7 +356,7 @@ const AgentCommissionsList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={COL_COUNT} />
                 ) : isError ? (
                   <TableRow>
@@ -494,7 +495,7 @@ const AgentCommissionsList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

@@ -122,7 +122,7 @@ const BankAccountsList = () => {
   }, [debouncedFilters, pageSize]);
 
   const listQuery = { ...debouncedFilters, pageNumber: page, pageSize };
-  const { data: pageData, isLoading, isFetching, error } = useListBankAccounts(listQuery);
+  const { data: pageData, isLoading, isFetching, isPlaceholderData, error } = useListBankAccounts(listQuery);
   const accessDenied = isApiForbidden(error);
 
   const items = pageData?.items ?? [];
@@ -360,7 +360,7 @@ const BankAccountsList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={7} />
                 ) : items.length === 0 ? (
                   <TableRow>
@@ -415,7 +415,7 @@ const BankAccountsList = () => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

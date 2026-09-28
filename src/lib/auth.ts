@@ -46,17 +46,6 @@ export const persistSalesAccess = (salesAccess: unknown) => {
   localStorage.setItem(SALES_ACCESS_KEY, JSON.stringify(salesAccess));
 };
 
-export const readSalesAccess = <T>(): T | null => {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(SALES_ACCESS_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-};
-
 export const clearAuthSession = () => {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(EXPIRES_ON_UTC_KEY);

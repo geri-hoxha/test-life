@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -31,7 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useListProducts, mapApiProduct } from "@/api/products";
 import { useListPeople } from "@/api/people";
 import { useListCompanies } from "@/api/companies";
 import { useCountryEnum } from "@/api/smart-enums";
@@ -56,35 +54,6 @@ const initials = (first: string, last: string) =>
 
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
-
-const exposureBreakdown = (
-  customerId: string,
-  total: number,
-  products: { id: string; name: string }[]
-) => {
-  if (total <= 0 || products.length === 0) return [] as { product: string; amount: number }[];
-  let seed = 0;
-  for (let i = 0; i < customerId.length; i++) seed = (seed * 31 + customerId.charCodeAt(i)) >>> 0;
-  const rand = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 0xffffffff;
-  };
-  const count = 2 + Math.floor(rand() * Math.min(3, Math.max(1, products.length - 1)));
-  const picks: typeof products = [];
-  const pool = [...products];
-  for (let i = 0; i < count && pool.length; i++) {
-    picks.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
-  }
-  const weights = picks.map(() => 0.3 + rand());
-  const sum = weights.reduce((a, b) => a + b, 0);
-  const rows = picks.map((p, i) => ({
-    product: p.name,
-    amount: Math.round((weights[i] / sum) * total),
-  }));
-  const drift = total - rows.reduce((a, r) => a + r.amount, 0);
-  if (rows.length) rows[0].amount += drift;
-  return rows;
-};
 
 const copy = {
   person: {
@@ -190,6 +159,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
     data: peoplePage,
     isLoading: peopleLoading,
     isFetching: peopleFetching,
+    isPlaceholderData: peoplePlaceholder,
     error: peopleError,
   } = useListPeople(peopleQuery, {
     enabled: !isCompany,
@@ -198,17 +168,11 @@ export const PartyList = ({ partyType }: PartyListProps) => {
     data: companiesPage,
     isLoading: companiesLoading,
     isFetching: companiesFetching,
+    isPlaceholderData: companiesPlaceholder,
     error: companiesError,
   } = useListCompanies(companiesQuery, {
     enabled: isCompany,
   });
-  const { data: productsPage } = useListProducts({ pageNumber: 1, pageSize: 100 });
-
-  const products = useMemo(
-    () => (productsPage?.items ?? []).map(mapApiProduct),
-    [productsPage?.items]
-  );
-
   const customers = useMemo(() => {
     if (isCompany) return (companiesPage?.items ?? []).map(mapCompanyToCustomer);
     return (peoplePage?.items ?? []).map(mapPersonToCustomer);
@@ -227,6 +191,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
 
   const isLoading = isCompany ? companiesLoading : peopleLoading;
   const isFetching = isCompany ? companiesFetching : peopleFetching;
+  const isPlaceholderData = isCompany ? companiesPlaceholder : peoplePlaceholder;
   const error = isCompany ? companiesError : peopleError;
   const accessDenied = isApiForbidden(error);
 
@@ -451,7 +416,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isPlaceholderData ? (
                   <TableLoadingRow colSpan={colSpan} label={ui.loading} />
                 ) : customers.length === 0 ? (
                   <TableRow>
@@ -504,33 +469,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                         </TableCell>
                         <TableCell className="text-right font-medium" onClick={(e) => e.stopPropagation()}>
                           {c.totalExposure > 0 ? (
-                            <div className="flex flex-col items-end leading-tight">
-                              <span>{fmtMoney(c.totalExposure)}</span>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <button className="text-[11px] font-normal text-accent hover:underline">
-                                    Breakdown
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent align="end" className="w-72 p-3">
-                                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                                    Exposure by Product
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    {exposureBreakdown(c.id, c.totalExposure, products).map((r) => (
-                                      <div key={r.product} className="flex items-center justify-between gap-3 text-sm">
-                                        <span className="truncate text-foreground">{r.product}</span>
-                                        <span className="font-medium tabular-nums">{fmtMoney(r.amount)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="flex items-center justify-between gap-3 pt-2 mt-2 border-t border-border text-sm">
-                                    <span className="font-semibold">Total</span>
-                                    <span className="font-semibold tabular-nums">{fmtMoney(c.totalExposure)}</span>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </div>
+                            <span>{fmtMoney(c.totalExposure)}</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
@@ -562,7 +501,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
               totalPages={totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              disabled={isLoading}
+              disabled={isLoading || isPlaceholderData}
             />
           </div>
         </CardContent>

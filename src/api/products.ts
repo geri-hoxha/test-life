@@ -30,10 +30,6 @@ export const productsKeys = {
   detail: (id: string) => [...productsKeys.details(), id] as const,
 };
 
-export const buildAddProductBankAccountBody = (
-  bankAccountId: string,
-): ProductsAddProductBankAccountRequest => ({ bankAccountId });
-
 export const buildAddProductCoverageBody = (input: {
   coverageId: string;
   ratingTableId: string;

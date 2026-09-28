@@ -63,9 +63,10 @@ import {
   useUpdateUser,
 } from "@/api/users";
 import { isApiForbidden, toastApiError } from "@/lib/api-error";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, KeyRound, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { RoleField } from "./RoleField";
+import { ResetPasswordDialog } from "./ResetPasswordDialog";
 
 const ActiveBadge = ({ active }: { active?: boolean }) => (
   <Badge
@@ -109,6 +110,7 @@ const UserDetail = () => {
   const grantAllOffices = useGrantUserAllPartnerOfficesAccess();
 
   const [editOpen, setEditOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [edit, setEdit] = useState<EditState>({ displayName: "", isActive: true, roles: [] });
   const [agentId, setAgentId] = useState("");
   const [partnerId, setPartnerId] = useState("");
@@ -353,10 +355,16 @@ const UserDetail = () => {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">{user.userName}</p>
         </div>
-        <Button className="gap-2" onClick={openEdit}>
-          <Pencil className="h-4 w-4" />
-          Edit user
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setResetPasswordOpen(true)}>
+            <KeyRound className="h-4 w-4" />
+            Reset password
+          </Button>
+          <Button className="gap-2" onClick={openEdit}>
+            <Pencil className="h-4 w-4" />
+            Edit user
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 mb-6">
@@ -651,6 +659,13 @@ const UserDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ResetPasswordDialog
+        authUserId={authUserId}
+        userLabel={user.displayName?.trim() || user.userName || "this user"}
+        open={resetPasswordOpen}
+        onOpenChange={setResetPasswordOpen}
+      />
 
       <AlertDialog open={confirm != null} onOpenChange={(open) => !open && setConfirm(null)}>
         <AlertDialogContent>

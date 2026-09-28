@@ -4,25 +4,29 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
 import { Customer, fullName } from "@/data/customers";
-import { useGetPerson, useListPeople } from "@/api/people";
-import { useGetCompany, useListCompanies } from "@/api/companies";
+import { useGetPerson } from "@/api/people";
+import { useGetCompany } from "@/api/companies";
 import { mapCompanyToCustomer, mapPersonToCustomer, mergeCustomers } from "@/api/adapters/customers";
-import { compactQuery } from "@/lib/list-query";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePartySearch } from "@/hooks/usePartySearch";
 
 type CustomerComboboxProps = {
-  /** When omitted, people and companies are loaded when the field is opened. */
+  /** When omitted, people and companies are searched on the backend (debounced). */
   customers?: Customer[];
   value: string;
-  onValueChange: (id: string) => void;
+  /** `customer` is the picked option; it is undefined when the value is cleared. */
+  onValueChange: (id: string, customer?: Customer) => void;
+  /** Remote mode: also search companies (default true). */
+  includeCompanies?: boolean;
+  /** Remote mode: query the backend only once the user types, instead of listing on open. */
+  requireSearch?: boolean;
   placeholder?: string;
   className?: string;
   triggerClassName?: string;
@@ -66,22 +70,26 @@ const customerSearchValue = (c: Customer) =>
     .filter(Boolean)
     .join(" ");
 
+/** Every search word must match some field, so "Geri Hoxha" matches first + last name. */
 const matchesCustomerSearch = (c: Customer, search: string) => {
-  const q = search.trim().toLowerCase();
-  if (!q) return true;
+  const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
 
-  const fields =
+  const fields = (
     c.customerType === "Company"
       ? [c.companyName, c.nipt]
-      : [c.firstName, c.lastName, c.personalId, c.dateOfBirth, formatBirthday(c.dateOfBirth)];
+      : [c.firstName, c.lastName, c.personalId, c.dateOfBirth, formatBirthday(c.dateOfBirth)]
+  ).map((field) => field?.toLowerCase() ?? "");
 
-  return fields.some((field) => field?.toLowerCase().includes(q));
+  return terms.every((term) => fields.some((field) => field.includes(term)));
 };
 
 export const CustomerCombobox = ({
   customers,
   value,
   onValueChange,
+  includeCompanies = true,
+  requireSearch = false,
   placeholder = "Select customer",
   className,
   triggerClassName,
@@ -91,61 +99,48 @@ export const CustomerCombobox = ({
 }: CustomerComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  // Last option picked here, so its label survives the result list being cleared.
+  const [picked, setPicked] = useState<Customer>();
   const isRemote = customers === undefined;
-  const debouncedSearch = useDebouncedValue(search.trim(), 500);
-
-  const peopleQuery = useMemo(() => {
-    const parts = debouncedSearch.split(/\s+/).filter(Boolean);
-    const firstName = parts[0];
-    const lastName = parts.length > 1 ? parts.slice(1).join(" ") : undefined;
-    return compactQuery({
-      pageNumber: 1,
-      pageSize: 50,
-      firstName: firstName || undefined,
-      lastName: lastName || undefined,
-    });
-  }, [debouncedSearch]);
-
-  const companiesQuery = useMemo(
-    () =>
-      compactQuery({
-        pageNumber: 1,
-        pageSize: 50,
-        legalName: debouncedSearch || undefined,
-      }),
-    [debouncedSearch],
-  );
-
-  const { data: peoplePage, isFetching: peopleFetching } = useListPeople(peopleQuery, {
+  const remote = usePartySearch(search, {
     enabled: isRemote && open,
-  });
-  const { data: companiesPage, isFetching: companiesFetching } = useListCompanies(companiesQuery, {
-    enabled: isRemote && open,
-  });
-  const { data: selectedPerson } = useGetPerson(value, {
-    enabled: isRemote && Boolean(value),
-  });
-  const { data: selectedCompany } = useGetCompany(value, {
-    enabled: isRemote && Boolean(value) && !selectedPerson,
+    includeCompanies,
+    requireTerm: requireSearch,
   });
 
   const remoteCustomers = useMemo(
-    () => mergeCustomers(peoplePage?.items, companiesPage?.items),
-    [companiesPage?.items, peoplePage?.items],
+    () => mergeCustomers(remote.people, remote.companies),
+    [remote.companies, remote.people],
   );
   const source = isRemote ? remoteCustomers : (customers ?? []);
+  // Remote results are already filtered server-side by the debounced term; only
+  // an in-memory `customers` list is filtered per keystroke.
   const filtered = useMemo(
-    () => source.filter((c) => matchesCustomerSearch(c, search)),
-    [search, source],
+    () =>
+      isRemote
+        ? remoteCustomers
+        : (customers ?? []).filter((c) => matchesCustomerSearch(c, search)),
+    [customers, isRemote, remoteCustomers, search],
   );
   const selectedFromList = source.find((c) => c.id === value);
+  const selectedKnown = selectedFromList ?? (picked?.id === value ? picked : undefined);
+  // Values set from outside (prefill, "same as", newly created) are resolved by id.
+  const { data: selectedPerson } = useGetPerson(value, {
+    enabled: isRemote && Boolean(value) && !selectedKnown,
+  });
+  const { data: selectedCompany } = useGetCompany(value, {
+    enabled:
+      isRemote && includeCompanies && Boolean(value) && !selectedKnown && !selectedPerson,
+  });
   const selectedMapped = selectedPerson
     ? mapPersonToCustomer(selectedPerson)
     : selectedCompany
       ? mapCompanyToCustomer(selectedCompany)
       : undefined;
-  const selected = selectedFromList ?? (isRemote ? selectedMapped : undefined);
-  const isFetching = peopleFetching || companiesFetching;
+  const selected = selectedKnown ?? (isRemote ? selectedMapped : undefined);
+  const awaitingTerm = isRemote && requireSearch && !search.trim();
+  const isSearching = isRemote && remote.isSearching && !awaitingTerm;
+  const emptyMessage = awaitingTerm ? "Start typing to search…" : "No customer found.";
 
   return (
     <Popover
@@ -176,12 +171,19 @@ export const CustomerCombobox = ({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search by personal ID, first or last name…"
+            placeholder={
+              includeCompanies
+                ? "Search by name, personal ID or NIPT…"
+                : "Search by name or personal ID…"
+            }
             value={search}
             onValueChange={setSearch}
+            loading={isSearching && filtered.length > 0}
           />
           <CommandList>
-            <CommandEmpty>{isRemote && isFetching ? "Loading…" : "No customer found."}</CommandEmpty>
+            {filtered.length === 0 && (
+              <ComboboxStatus loading={isSearching}>{emptyMessage}</ComboboxStatus>
+            )}
             <CommandGroup>
               {allowClear && (
                 <CommandItem
@@ -201,7 +203,9 @@ export const CustomerCombobox = ({
                   key={c.id}
                   value={customerSearchValue(c)}
                   onSelect={() => {
-                    onValueChange(allowClear && value === c.id ? "" : c.id);
+                    const next = allowClear && value === c.id ? undefined : c;
+                    setPicked(next);
+                    onValueChange(next?.id ?? "", next);
                     setOpen(false);
                     setSearch("");
                   }}

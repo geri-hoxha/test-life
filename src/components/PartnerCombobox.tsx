@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ComboboxStatus } from "@/components/Loader";
 import { useGetPartner, useListPartners } from "@/api/partners";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
@@ -56,6 +56,7 @@ export const PartnerCombobox = ({
     });
   }, [partnersPage?.items, debouncedSearch]);
 
+  const isSearching = isFetching || search.trim().toLowerCase() !== debouncedSearch;
   const selectedFromList = partners.find((p) => p.id === value);
   const selected = selectedFromList ?? selectedPartner;
   const selectedLabel = selected ? partnerLabel(selected.name, selected.id) : null;
@@ -92,9 +93,12 @@ export const PartnerCombobox = ({
             placeholder="Search partners…"
             value={search}
             onValueChange={setSearch}
+            loading={isSearching && partners.length > 0}
           />
           <CommandList>
-            <CommandEmpty>{isFetching ? "Searching…" : "No partner found."}</CommandEmpty>
+            {partners.length === 0 && (
+              <ComboboxStatus loading={isSearching}>No partner found.</ComboboxStatus>
+            )}
             <CommandGroup>
               {allowClear && (
                 <CommandItem
