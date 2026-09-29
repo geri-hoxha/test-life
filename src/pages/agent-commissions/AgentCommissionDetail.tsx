@@ -60,7 +60,7 @@ const AgentCommissionDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/agent-commissions")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Agent commissions
         </Button>
@@ -71,7 +71,7 @@ const AgentCommissionDetail = () => {
 
   if (isError || !commission) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/agent-commissions")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Agent commissions
         </Button>
@@ -88,7 +88,7 @@ const AgentCommissionDetail = () => {
   const agentLabel = agent?.displayName?.trim() || commission.agentId;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/agent-commissions")} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Agent commissions

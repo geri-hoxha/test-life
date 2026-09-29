@@ -196,7 +196,7 @@ const RenewalDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         {back}
         <PageLoader label="Loading renewal…" />
       </AppShell>
@@ -205,7 +205,7 @@ const RenewalDetail = () => {
 
   if (isError || !renewal) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         {back}
         <Card className="p-10 text-center">
           <p className="text-muted-foreground text-sm">This renewal could not be loaded.</p>
@@ -504,7 +504,7 @@ const RenewalDetail = () => {
     : null;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/renewals")} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Renewals

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
+import { FilterGrid } from "@/components/FilterGrid";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
@@ -127,7 +128,7 @@ const CurrencyExchange = () => {
                 </Button>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterGrid>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">
                   Currency
@@ -149,7 +150,7 @@ const CurrencyExchange = () => {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </FilterGrid>
           </div>
         </CardHeader>
         <CardContent>

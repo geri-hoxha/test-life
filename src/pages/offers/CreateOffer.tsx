@@ -804,7 +804,7 @@ const CreateOffer = () => {
   };
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       {saving && (
         <OverlayLoader
           label={

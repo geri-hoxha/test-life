@@ -481,7 +481,7 @@ const PolicyDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/policies")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Policies
         </Button>
@@ -492,7 +492,7 @@ const PolicyDetail = () => {
 
   if (isError || !policy) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/policies")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Policies
         </Button>
@@ -507,7 +507,7 @@ const PolicyDetail = () => {
   }
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/policies")} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Policies

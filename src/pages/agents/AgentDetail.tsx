@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
+import { FilterGrid } from "@/components/FilterGrid";
 import { PageLoader, TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { ProductCombobox } from "@/components/ProductCombobox";
@@ -330,7 +331,7 @@ const AgentDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/agents")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Agents
         </Button>
@@ -341,7 +342,7 @@ const AgentDetail = () => {
 
   if (isError || !agent) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/agents")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Agents
         </Button>
@@ -363,7 +364,7 @@ const AgentDetail = () => {
   const editing = Boolean(editingConfig);
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <Button variant="ghost" size="sm" onClick={() => navigate("/agents")} className="gap-2 mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to Agents
       </Button>
@@ -426,7 +427,7 @@ const AgentDetail = () => {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterGrid>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Product</Label>
                 <ProductCombobox
@@ -437,7 +438,7 @@ const AgentDetail = () => {
                   triggerClassName="h-9"
                 />
               </div>
-            </div>
+            </FilterGrid>
           </div>
         </CardHeader>
         <CardContent>

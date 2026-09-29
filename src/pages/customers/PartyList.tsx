@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
+import { FilterGrid } from "@/components/FilterGrid";
 import { TableLoadingRow } from "@/components/Loader";
 import TablePagination from "@/components/TablePagination";
 import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
@@ -249,7 +250,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
               )}
             </div>
             {!isCompany && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <FilterGrid>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Personal ID</Label>
                   <Input
@@ -316,10 +317,10 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              </FilterGrid>
             )}
             {isCompany && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <FilterGrid>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Registration #</Label>
                   <Input
@@ -389,7 +390,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              </FilterGrid>
             )}
           </div>
         </CardHeader>

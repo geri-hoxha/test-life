@@ -278,7 +278,7 @@ const UserDetail = () => {
 
   if (!idValid) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <p className="text-sm text-muted-foreground">This user id is not valid.</p>
       </AppShell>
     );
@@ -286,7 +286,7 @@ const UserDetail = () => {
 
   if (userQuery.isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <PageLoader />
       </AppShell>
     );
@@ -294,7 +294,7 @@ const UserDetail = () => {
 
   if (accessDenied) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <AccessDeniedNotice />
       </AppShell>
     );
@@ -302,7 +302,7 @@ const UserDetail = () => {
 
   if (userQuery.isError || !user) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" className="mb-4 gap-2" asChild>
           <Link to="/administration/users">
             <ArrowLeft className="h-4 w-4" />
@@ -337,7 +337,7 @@ const UserDetail = () => {
             : "";
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <Button variant="ghost" size="sm" className="mb-4 gap-2" asChild>
         <Link to="/administration/users">
           <ArrowLeft className="h-4 w-4" />
