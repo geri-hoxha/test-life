@@ -139,7 +139,7 @@ const CreateProduct = () => {
   if (!productGroupId) return null;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       {busy && (
         <OverlayLoader
           label="Creating product…"

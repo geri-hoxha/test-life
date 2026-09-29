@@ -87,7 +87,7 @@ const InvoiceDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button
           variant="ghost"
           size="sm"
@@ -103,7 +103,7 @@ const InvoiceDetail = () => {
 
   if (isError || !invoice) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button
           variant="ghost"
           size="sm"
@@ -128,7 +128,7 @@ const InvoiceDetail = () => {
   const currency = invoice.currency;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <div className="flex items-center justify-between mb-4">
         <Button
           variant="ghost"

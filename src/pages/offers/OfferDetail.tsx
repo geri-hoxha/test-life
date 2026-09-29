@@ -880,7 +880,7 @@ const OfferDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <PageLoader label="Loading offer…" />
       </AppShell>
     );
@@ -888,7 +888,7 @@ const OfferDetail = () => {
 
   if (!offer) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <div className="text-center py-20">
           <h1 className="text-xl font-semibold">Offer not found</h1>
           <p className="text-sm text-muted-foreground mt-2">
@@ -1450,7 +1450,7 @@ const OfferDetail = () => {
   };
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       {pageBusy ? <OverlayLoader label={pageBusyLabel} /> : null}
 
       <div className="flex items-center justify-between mb-4">

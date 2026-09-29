@@ -197,7 +197,7 @@ const TopBar = () => {
 
   return (
     <header className="bg-gradient-topbar text-topbar-foreground border-b border-topbar-border sticky top-0 z-40 shadow-elevated">
-      <div className="container flex items-center gap-4 h-16">
+      <div className="w-full px-6 flex items-center gap-4 h-16">
         <a href="/" className="flex items-center gap-2.5 shrink-0 mr-2">
           <div className="h-9 w-9 rounded-md bg-gradient-accent flex items-center justify-center shadow-elevated">
             <Shield
@@ -288,7 +288,7 @@ const TopBar = () => {
       </div>
 
       <nav className="border-t border-topbar-border/60">
-        <div className="container flex items-center gap-0.5 h-11 overflow-x-auto overflow-y-hidden">
+        <div className="w-full px-6 flex items-center gap-0.5 h-11 overflow-x-auto overflow-y-hidden">
           {navEntries.map((entry) => {
             const EntryIcon = entry.icon;
             if (!isNavGroup(entry)) {

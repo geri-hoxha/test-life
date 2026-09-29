@@ -60,7 +60,7 @@ const PartnerCommissionDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/partner-commissions")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Partner commissions
         </Button>
@@ -71,7 +71,7 @@ const PartnerCommissionDetail = () => {
 
   if (isError || !commission) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <Button variant="ghost" size="sm" onClick={() => navigate("/partner-commissions")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Partner commissions
         </Button>
@@ -88,7 +88,7 @@ const PartnerCommissionDetail = () => {
   const partnerLabel = partner?.name?.trim() || commission.partnerId;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/partner-commissions")} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Partner commissions

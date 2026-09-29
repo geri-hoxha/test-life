@@ -216,6 +216,8 @@ const CustomerForm = ({
   const set = <K extends keyof Customer>(k: K, v: Customer[K]) =>
     setC((s) => ({ ...s, [k]: v }));
   const isCompany = c.customerType === "Company";
+  // Companies have an addresses side column; person forms are a single column.
+  const shellWidth = isCompany ? "wide" : "narrow";
 
   const setCountry = (v: string) => {
     setC((s) => ({ ...s, country: v, ssnIssuingCountry: v }));
@@ -494,7 +496,7 @@ const CustomerForm = ({
       return <Loader label="Loading…" className="py-8" />;
     }
     return (
-      <AppShell>
+      <AppShell width={shellWidth}>
         <PageLoader
           label={partyType === "company" ? "Loading company…" : "Loading person…"}
         />
@@ -1048,7 +1050,7 @@ const CustomerForm = ({
   }
 
   return (
-    <AppShell>
+    <AppShell width={shellWidth}>
       <PageHeader
         breadcrumbs={[
           {

@@ -156,7 +156,7 @@ const ProductDetail = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <PageLoader label="Loading product…" />
       </AppShell>
     );
@@ -164,7 +164,7 @@ const ProductDetail = () => {
 
   if (isError || !product || !fields) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <PageHeader
           breadcrumbs={[{ label: "Products", to: "/products" }, { label: "Not found" }]}
           title="Product not found"
@@ -279,7 +279,7 @@ const ProductDetail = () => {
   const selectedPlan = policyPlanTypeOptions.find((o) => o.value === fields.policyPlanType);
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       {saving && (
         <OverlayLoader
           label="Saving product…"

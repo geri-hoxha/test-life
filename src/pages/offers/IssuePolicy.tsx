@@ -121,7 +121,7 @@ const IssuePolicy = () => {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <PageLoader label="Loading offer…" />
       </AppShell>
     );
@@ -129,7 +129,7 @@ const IssuePolicy = () => {
 
   if (!offer) {
     return (
-      <AppShell>
+      <AppShell width="wide">
         <div className="text-center py-20">
           <h1 className="text-xl font-semibold">Offer not found</h1>
           <Button onClick={() => navigate("/offers")} className="mt-4">Back to Offers</Button>
@@ -200,7 +200,7 @@ const IssuePolicy = () => {
   };
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/offers/${offer.id}`)} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Offer

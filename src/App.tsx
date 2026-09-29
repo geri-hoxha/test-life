@@ -14,7 +14,6 @@ import PersonDetail from "./pages/people/PersonDetail.tsx";
 import CompaniesList from "./pages/companies/CompaniesList.tsx";
 import CompanyForm from "./pages/companies/CompanyForm.tsx";
 import CompanyDetail from "./pages/companies/CompanyDetail.tsx";
-import CustomersRedirect from "./pages/customers/CustomersRedirect.tsx";
 import CurrencyExchange from "./pages/administration/CurrencyExchange.tsx";
 import OffersList from "./pages/offers/OffersList.tsx";
 import CreateOffer from "./pages/offers/CreateOffer.tsx";
@@ -24,7 +23,6 @@ import PoliciesList from "./pages/policies/PoliciesList.tsx";
 import RenewalsList from "./pages/renewals/RenewalsList.tsx";
 import RenewalDetail from "./pages/renewals/RenewalDetail.tsx";
 import PolicyDetail from "./pages/policies/PolicyDetail.tsx";
-import Reports from "./pages/reports/Reports.tsx";
 import RatingTablesList from "./pages/administration/RatingTablesList.tsx";
 import RatingTableDetail from "./pages/administration/RatingTableDetail.tsx";
 import DocumentTypesList from "./pages/administration/DocumentTypesList.tsx";
@@ -81,10 +79,6 @@ const App = () => (
             <Route path="/companies/new" element={<CompanyForm />} />
             <Route path="/companies/:id" element={<CompanyDetail />} />
             <Route path="/companies/:id/edit" element={<CompanyForm />} />
-            <Route path="/customers/new" element={<CustomersRedirect />} />
-            <Route path="/customers/:id/edit" element={<CustomersRedirect />} />
-            <Route path="/customers/:id" element={<CustomersRedirect />} />
-            <Route path="/customers" element={<CustomersRedirect />} />
             <Route path="/offers" element={<OffersList />} />
             <Route path="/offers/new" element={<CreateOffer />} />
             <Route path="/offers/:id" element={<OfferDetail />} />
@@ -105,7 +99,6 @@ const App = () => (
             <Route path="/partner-commissions/:id" element={<PartnerCommissionDetail />} />
             <Route path="/risk-list" element={<RiskList />} />
             <Route path="/bank-accounts" element={<BankAccountsList />} />
-            <Route path="/reports" element={<Reports />} />
             <Route path="/administration" element={<CurrencyExchange />} />
             <Route path="/administration/currency-exchange" element={<CurrencyExchange />} />
             <Route path="/administration/rating-tables" element={<RatingTablesList />} />
