@@ -1,4 +1,4 @@
-# Azure LifeFlow
+# Esig Life
 
 A React web front-end for managing an insurance business: offers, policies, renewals, invoices, customers, agents, partners, commissions and more.
 
