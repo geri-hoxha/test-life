@@ -94,7 +94,7 @@ const BankAccountsList = () => {
   const [iban, setIban] = useState("");
   const [swiftCode, setSwiftCode] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<BankAccountsBankAccountResponse | null>(null);
@@ -357,7 +357,7 @@ const BankAccountsList = () => {
                   <TableHead>Account number</TableHead>
                   <TableHead>IBAN</TableHead>
                   <TableHead>SWIFT</TableHead>
-                  <TableHead className="w-[100px] text-right">Actions</TableHead>
+                  <TableHead stickyRight className="w-[100px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -380,7 +380,7 @@ const BankAccountsList = () => {
                         {row.iban ?? "—"}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{row.swiftCode ?? "—"}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"

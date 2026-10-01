@@ -69,7 +69,7 @@ const PartnersList = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PartnersPartnerResponse | null>(null);
@@ -240,7 +240,7 @@ const PartnersList = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[96px] text-right">Actions</TableHead>
+                  <TableHead stickyRight className="w-[96px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -263,7 +263,7 @@ const PartnersList = () => {
                     <TableRow key={row.id ?? row.name}>
                       <TableCell className="font-medium">
                         {row.id ? (
-                          <Link to={`/partners/${row.id}`} className="hover:underline">
+                          <Link to={`/partners/${row.id}`} className="text-primary hover:underline">
                             {row.name?.trim() || row.id}
                           </Link>
                         ) : (
@@ -282,7 +282,7 @@ const PartnersList = () => {
                           {row.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"

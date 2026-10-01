@@ -77,7 +77,7 @@ const OffersList = () => {
   const [personId, setPersonId] = useState("");
   const [partyId, setPartyId] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const filters = useMemo(
     () =>
@@ -314,7 +314,7 @@ const OffersList = () => {
                     <TableHead>Insured last name</TableHead>
                     <TableHead>Personal ID</TableHead>
                     <TableHead>Partner</TableHead>
-                    <TableHead className="w-[80px] text-right">
+                    <TableHead stickyRight className="w-[80px] text-right">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -362,8 +362,20 @@ const OffersList = () => {
                           className={`[&>td]:whitespace-nowrap ${o.id ? "cursor-pointer" : ""}`}
                           onClick={() => o.id && navigate(`/offers/${o.id}`)}
                         >
-                          <TableCell className="font-mono text-xs">
-                            {orDash(o.id)}
+                          <TableCell
+                            className="font-mono text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {o.id ? (
+                              <Link
+                                to={`/offers/${o.id}`}
+                                className="font-medium text-primary hover:underline"
+                              >
+                                {o.id}
+                              </Link>
+                            ) : (
+                              orDash(o.id)
+                            )}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {productCell}
@@ -443,6 +455,7 @@ const OffersList = () => {
                             {orDash(o.partnerName)}
                           </TableCell>
                           <TableCell
+                            stickyRight
                             className="text-right"
                             onClick={(e) => e.stopPropagation()}
                           >

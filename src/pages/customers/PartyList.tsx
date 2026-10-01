@@ -86,7 +86,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
   const isCompany = partyType === "company";
   const ui = copy[partyType];
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [personalIdentifier, setPersonalIdentifier] = useState("");
   const [nationality, setNationality] = useState("ALL");
@@ -413,7 +413,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                   <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead className="text-right">Total exposure</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead stickyRight className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -436,14 +436,19 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                         className="hover:bg-muted/40 cursor-pointer"
                         onClick={() => navigate(customerPath(c.id, c.customerType))}
                       >
-                        <TableCell>
-                          <div className="flex items-center gap-2.5 min-w-40">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-accent-soft text-accent text-xs font-semibold">
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2 min-w-40">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="bg-accent-soft text-accent text-[10px] font-semibold">
                                 {avatarInitials}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="font-medium">{fullName(c)}</div>
+                            <Link
+                              to={customerPath(c.id, c.customerType)}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {fullName(c)}
+                            </Link>
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
@@ -475,7 +480,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <TableCell stickyRight className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="inline-flex items-center gap-1">
                             <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
                               <Link to={customerPath(c.id, c.customerType, { edit: true })}>

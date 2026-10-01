@@ -73,7 +73,7 @@ const InvoicesList = () => {
     return isInvoiceType(fromUrl) ? fromUrl : "ALL";
   });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
   const [retryTarget, setRetryTarget] = useState<InvoicesInvoiceListItemResponse | null>(null);
 
   const filters = useMemo(
@@ -216,7 +216,7 @@ const InvoicesList = () => {
                   <TableHead className="text-right whitespace-nowrap">Gross</TableHead>
                   <TableHead className="whitespace-nowrap">Status</TableHead>
                   <TableHead className="whitespace-nowrap">Provider</TableHead>
-                  <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
+                  <TableHead stickyRight className="text-right whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -236,7 +236,19 @@ const InvoicesList = () => {
                       onClick={() => row.id && navigate(`/invoices/${row.id}`)}
                     >
                       <TableCell className="font-mono text-xs font-medium">
-                        {row.number != null ? `#${row.number}` : "—"}
+                        {row.number != null && row.id ? (
+                          <Link
+                            to={`/invoices/${row.id}`}
+                            className="text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            #{row.number}
+                          </Link>
+                        ) : row.number != null ? (
+                          `#${row.number}`
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                       <TableCell>
                         {row.policyId ? (
@@ -284,7 +296,7 @@ const InvoicesList = () => {
                       <TableCell>
                         {row.provider ? <Badge variant="outline">{row.provider}</Badge> : "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"

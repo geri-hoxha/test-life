@@ -3,6 +3,7 @@ import type {
   DomainPoliciesPolicyRenewalStatus,
   OffersDateOnlyRangeResponse,
 } from "@/api/types";
+import { formatPolicyMoney } from "@/pages/policies/policy-ui";
 
 export const RENEWAL_STATUSES: DomainPoliciesPolicyRenewalStatus[] = [
   "planned",
@@ -36,18 +37,14 @@ export const renewalStatusClass = (status?: DomainPoliciesPolicyRenewalStatus | 
   return "bg-muted text-muted-foreground";
 };
 
-export const formatRenewalMoney = (value?: number | null, currency?: string) => {
+/** Renewal amounts are in the policy's currency. When it isn't known, show the bare number rather than assume one. */
+export const formatRenewalMoney = (
+  value: number | null | undefined,
+  currency: string | null | undefined,
+) => {
   if (value == null || Number.isNaN(value)) return "—";
-  const ccy = currency?.trim() || "ALL";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: ccy,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toLocaleString()} ${ccy}`;
-  }
+  if (!currency?.trim()) return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return formatPolicyMoney(value, currency);
 };
 
 export const formatRenewalDate = (iso?: string | null) => {

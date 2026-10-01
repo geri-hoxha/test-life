@@ -86,7 +86,7 @@ const PoliciesList = () => {
   const [personId, setPersonId] = useState("");
   const [legacyPolicyNumber, setLegacyPolicyNumber] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
   const [printingId, setPrintingId] = useState<string | null>(null);
 
   const filters = useMemo(
@@ -331,7 +331,7 @@ const PoliciesList = () => {
                   <TableHead>Coverage end</TableHead>
                   <TableHead>Issued</TableHead>
                   <TableHead>Offer</TableHead>
-                  <TableHead className="w-[88px] text-right">Actions</TableHead>
+                  <TableHead stickyRight className="w-[88px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -359,7 +359,13 @@ const PoliciesList = () => {
                   items.map((p) => (
                     <TableRow key={p.id ?? `${p.serial}-${p.issuedOnUtc}`}>
                       <TableCell className="font-mono text-sm font-medium">
-                        {policyNumberLabel(p.serial, p.id)}
+                        {p.id ? (
+                          <Link to={`/policies/${p.id}`} className="text-primary hover:underline">
+                            {policyNumberLabel(p.serial, p.id)}
+                          </Link>
+                        ) : (
+                          policyNumberLabel(p.serial, p.id)
+                        )}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {p.legacyPolicyNumber?.trim() || <Empty />}
@@ -417,7 +423,7 @@ const PoliciesList = () => {
                           <Empty />
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <div className="inline-flex items-center justify-end">
                           <Button
                             variant="ghost"
