@@ -98,7 +98,7 @@ const DocumentTypesList = () => {
   const [nameFilter, setNameFilter] = useState("");
   const [hasTemplateFilter, setHasTemplateFilter] = useState<HasTemplateFilter>("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DocumentTypeDetail | null>(null);
@@ -357,7 +357,7 @@ const DocumentTypesList = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="w-[152px] text-right">Actions</TableHead>
+                  <TableHead stickyRight className="w-[152px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,7 +376,7 @@ const DocumentTypesList = () => {
                       <TableCell className="text-sm text-muted-foreground max-w-[280px] truncate">
                         {row.description ?? "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           {row.templateDocumentId?.trim() ? (
                             <Button

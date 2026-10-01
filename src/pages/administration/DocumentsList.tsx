@@ -99,7 +99,7 @@ const DocumentsList = () => {
   const [createdTo, setCreatedTo] = useState("");
   const [isDeletedFilter, setIsDeletedFilter] = useState<IsDeletedFilter>("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -344,7 +344,7 @@ const DocumentsList = () => {
                   <TableHead>Size</TableHead>
                   <TableHead>Provider</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-[140px] text-right">Actions</TableHead>
+                  <TableHead stickyRight className="w-[140px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -370,7 +370,7 @@ const DocumentsList = () => {
                         {row.storageProvider ?? "—"}
                       </TableCell>
                       <TableCell className="text-sm tabular-nums">{formatCreated(row.createdOn)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"

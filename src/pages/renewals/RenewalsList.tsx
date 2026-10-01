@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AppShell from "@/components/layout/AppShell";
 import { FilterGrid } from "@/components/FilterGrid";
 import { TableLoadingRow } from "@/components/Loader";
@@ -94,7 +94,7 @@ const RenewalsList = () => {
     dueFromSearch(searchParams.get("due")),
   );
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
   const [startTarget, setStartTarget] =
     useState<PoliciesRenewalListItemResponse | null>(null);
   const [openingBalance, setOpeningBalance] = useState("");
@@ -297,7 +297,7 @@ const RenewalsList = () => {
                     </TableHead>
                     <TableHead className="text-right">Charge premium</TableHead>
                     <TableHead className="text-right">Docs</TableHead>
-                    <TableHead className="w-[110px] text-right">
+                    <TableHead stickyRight className="w-[110px] text-right">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -328,12 +328,28 @@ const RenewalsList = () => {
                         }
                         onClick={() => openRow(row)}
                       >
-                        <TableCell className="font-mono text-xs">
-                          {row.policySerial != null
-                            ? row.policySerial
-                            : row.policyId
-                              ? shortRenewalId(row.policyId)
-                              : "—"}
+                        <TableCell
+                          className="font-mono text-xs"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {(() => {
+                            const label =
+                              row.policySerial != null
+                                ? row.policySerial
+                                : row.policyId
+                                  ? shortRenewalId(row.policyId)
+                                  : "—";
+                            return row.id && row.policyId ? (
+                              <Link
+                                to={renewalDetailPath(row.policyId, row.id)}
+                                className="font-medium text-primary hover:underline"
+                              >
+                                {label}
+                              </Link>
+                            ) : (
+                              label
+                            );
+                          })()}
                         </TableCell>
                         <TableCell
                           className="text-sm max-w-[180px] truncate"
@@ -372,7 +388,7 @@ const RenewalsList = () => {
                           }
                         >
                           {row.requiresLoanBalances
-                            ? formatRenewalMoney(row.openingBalance)
+                            ? formatRenewalMoney(row.openingBalance, row.currency)
                             : "—"}
                         </TableCell>
                         <TableCell
@@ -383,17 +399,17 @@ const RenewalsList = () => {
                           }
                         >
                           {row.requiresLoanBalances
-                            ? formatRenewalMoney(row.closingBalance)
+                            ? formatRenewalMoney(row.closingBalance, row.currency)
                             : "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {formatRenewalMoney(row.chargePremium)}
+                          {formatRenewalMoney(row.chargePremium, row.currency)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {row.outstandingDocumentCount ?? 0}
                         </TableCell>
 
-                        <TableCell className="text-right">
+                        <TableCell stickyRight className="text-right">
                           {row.status === "planned" && (
                             <Button
                               size="sm"

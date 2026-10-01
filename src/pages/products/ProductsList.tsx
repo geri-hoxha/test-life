@@ -88,7 +88,7 @@ const ProductsList = () => {
   const [productName, setProductName] = useState("");
   const [productGroupIdFilter, setProductGroupIdFilter] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [ngName, setNgName] = useState("");
@@ -643,29 +643,29 @@ const ProductsList = () => {
           <table className="min-w-[1100px] w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr className="border-b">
-                <th className="h-11 px-4 text-left font-medium w-[220px] min-w-[220px]">
+                <th className="h-9 px-3 text-left font-medium w-[220px] min-w-[220px]">
                   Name
                 </th>
-                <th className="h-11 px-4 text-left font-medium">
+                <th className="h-9 px-3 text-left font-medium">
                   Coverage text
                 </th>
-                <th className="h-11 px-4 text-left font-medium">Currencies</th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                <th className="h-9 px-3 text-left font-medium">Currencies</th>
+                <th className="h-9 px-3 text-left font-medium whitespace-nowrap">
                   Policy plan type
                 </th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                <th className="h-9 px-3 text-left font-medium whitespace-nowrap">
                   Actuarial code
                 </th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                <th className="h-9 px-3 text-left font-medium whitespace-nowrap">
                   SAP channel code
                 </th>
-                <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                <th className="h-9 px-3 text-left font-medium whitespace-nowrap">
                   SAP product code
                 </th>
-                {/* <th className="h-11 px-4 text-left font-medium whitespace-nowrap">
+                {/* <th className="h-9 px-3 text-left font-medium whitespace-nowrap">
                   Requires loan balances
                 </th> */}
-                <th className="h-11 px-2 text-center font-medium w-14 sticky right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">
+                <th className="h-9 px-2 text-center font-medium w-14 sticky right-0 bg-[#F8FAFC] z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">
                   Actions
                 </th>
               </tr>
@@ -683,12 +683,16 @@ const ProductsList = () => {
                     className="border-b hover:bg-muted/40 cursor-pointer"
                     onClick={() => navigate(`/products/${p.id}`)}
                   >
-                    <td className="px-4 py-3.5 w-[220px] min-w-[220px] max-w-[220px]">
-                      <div className="font-semibold text-base text-foreground leading-snug">
+                    <td className="px-3 py-1.5 w-[220px] min-w-[220px] max-w-[220px]">
+                      <Link
+                        to={`/products/${p.id}`}
+                        className="block font-semibold text-sm text-primary leading-snug hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {p.name}
-                      </div>
+                      </Link>
                     </td>
-                    <td className="px-4 py-3.5 max-w-[280px]">
+                    <td className="px-3 py-1.5 max-w-[280px]">
                       <div
                         className="text-xs text-muted-foreground line-clamp-2 leading-snug"
                         title={p.coverageText}
@@ -696,7 +700,7 @@ const ProductsList = () => {
                         {p.coverageText?.trim() || "—"}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 min-w-40">
+                    <td className="px-3 py-1.5 min-w-40">
                       <div className="flex gap-1.5 flex-wrap">
                         {p.currencies.length ? (
                           p.currencies.map((c) => (
@@ -713,25 +717,25 @@ const ProductsList = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
+                    <td className="px-3 py-1.5 whitespace-nowrap">
                       {p.policyPlanType
                         ? policyPlanTypeLabel(p.policyPlanType)
                         : "—"}
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs">
+                    <td className="px-3 py-1.5 whitespace-nowrap font-mono text-xs">
                       {actuarialLabel}
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs">
+                    <td className="px-3 py-1.5 whitespace-nowrap font-mono text-xs">
                       {p.sapChannelCode?.trim() || "—"}
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs">
+                    <td className="px-3 py-1.5 whitespace-nowrap font-mono text-xs">
                       {p.sapProductCode?.trim() || "—"}
                     </td>
-                    {/* <td className="px-4 py-3.5 whitespace-nowrap">
+                    {/* <td className="px-3 py-1.5 whitespace-nowrap">
                       {p.requiresLoanBalances ? "Yes" : "No"}
                     </td> */}
                     <td
-                      className="px-2 py-3.5 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]"
+                      className="px-2 py-1.5 sticky right-0 bg-background z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-1">

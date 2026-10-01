@@ -57,6 +57,7 @@ import {
   useSubmitRenewalDocument,
   useWaiveRenewalDocument,
 } from "@/api/renewals";
+import { useGetPolicy } from "@/api/policies";
 import { buildCreateDocumentFormData, createDocument } from "@/api/documents";
 import { useListDocumentTypes } from "@/api/document-types";
 import { toastApiError } from "@/lib/api-error";
@@ -120,10 +121,11 @@ const formatRate = (
         percentageValue?: number | null;
       }
     | undefined,
+  currency: string | undefined,
 ) => {
   if (!rate) return "—";
   if (rate.isFlat) {
-    return formatRenewalMoney(rate.flatValue ?? 0, rate.flatValueCurrency ?? undefined);
+    return formatRenewalMoney(rate.flatValue ?? 0, rate.flatValueCurrency || currency);
   }
   if (rate.percentageValue != null) return `${rate.percentageValue * 100}%`;
   return "—";
@@ -135,6 +137,9 @@ const RenewalDetail = () => {
   const { data: renewal, isLoading, isError } = useGetPolicyRenewal(policyId, renewalId, {
     enabled: Boolean(policyId) && Boolean(renewalId),
   });
+  // The renewal response has no currency; its amounts are in the policy's.
+  const { data: policy, isLoading: policyLoading } = useGetPolicy(policyId);
+  const currency = policy?.currency;
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
 
   const startRenewal = useStartPolicyRenewal();
@@ -194,7 +199,7 @@ const RenewalDetail = () => {
     </Button>
   );
 
-  if (isLoading) {
+  if (isLoading || policyLoading) {
     return (
       <AppShell width="wide">
         {back}
@@ -611,12 +616,12 @@ const RenewalDetail = () => {
             }
           />
           <Field label="Source offer period sequence" value={renewal.sourceOfferPeriodSequence ?? "—"} />
-          <Field label="Opening balance" value={formatRenewalMoney(renewal.openingBalance)} />
-          <Field label="Closing balance" value={formatRenewalMoney(renewal.closingBalance)} />
-          <Field label="Calculated premium" value={formatRenewalMoney(renewal.calculatedPremium)} />
+          <Field label="Opening balance" value={formatRenewalMoney(renewal.openingBalance, currency)} />
+          <Field label="Closing balance" value={formatRenewalMoney(renewal.closingBalance, currency)} />
+          <Field label="Calculated premium" value={formatRenewalMoney(renewal.calculatedPremium, currency)} />
           <Field
             label="Charge premium"
-            value={<span className="text-primary">{formatRenewalMoney(renewal.chargePremium)}</span>}
+            value={<span className="text-primary">{formatRenewalMoney(renewal.chargePremium, currency)}</span>}
           />
           <Field
             label="Status"
@@ -811,14 +816,14 @@ const RenewalDetail = () => {
                             ) : null}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            {formatRenewalMoney(row.sumInsured)}
+                            {formatRenewalMoney(row.sumInsured, currency)}
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{formatRate(row.rateUsed)}</TableCell>
+                          <TableCell className="font-mono text-xs">{formatRate(row.rateUsed, currency)}</TableCell>
                           <TableCell className="text-right font-mono text-sm">
                             {row.ratingTableMultiplierUsed ?? "—"}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            {formatRenewalMoney(row.calculatedPremium)}
+                            {formatRenewalMoney(row.calculatedPremium, currency)}
                           </TableCell>
                         </TableRow>
                       ))

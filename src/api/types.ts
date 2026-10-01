@@ -1773,6 +1773,8 @@ export type PoliciesRenewalListItemResponse = {
   targetPeriod?: OffersDateOnlyRangeResponse;
   status?: DomainPoliciesPolicyRenewalStatus;
   requiresLoanBalances?: boolean;
+  /** ISO code of the policy's currency; all amounts on the row are in it. */
+  currency: string;
   openingBalance?: number | null;
   closingBalance?: number | null;
   chargePremium?: number;

@@ -108,7 +108,7 @@ const AgentCommissionsList = () => {
     () => searchParams.get("postedTo")?.trim() ?? "",
   );
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const filters = useMemo(
     () =>
@@ -353,7 +353,7 @@ const AgentCommissionsList = () => {
                   <TableHead className="text-right">Rate</TableHead>
                   <TableHead className="text-right">Basis</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead stickyRight className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -389,7 +389,17 @@ const AgentCommissionsList = () => {
                         }
                       >
                         <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                          {formatCommissionDateTime(row.postedOnUtc)}
+                          {row.id ? (
+                            <Link
+                              to={`/agent-commissions/${row.id}`}
+                              className="text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {formatCommissionDateTime(row.postedOnUtc)}
+                            </Link>
+                          ) : (
+                            formatCommissionDateTime(row.postedOnUtc)
+                          )}
                         </TableCell>
                         <TableCell>
                           {row.policyId ? (
@@ -467,7 +477,7 @@ const AgentCommissionsList = () => {
                         <TableCell className="text-right font-mono text-sm font-medium">
                           {formatCommissionMoney(row.amount, row.currency)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell stickyRight className="text-right">
                           <Button
                             variant="ghost"
                             size="sm"

@@ -58,7 +58,7 @@ const RatingTablesList = () => {
   const navigate = useNavigate();
   const [nameFilter, setNameFilter] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RatingTablesRatingTableResponse | null>(null);
@@ -219,7 +219,7 @@ const RatingTablesList = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Rules</TableHead>
                   <TableHead>ID</TableHead>
-                  <TableHead className="w-[140px] text-right">Actions</TableHead>
+                  <TableHead stickyRight className="w-[140px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,7 +238,7 @@ const RatingTablesList = () => {
                         {row.id ? (
                           <Link
                             to={`/administration/rating-tables/${row.id}`}
-                            className="hover:text-accent transition-colors"
+                            className="text-primary hover:underline"
                           >
                             {row.name ?? "—"}
                           </Link>
@@ -252,7 +252,7 @@ const RatingTablesList = () => {
                       <TableCell className="font-mono text-xs max-w-[200px] truncate" title={row.id}>
                         {row.id ?? "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"

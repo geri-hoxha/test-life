@@ -101,7 +101,7 @@ const RiskList = () => {
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [addOpen, setAddOpen] = useState(false);
   const [formIdentifier, setFormIdentifier] = useState("");
@@ -298,7 +298,7 @@ const RiskList = () => {
                   <TableHead>List type</TableHead>
                   <TableHead>Reason</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-[100px] text-right">Actions</TableHead>
+                  <TableHead stickyRight className="w-[100px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -327,7 +327,7 @@ const RiskList = () => {
                       <TableCell className="text-xs text-muted-foreground font-mono">
                         {formatCreated(row.createdOnUtc)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell stickyRight className="text-right">
                         <Button
                           variant="ghost"
                           size="sm"

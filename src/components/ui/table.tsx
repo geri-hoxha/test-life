@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
     <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table ref={ref} className={cn("w-full caption-bottom text-[13px]", className)} {...props} />
     </div>
   ),
 );
@@ -34,19 +34,33 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
-      className={cn("border-b transition-colors data-[state=selected]:bg-muted hover:bg-muted/50", className)}
+      className={cn("group border-b transition-colors data-[state=selected]:bg-muted hover:bg-muted/50", className)}
       {...props}
     />
   ),
 );
 TableRow.displayName = "TableRow";
 
-const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => (
+/**
+ * Pins a column to the right edge of the scrolling table wrapper so row actions stay visible.
+ * The cell needs an opaque background to cover scrolled content; the row hover tint is drawn as an overlay.
+ */
+const stickyRightClass =
+  "sticky right-0 z-10 bg-card shadow-[-1px_0_0_hsl(var(--border))] " +
+  "after:pointer-events-none after:absolute after:inset-0 after:bg-muted/50 after:opacity-0 group-hover:after:opacity-100";
+
+interface StickyProps {
+  /** Pin this column to the right edge (use for the Actions column). */
+  stickyRight?: boolean;
+}
+
+const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement> & StickyProps>(
+  ({ className, stickyRight, ...props }, ref) => (
     <th
       ref={ref}
       className={cn(
-        "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        "h-9 px-3 text-left align-middle text-xs font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        stickyRight && "sticky right-0 z-10 bg-card shadow-[-1px_0_0_hsl(var(--border))]",
         className,
       )}
       {...props}
@@ -55,9 +69,17 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
 );
 TableHead.displayName = "TableHead";
 
-const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)} {...props} />
+const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement> & StickyProps>(
+  ({ className, stickyRight, ...props }, ref) => (
+    <td
+      ref={ref}
+      className={cn(
+        "px-3 py-1.5 align-middle [&:has([role=checkbox])]:pr-0",
+        stickyRight && stickyRightClass,
+        className,
+      )}
+      {...props}
+    />
   ),
 );
 TableCell.displayName = "TableCell";
