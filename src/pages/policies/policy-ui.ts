@@ -6,6 +6,8 @@ import type {
   DomainPoliciesPolicyPeriodStatus,
   DomainPoliciesPolicyStatus,
   OffersDateOnlyRangeResponse,
+  PoliciesInvoiceRecipientResponse,
+  PoliciesPolicyResponse,
 } from "@/api/types";
 
 export const POLICY_STATUSES: DomainPoliciesPolicyStatus[] = [
@@ -25,7 +27,11 @@ export const policyStatusLabel = (status?: DomainPoliciesPolicyStatus | string |
   return status ? humanizePolicyEnum(status) : "—";
 };
 
-export const policyStatusClass = (status?: DomainPoliciesPolicyStatus | string | null) => {
+/** A lapsed, cancelled, or matured policy is already over, so a new cancellation cannot be started. */
+export const isPolicyCancellable = (status?: DomainPoliciesPolicyStatus | string | null) =>
+  status !== "lapsed" && status !== "cancelled" && status !== "matured";
+
+export const policyStatusClass =(status?: DomainPoliciesPolicyStatus | string | null) => {
   if (status === "pendingActivation") return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
   if (status === "active") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
   if (status === "lapsed") return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
@@ -170,3 +176,57 @@ export const policyNumberLabel = (serial?: number | null, id?: string | null) =>
 
 export const shareToPercentage = (share?: number | null) =>
   Math.round((share ?? 0) * 10000) / 100;
+
+export type PayerHistoryEntry = {
+  key: string;
+  /** `YYYY-MM-DD` from which this party was invoiced. */
+  effectiveFrom: string;
+  payer: PoliciesInvoiceRecipientResponse;
+  isCurrent: boolean;
+  /** The payer named when the policy was issued, when the recorded history does not already start with them. */
+  isIssuePayer: boolean;
+};
+
+/**
+ * Who has been invoiced over the life of a policy, newest first. The recorded
+ * changes are shown as-is; the payer at issue is added at the end only when
+ * the history does not already begin with them.
+ */
+export const buildPayerHistory = (
+  policy?: Pick<
+    PoliciesPolicyResponse,
+    "issuedOnUtc" | "participants" | "invoiceRecipients" | "currentInvoiceRecipient"
+  > | null,
+): PayerHistoryEntry[] => {
+  if (!policy) return [];
+  const changes = [...(policy.invoiceRecipients ?? [])].sort(
+    (a, b) =>
+      (a.effectiveFrom ?? "").localeCompare(b.effectiveFrom ?? "") || (a.id ?? 0) - (b.id ?? 0),
+  );
+  if (changes.length === 0) return [];
+
+  const entries: PayerHistoryEntry[] = changes.map((c, i) => ({
+    key: `change-${c.id ?? i}`,
+    effectiveFrom: c.effectiveFrom ?? "",
+    payer: c,
+    isCurrent: false,
+    isIssuePayer: false,
+  }));
+
+  const issuePayer = policy.participants?.find((p) => p.role === "invoiced");
+  if (issuePayer && issuePayer.partyId !== changes[0].partyId) {
+    entries.unshift({
+      key: "issue",
+      effectiveFrom: policy.issuedOnUtc?.slice(0, 10) ?? "",
+      payer: issuePayer,
+      isCurrent: false,
+      isIssuePayer: true,
+    });
+  }
+
+  const currentId = policy.currentInvoiceRecipient?.partyId;
+  const current = [...entries].reverse().find((e) => e.payer.partyId === currentId);
+  if (current) current.isCurrent = true;
+
+  return entries.reverse();
+};

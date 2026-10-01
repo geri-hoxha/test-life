@@ -33,8 +33,8 @@ export const ACTUARIAL_CODES: ProductsActuarialCode[] = [
  * How a policy continues after the current period.
  *
  * `/renewal-offer` is only valid for voluntary cover (`newPolicyOffer`).
- * Standard, standard-tabled, fixed monthly, and fixed annual append a period
- * through `/api/renewals`. Upfront, single premium, and Protect issue every
+ * Standard, standard-tabled, fixed monthly, fixed annual, and Protect append a
+ * period through `/api/renewals`. Upfront and single premium issue every
  * period at inception and have no renewal step.
  */
 export type PolicyRenewalFlow = "newPolicyOffer" | "appendPeriod" | "issuedAtInception";
@@ -47,7 +47,7 @@ const RENEWAL_FLOW_BY_PLAN: Record<ProductsPolicyPlanType, PolicyRenewalFlow> = 
   PPFV: "appendPeriod",
   PGP: "issuedAtInception",
   PPRS: "issuedAtInception",
-  "PROTECT-55": "issuedAtInception",
+  "PROTECT-55": "appendPeriod",
 };
 
 const RENEWAL_FLOW_BY_CONTINUATION: Record<ProductsPolicyContinuationMode, PolicyRenewalFlow> = {

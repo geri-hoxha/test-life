@@ -44,6 +44,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   useAcceptRenewalDocument,
+  usePolicyRenewals,
   useApplyPolicyRenewal,
   useApproveRenewalDiscount,
   useApproveRenewalFlag,
@@ -87,6 +88,7 @@ import { startRenewalRequestBody } from "./start-renewal-balances";
 import {
   formatRenewalDate,
   formatRenewalDateTime,
+  canStartRenewal,
   formatRenewalMoney,
   renewalStatusClass,
   renewalStatusLabel,
@@ -143,6 +145,9 @@ const RenewalDetail = () => {
   const { data: documentTypesPage } = useListDocumentTypes({ pageNumber: 1, pageSize: 200 });
 
   const startRenewal = useStartPolicyRenewal();
+  const { data: policyRenewals } = usePolicyRenewals(policyId, {
+    enabled: renewal?.status === "planned",
+  });
   const priceRenewal = usePricePolicyRenewal();
   const applyRenewal = useApplyPolicyRenewal();
   const acceptDocument = useAcceptRenewalDocument();
@@ -533,7 +538,7 @@ const RenewalDetail = () => {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {status === "planned" && (
+          {status === "planned" && policyRenewals && canStartRenewal(renewal, policyRenewals) && (
             <Button
               size="sm"
               className="gap-2"

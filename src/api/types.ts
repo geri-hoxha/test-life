@@ -499,6 +499,24 @@ export type PoliciesPolicyParticipantResponse = {
   relationshipToInsured?: DomainPoliciesRelationshipToInsured | null;
 };
 
+/** The party currently invoiced for a policy. */
+export type PoliciesInvoiceRecipientResponse = {
+  partyId?: string;
+  partyType?: DomainPartiesEnumsPartyType;
+  uniqueIdentifier?: string;
+  displayName?: string;
+  countryCode?: string;
+  relationshipToInsured?: DomainPoliciesRelationshipToInsured | null;
+};
+
+/** One entry of a policy's payer (invoice recipient) history. */
+export type PoliciesPolicyInvoiceRecipientResponse = PoliciesInvoiceRecipientResponse & {
+  id?: number;
+  effectiveFrom?: string;
+  recordedByAuthUserId?: number | null;
+  recordedOnUtc?: string;
+};
+
 export type PoliciesPolicyInsuredPersonResponse = {
   id?: number;
   personId?: string;
@@ -582,6 +600,9 @@ export type PoliciesPolicyResponse = {
   insuredPersons?: PoliciesPolicyInsuredPersonResponse[];
   documents?: PoliciesPolicyDocumentResponse[];
   periods?: PoliciesPolicyPeriodResponse[];
+  /** Payer history, one entry per change of invoice recipient. */
+  invoiceRecipients?: PoliciesPolicyInvoiceRecipientResponse[];
+  currentInvoiceRecipient?: PoliciesInvoiceRecipientResponse | null;
 };
 
 export type PoliciesPolicyCancellationResponse = {
@@ -1694,7 +1715,12 @@ export type PartnerCommissionsGetSummaryRequest = {
   to?: string;
 };
 
-export type DomainPoliciesPolicyRenewalStatus = "planned" | "draft" | "priced" | "applied";
+export type DomainPoliciesPolicyRenewalStatus =
+  | "planned"
+  | "draft"
+  | "priced"
+  | "applied"
+  | "cancelled";
 
 export type DomainUnderwritingDocumentStatus =
   | "required"

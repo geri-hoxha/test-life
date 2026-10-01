@@ -57,6 +57,7 @@ import {
   formatPolicyDate,
   formatPolicyDateTime,
   formatPolicyMoney,
+  isPolicyCancellable,
   shortPolicyId,
 } from "./policy-ui";
 import {
@@ -170,8 +171,7 @@ const PolicyCancellationCard = ({
 
   const isApplied = cancellation?.status === "applied";
   const isDraft = cancellation?.status === "draft";
-  const canCreate =
-    !cancellation && policyStatus !== "cancelled" && policyStatus !== "matured";
+  const canCreate = !cancellation && isPolicyCancellable(policyStatus);
   const readOnly = isApplied;
   const saving = createCancellation.isPending || updateCancellation.isPending;
   const busy =

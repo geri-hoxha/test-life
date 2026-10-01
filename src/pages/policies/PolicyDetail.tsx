@@ -70,9 +70,11 @@ import {
   formatCoverageTerm,
   formatPolicyDate,
   formatPolicyDateTime,
+  buildPayerHistory,
   formatPolicyMoney,
   installmentStatusClass,
   installmentStatusLabel,
+  isPolicyCancellable,
   periodStatusClass,
   periodStatusLabel,
   policyNumberLabel,
@@ -400,7 +402,12 @@ const PolicyDetail = () => {
 
   const participants = policy?.participants ?? [];
   const holder = participants.find((p) => p.role === "policyHolder");
-  const payer = participants.find((p) => p.role === "invoiced") ?? holder;
+  const current = policy?.currentInvoiceRecipient;
+  // The payer today: the recorded current invoice recipient, else whoever was named at issue.
+  const payer: PoliciesPolicyParticipantResponse | undefined = current
+    ? { role: "invoiced", ...current }
+    : (participants.find((p) => p.role === "invoiced") ?? holder);
+  const payerHistory = useMemo(() => buildPayerHistory(policy), [policy]);
   const beneficiaries = participants.filter((p) => p.role === "beneficiary");
   const insuredPersons = policy?.insuredPersons ?? [];
   const sales = policy?.salesAttribution;
@@ -579,15 +586,22 @@ const PolicyDetail = () => {
               Renewal offer
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-2 text-destructive border-destructive/40 hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/50"
-            onClick={() => setTab("cancellation")}
-          >
-            <Ban className="h-4 w-4" />
-            {policy.status === "cancelled" ? "View cancellation" : "Cancel policy"}
-          </Button>
+          {isPolicyCancellable(policy.status) ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 text-destructive border-destructive/40 hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/50"
+              onClick={() => setTab("cancellation")}
+            >
+              <Ban className="h-4 w-4" />
+              Cancel policy
+            </Button>
+          ) : policy.status === "cancelled" ? (
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => setTab("cancellation")}>
+              <Ban className="h-4 w-4" />
+              View cancellation
+            </Button>
+          ) : null}
           <Button
             size="sm"
             className="gap-2"
@@ -1003,6 +1017,55 @@ const PolicyDetail = () => {
                 />
               </CardContent>
             </Card>
+
+            {payerHistory.length > 0 ? (
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-base">Payer history</CardTitle>
+                  <CardDescription>
+                    Who has been invoiced for this policy, newest first
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>From</TableHead>
+                          <TableHead>Payer</TableHead>
+                          <TableHead>Identifier</TableHead>
+                          <TableHead>Relationship</TableHead>
+                          <TableHead />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payerHistory.map((entry) => (
+                          <TableRow key={entry.key}>
+                            <TableCell className="font-mono text-xs">
+                              {formatPolicyDate(entry.effectiveFrom)}
+                            </TableCell>
+                            <TableCell>
+                              <PartyLink
+                                partyId={entry.payer.partyId}
+                                partyType={entry.payer.partyType}
+                                displayName={entry.payer.displayName}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {entry.payer.uniqueIdentifier}
+                            </TableCell>
+                            <TableCell>{relationshipLabel(entry.payer.relationshipToInsured)}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {entry.isCurrent ? "Current" : entry.isIssuePayer ? "At issue" : null}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader>

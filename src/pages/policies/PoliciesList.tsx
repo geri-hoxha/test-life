@@ -54,7 +54,7 @@ import {
   shortPolicyId,
 } from "./policy-ui";
 
-const COL_COUNT = 16;
+const COL_COUNT = 15;
 
 const insuredFullName = (p: PoliciesPolicyListItemResponse) =>
   [p.insuredFirstName, p.insuredLastName]
@@ -317,7 +317,6 @@ const PoliciesList = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Serial</TableHead>
-                  <TableHead>Legacy policy no.</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Policy plan</TableHead>
                   <TableHead>Status</TableHead>
@@ -366,9 +365,6 @@ const PoliciesList = () => {
                         ) : (
                           policyNumberLabel(p.serial, p.id)
                         )}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {p.legacyPolicyNumber?.trim() || <Empty />}
                       </TableCell>
                       <TableCell className="text-sm">
                         {p.productName?.trim() || <Empty />}

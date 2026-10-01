@@ -70,6 +70,29 @@ export const formatRenewalPeriod = (period?: OffersDateOnlyRangeResponse | null)
   return `${formatRenewalDate(period.startDate)} → ${formatRenewalDate(period.endDate)}`;
 };
 
+/** A renewal that is finished and no longer holds up the ones after it. */
+const isSettledRenewal = (status?: string | null) => status === "applied" || status === "cancelled";
+
+type RenewalSequenceStatus = { targetPeriodSequence?: number | null; status?: string | null };
+
+/**
+ * Only the next coverage period of a policy can be started: a planned renewal
+ * qualifies once every earlier period has been applied (or cancelled).
+ */
+export const canStartRenewal = (
+  renewal: RenewalSequenceStatus,
+  siblings: readonly RenewalSequenceStatus[],
+): boolean => {
+  if (renewal.status !== "planned" || renewal.targetPeriodSequence == null) return false;
+  const sequence = renewal.targetPeriodSequence;
+  return !siblings.some(
+    (other) =>
+      other.targetPeriodSequence != null &&
+      other.targetPeriodSequence < sequence &&
+      !isSettledRenewal(other.status),
+  );
+};
+
 export const shortRenewalId = (id: string) =>
   id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
 
