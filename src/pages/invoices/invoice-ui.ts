@@ -1,9 +1,10 @@
-import { format, parseISO } from "date-fns";
 import type {
   DomainInvoicesInvoiceStatus,
   DomainInvoicesInvoiceType,
   InvoicesServicePeriod,
 } from "@/api/types";
+import { formatDate, formatDateTime } from "@/lib/date-format";
+import { formatMoney } from "@/lib/money-format";
 
 export const INVOICE_STATUSES: DomainInvoicesInvoiceStatus[] = [
   "pending",
@@ -39,37 +40,16 @@ export const invoiceTypeClass = (type?: DomainInvoicesInvoiceType | string) => {
   return "bg-muted text-muted-foreground";
 };
 
-export const formatInvoiceMoney = (value?: number | null, currency?: string) => {
-  if (value == null || Number.isNaN(value)) return "—";
-  const ccy = currency?.trim() || "ALL";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: ccy,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toLocaleString()} ${ccy}`;
-  }
-};
+export const formatInvoiceMoney = formatMoney;
 
-export const formatInvoiceDate = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd");
-  } catch {
-    return iso;
-  }
-};
+export const formatInvoiceDate = formatDate;
 
-export const formatInvoiceDateTime = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
-  }
-};
+/** UTC timestamp shown in the browser's time zone. */
+export const formatInvoiceDateTime = formatDateTime;
+
+/** An invoice the fiscal provider has already accepted cannot be fiscalized again. */
+export const canRetryFiscalization = (status?: DomainInvoicesInvoiceStatus | string | null) =>
+  status !== "fiscalized";
 
 export const formatServicePeriod = (period?: InvoicesServicePeriod | null) => {
   if (!period?.startDate && !period?.endDate) return "—";

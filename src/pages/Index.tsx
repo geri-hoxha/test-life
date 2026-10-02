@@ -3,7 +3,6 @@ import AppShell from "@/components/layout/AppShell";
 import KpiCard from "@/components/dashboard/KpiCard";
 import RecentOffersTable from "@/components/dashboard/RecentOffersTable";
 import RecentPoliciesTable from "@/components/dashboard/RecentPoliciesTable";
-import ActivityChart from "@/components/dashboard/ActivityChart";
 import { Package, FileText, ShieldCheck, Receipt } from "lucide-react";
 import { useListProducts } from "@/api/products";
 import { useListOffers } from "@/api/offers";
@@ -78,13 +77,9 @@ const Index = () => {
           />
         </div>
 
-        <div className="grid min-h-0 flex-[1.15] grid-cols-1 gap-3 xl:grid-cols-2">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-2">
           <RecentOffersTable />
           <RecentPoliciesTable />
-        </div>
-
-        <div className="min-h-0 flex-1">
-          <ActivityChart />
         </div>
       </div>
     </AppShell>

@@ -57,6 +57,7 @@ import {
   useListRiskListEntries,
 } from "@/api/risk-list-entries";
 import type { DomainComplianceRiskListType, RiskListsRiskListEntryResponse } from "@/api/types";
+import { formatDateTime } from "@/lib/date-format";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { isApiForbidden, toastApiError } from "@/lib/api-error";
@@ -83,15 +84,6 @@ const toDate = (isoDay: string) => {
     return parseISO(isoDay);
   } catch {
     return undefined;
-  }
-};
-
-const formatCreated = (iso?: string) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
   }
 };
 
@@ -325,7 +317,7 @@ const RiskList = () => {
                         {row.reason?.trim() || <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground font-mono">
-                        {formatCreated(row.createdOnUtc)}
+                        {formatDateTime(row.createdOnUtc)}
                       </TableCell>
                       <TableCell stickyRight className="text-right">
                         <Button

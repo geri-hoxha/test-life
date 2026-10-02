@@ -67,6 +67,7 @@ import type {
 } from "@/api/types";
 import AccessDeniedNotice from "@/components/AccessDeniedNotice";
 import { isApiForbidden, toastApiError } from "@/lib/api-error";
+import { formatDate } from "@/lib/date-format";
 import { compactQuery } from "@/lib/list-query";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -85,14 +86,7 @@ const toDate = (isoDay?: string | null) => {
   }
 };
 
-const formatDay = (iso?: string | null, empty = "—") => {
-  if (!iso?.trim()) return empty;
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd");
-  } catch {
-    return iso;
-  }
-};
+const formatDay = (iso?: string | null, empty = "—") => (iso?.trim() ? formatDate(iso) : empty);
 
 const toIsoDay = (date?: Date) => (date ? format(date, "yyyy-MM-dd") : "");
 

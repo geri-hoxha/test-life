@@ -8,6 +8,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { User, Building2, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { todayLocalIsoDate } from "@/lib/date-format";
 import AppShell from "@/components/layout/AppShell";
 import { Loader, PageLoader } from "@/components/Loader";
 import PageHeader from "@/components/layout/PageHeader";
@@ -154,7 +155,7 @@ const blank = (): Customer => ({
   occupation: "",
   notes: "",
   totalExposure: 0,
-  createdDate: new Date().toISOString().slice(0, 10),
+  createdDate: todayLocalIsoDate(),
 });
 
 export type CustomerFormProps = {

@@ -1,5 +1,6 @@
 /** Product/policy classification. Replaces the legacy `premiumPlan` + `sumInsuredBasis` pair. */
 
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import type {
   ProductsActuarialCode,
   ProductsPolicyContinuationMode,
@@ -33,8 +34,8 @@ export const ACTUARIAL_CODES: ProductsActuarialCode[] = [
  * How a policy continues after the current period.
  *
  * `/renewal-offer` is only valid for voluntary cover (`newPolicyOffer`).
- * Standard, standard-tabled, fixed monthly, and fixed annual append a period
- * through `/api/renewals`. Upfront, single premium, and Protect issue every
+ * Standard, standard-tabled, fixed monthly, fixed annual, and Protect append a
+ * period through `/api/renewals`. Upfront and single premium issue every
  * period at inception and have no renewal step.
  */
 export type PolicyRenewalFlow = "newPolicyOffer" | "appendPeriod" | "issuedAtInception";
@@ -47,7 +48,7 @@ const RENEWAL_FLOW_BY_PLAN: Record<ProductsPolicyPlanType, PolicyRenewalFlow> = 
   PPFV: "appendPeriod",
   PGP: "issuedAtInception",
   PPRS: "issuedAtInception",
-  "PROTECT-55": "issuedAtInception",
+  "PROTECT-55": "appendPeriod",
 };
 
 const RENEWAL_FLOW_BY_CONTINUATION: Record<ProductsPolicyContinuationMode, PolicyRenewalFlow> = {
@@ -67,6 +68,18 @@ export const policyRenewalFlow = (
     return RENEWAL_FLOW_BY_CONTINUATION[continuation];
   }
   return null;
+};
+
+const AVERAGE_DAYS_PER_MONTH = 30.4375;
+
+/**
+ * Whole months covered between two `yyyy-MM-dd` dates, minimum 1. The end date
+ * may be inclusive (`…-30`) or the day the next term starts (`…-01`); rounding
+ * absorbs that one-day difference.
+ */
+export const coverageTermMonths = (startDate: string, endDate: string): number => {
+  const days = differenceInCalendarDays(parseISO(endDate), parseISO(startDate)) + 1;
+  return Number.isFinite(days) ? Math.max(1, Math.round(days / AVERAGE_DAYS_PER_MONTH)) : 1;
 };
 
 export const formatCoverageTermMonths = (months?: number | null): string => {

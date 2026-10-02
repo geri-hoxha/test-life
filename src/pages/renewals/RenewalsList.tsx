@@ -43,6 +43,7 @@ import {
 import {
   isRenewalStatus,
   useListRenewals,
+  usePolicyRenewals,
   useStartPolicyRenewal,
 } from "@/api/renewals";
 import type {
@@ -58,6 +59,7 @@ import { Play, RefreshCw } from "lucide-react";
 import { StartRenewalBalanceFields } from "./StartRenewalBalanceFields";
 import {
   RENEWAL_STATUSES,
+  canStartRenewal,
   formatRenewalMoney,
   formatRenewalPeriod,
   renewalDetailPath,
@@ -65,7 +67,7 @@ import {
   renewalStatusLabel,
   shortRenewalId,
 } from "./renewal-ui";
-import { startRenewalRequestBody } from "./start-renewal-balances";
+import { startRenewalBody } from "./start-renewal-balances";
 
 const COL_COUNT = 12;
 
@@ -75,6 +77,32 @@ const dueFromSearch = (value: string | null): DueFilter => {
   if (value === "true") return "due";
   if (value === "false") return "notDue";
   return null;
+};
+
+/** "Start" only for the policy's next coverage period; later planned years cannot start yet. */
+const StartRenewalButton = ({
+  row,
+  onStart,
+}: {
+  row: PoliciesRenewalListItemResponse;
+  onStart: () => void;
+}) => {
+  const { data: siblings } = usePolicyRenewals(row.policyId ?? "");
+  if (!siblings || !canStartRenewal(row, siblings)) return null;
+  return (
+    <Button
+      size="sm"
+      className="h-8 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+      disabled={!row.id || !row.policyId}
+      onClick={(e) => {
+        e.stopPropagation();
+        onStart();
+      }}
+    >
+      <Play className="h-3.5 w-3.5" />
+      Start
+    </Button>
+  );
 };
 
 const RenewalsList = () => {
@@ -159,7 +187,11 @@ const RenewalsList = () => {
 
   const confirmStart = () => {
     if (!startTarget?.policyId || !startTarget.id) return;
-    const balances = startRenewalRequestBody(openingBalance, closingBalance);
+    const balances = startRenewalBody(
+      startTarget.requiresLoanBalances,
+      openingBalance,
+      closingBalance,
+    );
     if (!balances.ok) {
       setBalanceError(true);
       return;
@@ -411,19 +443,13 @@ const RenewalsList = () => {
 
                         <TableCell stickyRight className="text-right">
                           {row.status === "planned" && (
-                            <Button
-                              size="sm"
-                              className="h-8 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                              disabled={!row.id || !row.policyId}
-                              onClick={(e) => {
-                                e.stopPropagation();
+                            <StartRenewalButton
+                              row={row}
+                              onStart={() => {
                                 resetStartBalances();
                                 setStartTarget(row);
                               }}
-                            >
-                              <Play className="h-3.5 w-3.5" />
-                              Start
-                            </Button>
+                            />
                           )}
                         </TableCell>
                       </TableRow>
@@ -462,14 +488,16 @@ const RenewalsList = () => {
                 : "Start underwriting for this renewal."}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <StartRenewalBalanceFields
-            openingBalance={openingBalance}
-            closingBalance={closingBalance}
-            onOpeningBalanceChange={setOpeningBalance}
-            onClosingBalanceChange={setClosingBalance}
-            disabled={startRenewal.isPending}
-            showError={balanceError}
-          />
+          {startTarget?.requiresLoanBalances ? (
+            <StartRenewalBalanceFields
+              openingBalance={openingBalance}
+              closingBalance={closingBalance}
+              onOpeningBalanceChange={setOpeningBalance}
+              onClosingBalanceChange={setClosingBalance}
+              disabled={startRenewal.isPending}
+              showError={balanceError}
+            />
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={startRenewal.isPending}>
               Cancel

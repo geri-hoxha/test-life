@@ -32,6 +32,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import { fullName } from "@/data/customers";
+import { formatCoverageTermMonths } from "@/data/policy-plan-types";
 import { toast } from "sonner";
 import { useGetOffer, useIssueOfferPolicy } from "@/api/offers";
 import { mapApiOffer } from "@/api/adapters/offers";
@@ -41,7 +42,8 @@ import { useListCompanies } from "@/api/companies";
 import { mergeCustomers } from "@/api/adapters/customers";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { mapReviewFlagsToChecks, overallStatus } from "./VerificationStep";
-import { formatOfferMoney, offerStatusLabel } from "./offer-ui";
+import { policyNumberLabel } from "@/pages/policies/policy-ui";
+import { formatOfferDate, formatOfferMoney, offerStatusLabel } from "./offer-ui";
 
 type Step = 1 | 2;
 
@@ -192,7 +194,9 @@ const IssuePolicy = () => {
         toast.error("Policy was issued but the server did not return an id");
         return;
       }
-      toast.success(`Policy ${policyId} issued successfully`);
+      toast.success(
+        `Policy ${policyNumberLabel(issued.policy?.serial, policyId)} issued successfully`,
+      );
       navigate(`/policies/${policyId}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to issue policy");
@@ -336,9 +340,9 @@ const IssuePolicy = () => {
             <Card>
               <CardHeader><CardTitle className="text-base">Policy Period</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                <Field label="Start Date" value={<span className="font-mono text-xs">{offer.startDate}</span>} />
-                <Field label="End Date" value={<span className="font-mono text-xs">{offer.endDate}</span>} />
-                <Field label="Term" value={`${offer.termYears} years`} />
+                <Field label="Start Date" value={<span className="font-mono text-xs">{formatOfferDate(offer.startDate)}</span>} />
+                <Field label="End Date" value={<span className="font-mono text-xs">{formatOfferDate(offer.endDate)}</span>} />
+                <Field label="Term" value={formatCoverageTermMonths(offer.termMonths)} />
                 <Field label="Loan balances required" value={offer.requiresLoanBalances ? "Yes" : "No"} />
               </CardContent>
             </Card>
@@ -399,7 +403,7 @@ const IssuePolicy = () => {
               />
               <Field
                 label="Coverage term"
-                value={<span className="font-mono text-xs">{offer.startDate} → {offer.endDate}</span>}
+                value={<span className="font-mono text-xs">{formatOfferDate(offer.startDate)} → {formatOfferDate(offer.endDate)}</span>}
               />
             </CardContent>
           </Card>
@@ -418,8 +422,8 @@ const IssuePolicy = () => {
               />
               <Field label="Policy Holder" value={holderParticipant?.displayName ?? (holder ? fullName(holder) : "—")} />
               <Field label="Insured" value={insured ? fullName(insured) : "—"} />
-              <Field label="Start" value={<span className="font-mono text-xs">{offer.startDate}</span>} />
-              <Field label="End" value={<span className="font-mono text-xs">{offer.endDate}</span>} />
+              <Field label="Start" value={<span className="font-mono text-xs">{formatOfferDate(offer.startDate)}</span>} />
+              <Field label="End" value={<span className="font-mono text-xs">{formatOfferDate(offer.endDate)}</span>} />
               <Field label="Premium" value={<span className="text-primary font-semibold">{fmtMoney(offer.premium, offer.currency)}</span>} />
               <Field label="Status" value={offerStatusLabel(offer.status)} />
             </CardContent>

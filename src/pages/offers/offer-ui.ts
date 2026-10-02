@@ -1,4 +1,3 @@
-import { format, parseISO } from "date-fns";
 import type {
   DomainDistributionSalesChannel,
   DomainOffersOfferPeriodStatus,
@@ -10,6 +9,8 @@ import type {
   OffersOfferListItemResponse,
   RatingTablesRateResponse,
 } from "@/api/types";
+import { formatDate, formatDateTime } from "@/lib/date-format";
+import { formatMoney } from "@/lib/money-format";
 
 export const OFFER_STATUSES: DomainOffersOfferStatus[] = [
   "draft",
@@ -114,57 +115,12 @@ export const formatSharePct = (share?: number | null) => {
   return `${Math.round(share * 10000) / 100}%`;
 };
 
-export const formatOfferMoney = (value?: number | null, currency?: string) => {
-  if (value == null || Number.isNaN(value)) return "—";
-  const ccy = currency?.trim() || "ALL";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: ccy,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toLocaleString()} ${ccy}`;
-  }
-};
+export const formatOfferMoney = formatMoney;
 
-export const formatOfferDate = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd");
-  } catch {
-    return iso.slice(0, 10);
-  }
-};
+export const formatOfferDate = formatDate;
 
-export const formatOfferDateTime = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
-  }
-};
-
-const localDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
-const localDateTimeFormat = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-/** Date-only values (e.g. `2027-04-29`) in the browser's locale; parseISO keeps them on the same calendar day. */
-export const formatOfferLocalDate = (iso?: string | null) => {
-  if (!iso) return "—";
-  const date = parseISO(iso);
-  return Number.isNaN(date.getTime()) ? iso : localDateFormat.format(date);
-};
-
-/** UTC timestamps converted to the browser's time zone and locale. */
-export const formatOfferLocalDateTime = (iso?: string | null) => {
-  if (!iso) return "—";
-  const date = parseISO(iso);
-  return Number.isNaN(date.getTime()) ? iso : localDateTimeFormat.format(date);
-};
+/** UTC timestamp shown in the browser's time zone. */
+export const formatOfferDateTime = formatDateTime;
 
 export const formatCoverageTerm = (term?: OffersDateOnlyRangeResponse | null) => {
   if (!term?.startDate && !term?.endDate) return "—";
@@ -201,6 +157,24 @@ export const offerListLabel = (o: OffersOfferListItemResponse) => {
   ].filter(Boolean);
   return parts.join(" · ");
 };
+
+/** Keeps digits only and drops leading zeros, so 0 and negative numbers can't be typed. */
+export const sanitizeLegacyOfferNoInput = (value: string) =>
+  value.replace(/\D/g, "").replace(/^0+/, "");
+
+/** `legacyOfferAutoId` filter value: a whole number greater than 0, otherwise undefined (not sent). */
+export const legacyOfferAutoIdFromInput = (value: string): number | undefined => {
+  if (!/^\d+$/.test(value)) return undefined;
+  const n = Number(value);
+  return Number.isSafeInteger(n) && n > 0 ? n : undefined;
+};
+
+export const BANK_POLICY_SERIAL_MAX_LENGTH = 30;
+export const BANK_LOAN_NUMBER_MAX_LENGTH = 50;
+
+/** Keeps digits only, capped at the API limit. Leading zeros are kept: the serial is an identifier, not a number. */
+export const sanitizeBankPolicySerialInput = (value: string) =>
+  value.replace(/\D/g, "").slice(0, BANK_POLICY_SERIAL_MAX_LENGTH);
 
 export const REASON_MAX_LENGTH = 512;
 export const LOAN_SOURCE_SYSTEM_MAX_LENGTH = 100;

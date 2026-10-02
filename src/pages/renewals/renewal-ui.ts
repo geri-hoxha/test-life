@@ -1,8 +1,9 @@
-import { format, parseISO } from "date-fns";
 import type {
   DomainPoliciesPolicyRenewalStatus,
   OffersDateOnlyRangeResponse,
 } from "@/api/types";
+import { formatDate, formatDateTime } from "@/lib/date-format";
+import { formatAmount } from "@/lib/money-format";
 import { formatPolicyMoney } from "@/pages/policies/policy-ui";
 
 export const RENEWAL_STATUSES: DomainPoliciesPolicyRenewalStatus[] = [
@@ -43,31 +44,41 @@ export const formatRenewalMoney = (
   currency: string | null | undefined,
 ) => {
   if (value == null || Number.isNaN(value)) return "—";
-  if (!currency?.trim()) return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (!currency?.trim()) return formatAmount(value);
   return formatPolicyMoney(value, currency);
 };
 
-export const formatRenewalDate = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd");
-  } catch {
-    return iso.slice(0, 10);
-  }
-};
+export const formatRenewalDate = formatDate;
 
-export const formatRenewalDateTime = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
-  }
-};
+/** UTC timestamp shown in the browser's time zone. */
+export const formatRenewalDateTime = formatDateTime;
 
 export const formatRenewalPeriod = (period?: OffersDateOnlyRangeResponse | null) => {
   if (!period?.startDate && !period?.endDate) return "—";
   return `${formatRenewalDate(period.startDate)} → ${formatRenewalDate(period.endDate)}`;
+};
+
+/** A renewal that is finished and no longer holds up the ones after it. */
+const isSettledRenewal = (status?: string | null) => status === "applied" || status === "cancelled";
+
+type RenewalSequenceStatus = { targetPeriodSequence?: number | null; status?: string | null };
+
+/**
+ * Only the next coverage period of a policy can be started: a planned renewal
+ * qualifies once every earlier period has been applied (or cancelled).
+ */
+export const canStartRenewal = (
+  renewal: RenewalSequenceStatus,
+  siblings: readonly RenewalSequenceStatus[],
+): boolean => {
+  if (renewal.status !== "planned" || renewal.targetPeriodSequence == null) return false;
+  const sequence = renewal.targetPeriodSequence;
+  return !siblings.some(
+    (other) =>
+      other.targetPeriodSequence != null &&
+      other.targetPeriodSequence < sequence &&
+      !isSettledRenewal(other.status),
+  );
 };
 
 export const shortRenewalId = (id: string) =>

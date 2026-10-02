@@ -1,9 +1,10 @@
-import { format, parseISO } from "date-fns";
 import type {
   DomainCommissionsBasis,
   DomainCommissionsBusinessType,
   DomainCommissionsEntryType,
 } from "@/api/types";
+import { formatDateTime } from "@/lib/date-format";
+import { formatMoney } from "@/lib/money-format";
 
 export const COMMISSION_BUSINESS_TYPES: DomainCommissionsBusinessType[] = [
   "newBusiness",
@@ -53,19 +54,7 @@ export const basisLabel = (value?: DomainCommissionsBasis | string) => {
   return value ? humanizeCommissionEnum(value) : "—";
 };
 
-export const formatCommissionMoney = (value?: number | null, currency?: string) => {
-  if (value == null || Number.isNaN(value)) return "—";
-  const ccy = currency?.trim() || "ALL";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: ccy,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toLocaleString()} ${ccy}`;
-  }
-};
+export const formatCommissionMoney = formatMoney;
 
 export const formatCommissionRate = (rate?: number | null) => {
   if (rate == null || Number.isNaN(rate)) return "—";
@@ -75,14 +64,8 @@ export const formatCommissionRate = (rate?: number | null) => {
   })}%`;
 };
 
-export const formatCommissionDateTime = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
-  }
-};
+/** UTC timestamp shown in the browser's time zone. */
+export const formatCommissionDateTime = formatDateTime;
 
 export const shortCommissionId = (id: string) =>
   id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;

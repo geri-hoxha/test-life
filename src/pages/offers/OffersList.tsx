@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -44,15 +45,20 @@ import { AccessDeniedOr } from "@/components/AccessDeniedNotice";
 import { isApiForbidden } from "@/lib/api-error";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import {
+  BANK_LOAN_NUMBER_MAX_LENGTH,
+  BANK_POLICY_SERIAL_MAX_LENGTH,
   OFFER_STATUSES,
-  formatOfferLocalDate,
-  formatOfferLocalDateTime,
+  formatOfferDate,
+  formatOfferDateTime,
   formatOfferMoney,
+  legacyOfferAutoIdFromInput,
   offerStatusClass,
   offerStatusLabel,
+  sanitizeBankPolicySerialInput,
+  sanitizeLegacyOfferNoInput,
 } from "./offer-ui";
 
-const COL_COUNT = 17;
+const COL_COUNT = 20;
 
 const orDash = (value?: string | null) =>
   value?.trim() || <span className="text-muted-foreground">—</span>;
@@ -76,6 +82,9 @@ const OffersList = () => {
   const [createdTo, setCreatedTo] = useState("");
   const [personId, setPersonId] = useState("");
   const [partyId, setPartyId] = useState("");
+  const [legacyOfferNo, setLegacyOfferNo] = useState("");
+  const [bankPolicySerial, setBankPolicySerial] = useState("");
+  const [bankLoanNumber, setBankLoanNumber] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -91,6 +100,9 @@ const OffersList = () => {
         createdToUtc: dateToUtcEnd(createdTo),
         partyId: partyId.trim() || undefined,
         personId: personId.trim() || undefined,
+        legacyOfferAutoId: legacyOfferAutoIdFromInput(legacyOfferNo),
+        bankPolicySerial: bankPolicySerial.trim() || undefined,
+        bankLoanNumber: bankLoanNumber.trim() || undefined,
       }),
     [
       statusFilter,
@@ -100,6 +112,9 @@ const OffersList = () => {
       createdTo,
       partyId,
       personId,
+      legacyOfferNo,
+      bankPolicySerial,
+      bankLoanNumber,
     ],
   );
   const debouncedFilters = useDebouncedValue(filters);
@@ -136,6 +151,9 @@ const OffersList = () => {
     setCreatedTo("");
     setPersonId("");
     setPartyId("");
+    setLegacyOfferNo("");
+    setBankPolicySerial("");
+    setBankLoanNumber("");
   };
 
   const hasFilters =
@@ -145,7 +163,10 @@ const OffersList = () => {
     createdFrom ||
     createdTo ||
     partyId ||
-    personId;
+    personId ||
+    legacyOfferNo ||
+    bankPolicySerial ||
+    bankLoanNumber;
 
   return (
     <AppShell>
@@ -266,6 +287,51 @@ const OffersList = () => {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">
+                    Legacy offer no.
+                  </Label>
+                  <Input
+                    className="h-9 font-mono text-xs"
+                    inputMode="numeric"
+                    value={legacyOfferNo}
+                    onChange={(e) =>
+                      setLegacyOfferNo(sanitizeLegacyOfferNoInput(e.target.value))
+                    }
+                    placeholder="Filter by legacy offer no."
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Bank policy serial
+                  </Label>
+                  <Input
+                    className="h-9 font-mono text-xs"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={BANK_POLICY_SERIAL_MAX_LENGTH}
+                    value={bankPolicySerial}
+                    onChange={(e) =>
+                      setBankPolicySerial(
+                        sanitizeBankPolicySerialInput(e.target.value),
+                      )
+                    }
+                    placeholder="Filter by bank policy serial"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Bank loan number
+                  </Label>
+                  <Input
+                    className="h-9 font-mono text-xs"
+                    autoComplete="off"
+                    maxLength={BANK_LOAN_NUMBER_MAX_LENGTH}
+                    value={bankLoanNumber}
+                    onChange={(e) => setBankLoanNumber(e.target.value)}
+                    placeholder="Filter by bank loan number"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
                     Created from
                   </Label>
                   <DatePicker
@@ -299,6 +365,9 @@ const OffersList = () => {
                 <TableHeader>
                   <TableRow className="[&>th]:whitespace-nowrap">
                     <TableHead>ID</TableHead>
+                    <TableHead>Legacy offer no.</TableHead>
+                    <TableHead>Bank policy serial</TableHead>
+                    <TableHead>Bank loan number</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Product ID</TableHead>
                     <TableHead>Policy plan</TableHead>
@@ -377,6 +446,15 @@ const OffersList = () => {
                               orDash(o.id)
                             )}
                           </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {o.legacyOfferAutoId ?? null}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {orDash(o.bankPolicySerial)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {orDash(o.bankLoanNumber)}
+                          </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {productCell}
                           </TableCell>
@@ -390,7 +468,7 @@ const OffersList = () => {
                             {orDash(o.policyPlan)}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {formatOfferLocalDateTime(o.createdOnUtc)}
+                            {formatOfferDateTime(o.createdOnUtc)}
                           </TableCell>
                           <TableCell
                             className="font-mono text-xs"
@@ -408,10 +486,10 @@ const OffersList = () => {
                             )}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {formatOfferLocalDate(o.coverageTerm?.startDate)}
+                            {formatOfferDate(o.coverageTerm?.startDate)}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {formatOfferLocalDate(o.coverageTerm?.endDate)}
+                            {formatOfferDate(o.coverageTerm?.endDate)}
                           </TableCell>
                           <TableCell>
                             {o.currency ? (

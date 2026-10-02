@@ -77,6 +77,16 @@ export const useListRenewals = (
     placeholderData: keepPreviousData,
   });
 
+/** Every renewal of one policy, used to tell which coverage period comes next. */
+export const usePolicyRenewals = (policyId: string, options?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: renewalsKeys.list({ policyId, pageSize: 200 }),
+    queryFn: ({ signal }) => listRenewals({ policyId, pageSize: 200 }, signal),
+    enabled: Boolean(policyId) && (options?.enabled ?? true),
+    staleTime: 30_000,
+    select: (page) => page.items ?? [],
+  });
+
 /** GET /api/policies/{policyId}/renewals/{renewalId} */
 export const getPolicyRenewal = async (
   policyId: string,
@@ -477,4 +487,5 @@ export const isRenewalStatus = (
   value === "planned" ||
   value === "draft" ||
   value === "priced" ||
-  value === "applied";
+  value === "applied" ||
+  value === "cancelled";

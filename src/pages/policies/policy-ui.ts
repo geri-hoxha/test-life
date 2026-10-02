@@ -1,4 +1,3 @@
-import { format, parseISO } from "date-fns";
 import type {
   DomainBillingPremiumInstallmentStatus,
   DomainPoliciesCancellationKind,
@@ -6,7 +5,11 @@ import type {
   DomainPoliciesPolicyPeriodStatus,
   DomainPoliciesPolicyStatus,
   OffersDateOnlyRangeResponse,
+  PoliciesInvoiceRecipientResponse,
+  PoliciesPolicyResponse,
 } from "@/api/types";
+import { formatDate, formatDateTime, toLocalIsoDate } from "@/lib/date-format";
+import { formatMoney } from "@/lib/money-format";
 
 export const POLICY_STATUSES: DomainPoliciesPolicyStatus[] = [
   "pendingActivation",
@@ -25,7 +28,11 @@ export const policyStatusLabel = (status?: DomainPoliciesPolicyStatus | string |
   return status ? humanizePolicyEnum(status) : "—";
 };
 
-export const policyStatusClass = (status?: DomainPoliciesPolicyStatus | string | null) => {
+/** A lapsed, cancelled, or matured policy is already over, so a new cancellation cannot be started. */
+export const isPolicyCancellable = (status?: DomainPoliciesPolicyStatus | string | null) =>
+  status !== "lapsed" && status !== "cancelled" && status !== "matured";
+
+export const policyStatusClass =(status?: DomainPoliciesPolicyStatus | string | null) => {
   if (status === "pendingActivation") return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
   if (status === "active") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
   if (status === "lapsed") return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
@@ -92,57 +99,39 @@ export const installmentStatusClass = (
   return "bg-muted text-muted-foreground";
 };
 
-export const formatPolicyMoney = (value?: number | null, currency?: string) => {
-  if (value == null || Number.isNaN(value)) return "—";
-  const ccy = currency?.trim() || "ALL";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: ccy,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toLocaleString()} ${ccy}`;
-  }
-};
+/** The premium actually charged on a policy: a cancelled period is no longer charged, so it stays out of the total. */
+export const totalChargePremium = (
+  periods: readonly { status?: string | null; chargePremium?: number | null }[],
+) =>
+  periods
+    .filter((period) => period.status !== "cancelled")
+    .reduce((sum, period) => sum + (period.chargePremium ?? 0), 0);
 
-export const formatPolicyDate = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd");
-  } catch {
-    return iso.slice(0, 10);
-  }
-};
+export const BILLED_IN_LEGACY_LABEL = "Billed in legacy";
 
-export const formatPolicyDateTime = (iso?: string | null) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
-  }
-};
+/**
+ * A period migrated from legacy carries its legacy policy number, and legacy already billed
+ * its installments, which this system still holds as "ready to invoice".
+ */
+export const isBilledInLegacy = (
+  installment: { status?: string | null; coveragePeriodSequence?: number | null },
+  periods: readonly { sequenceNumber?: number; legacyPolicyNumber?: string | number | null }[],
+) =>
+  installment.status === "readyToInvoice" &&
+  installment.coveragePeriodSequence != null &&
+  periods.some(
+    (period) =>
+      period.sequenceNumber === installment.coveragePeriodSequence &&
+      // The API may send the legacy number as a JSON number rather than a string.
+      String(period.legacyPolicyNumber ?? "").trim() !== "",
+  );
 
-const localDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
-const localDateTimeFormat = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+export const formatPolicyMoney = formatMoney;
 
-/** Date-only values (e.g. `2032-06-23`) in the browser's locale; parseISO keeps them on the same calendar day. */
-export const formatPolicyLocalDate = (iso?: string | null) => {
-  if (!iso) return "—";
-  const date = parseISO(iso);
-  return Number.isNaN(date.getTime()) ? iso : localDateFormat.format(date);
-};
+export const formatPolicyDate = formatDate;
 
-/** UTC timestamps converted to the browser's time zone and locale. */
-export const formatPolicyLocalDateTime = (iso?: string | null) => {
-  if (!iso) return "—";
-  const date = parseISO(iso);
-  return Number.isNaN(date.getTime()) ? iso : localDateTimeFormat.format(date);
-};
+/** UTC timestamp shown in the browser's time zone. */
+export const formatPolicyDateTime = formatDateTime;
 
 export const formatCoverageTerm =(term?: OffersDateOnlyRangeResponse | null) => {
   if (!term?.startDate && !term?.endDate) return "—";
@@ -170,3 +159,57 @@ export const policyNumberLabel = (serial?: number | null, id?: string | null) =>
 
 export const shareToPercentage = (share?: number | null) =>
   Math.round((share ?? 0) * 10000) / 100;
+
+export type PayerHistoryEntry = {
+  key: string;
+  /** `YYYY-MM-DD` from which this party was invoiced. */
+  effectiveFrom: string;
+  payer: PoliciesInvoiceRecipientResponse;
+  isCurrent: boolean;
+  /** The payer named when the policy was issued, when the recorded history does not already start with them. */
+  isIssuePayer: boolean;
+};
+
+/**
+ * Who has been invoiced over the life of a policy, newest first. The recorded
+ * changes are shown as-is; the payer at issue is added at the end only when
+ * the history does not already begin with them.
+ */
+export const buildPayerHistory = (
+  policy?: Pick<
+    PoliciesPolicyResponse,
+    "issuedOnUtc" | "participants" | "invoiceRecipients" | "currentInvoiceRecipient"
+  > | null,
+): PayerHistoryEntry[] => {
+  if (!policy) return [];
+  const changes = [...(policy.invoiceRecipients ?? [])].sort(
+    (a, b) =>
+      (a.effectiveFrom ?? "").localeCompare(b.effectiveFrom ?? "") || (a.id ?? 0) - (b.id ?? 0),
+  );
+  if (changes.length === 0) return [];
+
+  const entries: PayerHistoryEntry[] = changes.map((c, i) => ({
+    key: `change-${c.id ?? i}`,
+    effectiveFrom: c.effectiveFrom ?? "",
+    payer: c,
+    isCurrent: false,
+    isIssuePayer: false,
+  }));
+
+  const issuePayer = policy.participants?.find((p) => p.role === "invoiced");
+  if (issuePayer && issuePayer.partyId !== changes[0].partyId) {
+    entries.unshift({
+      key: "issue",
+      effectiveFrom: toLocalIsoDate(policy.issuedOnUtc),
+      payer: issuePayer,
+      isCurrent: false,
+      isIssuePayer: true,
+    });
+  }
+
+  const currentId = policy.currentInvoiceRecipient?.partyId;
+  const current = [...entries].reverse().find((e) => e.payer.partyId === currentId);
+  if (current) current.isCurrent = true;
+
+  return entries.reverse();
+};

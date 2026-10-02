@@ -77,8 +77,17 @@ import {
   useRelationshipToInsuredOptions,
 } from "@/hooks/useRelationshipToInsuredOptions";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
-import { formatCoverageTermMonths } from "@/data/policy-plan-types";
+import {
+  coverageTermMonths,
+  formatCoverageTermMonths,
+} from "@/data/policy-plan-types";
+import { todayLocalIsoDate } from "@/lib/date-format";
 import { getApiErrorMessage, toastApiError } from "@/lib/api-error";
+import {
+  BANK_LOAN_NUMBER_MAX_LENGTH,
+  BANK_POLICY_SERIAL_MAX_LENGTH,
+  sanitizeBankPolicySerialInput,
+} from "./offer-ui";
 import {
   buildYearlyLoanPeriodDates,
   inclusiveYearEnd,
@@ -101,7 +110,7 @@ type ManualLoanRow = {
   remainingLoanAmount: number | "";
 };
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = todayLocalIsoDate;
 const DEFAULT_OFFER_TERM_YEARS = 20;
 
 const addMonthsIso = (iso: string, months: number) =>
@@ -244,6 +253,8 @@ const CreateOffer = () => {
   const [productGroupId, setProductGroupId] = useState("");
   const [productId, setProductId] = useState("");
   const [currency, setCurrency] = useState("");
+  const [bankPolicySerial, setBankPolicySerial] = useState("");
+  const [bankLoanNumber, setBankLoanNumber] = useState("");
 
   // Step 2 — parties are searched on the backend as the user types, so the
   // type of each selected party is remembered to post the right partyType.
@@ -403,7 +414,8 @@ const CreateOffer = () => {
   const [holderSource, setHolderSource] = useState<"customer" | "partner">(
     "customer",
   );
-  const holderIsPartner = holderSource === "partner" && Boolean(partnerOfficeId);
+  const holderIsPartner =
+    holderSource === "partner" && Boolean(partnerOfficeId);
   const beneficiaryIsPartner = (b: BeneficiaryDraft) =>
     Boolean(b.isPartner && partnerOfficeId);
   const partnerName =
@@ -649,6 +661,10 @@ const CreateOffer = () => {
           ? { partnerOfficeId: partnerOfficeId.trim() }
           : {}),
         ...(agentId.trim() ? { agentId: agentId.trim() } : {}),
+        ...(bankPolicySerial ? { bankPolicySerial } : {}),
+        ...(bankLoanNumber.trim()
+          ? { bankLoanNumber: bankLoanNumber.trim() }
+          : {}),
         insuredPersonId: insuredId || null,
       };
       const created = await createOffer.mutateAsync(body);
@@ -657,7 +673,7 @@ const CreateOffer = () => {
       createdOfferIdRef.current = offerId;
       insuredAttachedOnCreate = Boolean(
         insuredId &&
-          created.insuredPersons?.some((p) => p.personId === insuredId),
+        created.insuredPersons?.some((p) => p.personId === insuredId),
       );
     } catch (err) {
       toastApiError(err, "Failed to create offer");
@@ -848,7 +864,8 @@ const CreateOffer = () => {
               <CardTitle className="text-base">Product Selection</CardTitle>
               <CardDescription>
                 CreateOfferRequest: productId, currency, periodStart, periodEnd,
-                insuredPersonId, optional partnerOfficeId and agentId.
+                insuredPersonId, optional partnerOfficeId, agentId,
+                bankPolicySerial and bankLoanNumber.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
@@ -996,6 +1013,37 @@ const CreateOffer = () => {
                 </div>
               </div>
 
+              <div>
+                <Label htmlFor="bank-policy-serial">Bank policy serial</Label>
+                <Input
+                  id="bank-policy-serial"
+                  className="font-mono"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={BANK_POLICY_SERIAL_MAX_LENGTH}
+                  value={bankPolicySerial}
+                  onChange={(e) =>
+                    setBankPolicySerial(
+                      sanitizeBankPolicySerialInput(e.target.value),
+                    )
+                  }
+                  placeholder="Bank policy serial"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="bank-loan-number">Bank loan number</Label>
+                <Input
+                  id="bank-loan-number"
+                  className="font-mono"
+                  autoComplete="off"
+                  maxLength={BANK_LOAN_NUMBER_MAX_LENGTH}
+                  value={bankLoanNumber}
+                  onChange={(e) => setBankLoanNumber(e.target.value)}
+                  placeholder="Bank loan number"
+                />
+              </div>
+
               {product && (
                 <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 text-sm">
                   <div className="font-medium">
@@ -1136,7 +1184,9 @@ const CreateOffer = () => {
                   value={payerId}
                   onValueChange={selectParty(setPayerId)}
                   placeholder={
-                    payerIsInsured ? "Select insured person first" : "Select payer"
+                    payerIsInsured
+                      ? "Select insured person first"
+                      : "Select payer"
                   }
                   disabled={payerIsInsured}
                 />
@@ -1159,7 +1209,9 @@ const CreateOffer = () => {
                         variant="link"
                         size="sm"
                         className="px-0 h-7 text-xs"
-                        onClick={() => onPayerRelationshipChange(SAME_AS_INSURED)}
+                        onClick={() =>
+                          onPayerRelationshipChange(SAME_AS_INSURED)
+                        }
                       >
                         Same as insured person
                       </Button>
@@ -1224,7 +1276,9 @@ const CreateOffer = () => {
                                   size="sm"
                                   className="px-0 h-7 text-xs"
                                   onClick={() =>
-                                    updateBeneficiary(b.id, { isPartner: false })
+                                    updateBeneficiary(b.id, {
+                                      isPartner: false,
+                                    })
                                   }
                                 >
                                   Use a customer instead
@@ -1249,7 +1303,9 @@ const CreateOffer = () => {
                                       size="sm"
                                       className="px-0 h-7 text-xs"
                                       onClick={() =>
-                                        updateBeneficiary(b.id, { isPartner: true })
+                                        updateBeneficiary(b.id, {
+                                          isPartner: true,
+                                        })
                                       }
                                     >
                                       Use partner
@@ -1341,7 +1397,12 @@ const CreateOffer = () => {
                       : "text-destructive"
                   }`}
                 >
-                  Term: {termYears} years
+                  Term:{" "}
+                  {startDate && endDate
+                    ? formatCoverageTermMonths(
+                        coverageTermMonths(startDate, endDate),
+                      )
+                    : "—"}
                   {maxEndDate
                     ? ` · Max ${product?.maximumCoverageTermMonths} months (ends ${format(parseISO(maxEndDate), "dd/MM/yyyy")})`
                     : ""}

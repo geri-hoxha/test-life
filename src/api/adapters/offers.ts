@@ -19,6 +19,8 @@ import type {
   PaymentMode,
   Beneficiary,
 } from "@/data/offers";
+import { coverageTermMonths } from "@/data/policy-plan-types";
+import { todayLocalIsoDate, toLocalIsoDate } from "@/lib/date-format";
 
 const DEFAULT_PAYMENT: PaymentMode = "Pagesa me prim te rregullt";
 
@@ -191,7 +193,7 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     0,
   );
 
-  const created = o.createdOnUtc?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+  const created = toLocalIsoDate(o.createdOnUtc) || todayLocalIsoDate();
   const start = o.coverageTerm?.startDate?.slice(0, 10) || firstYear?.startDate || created;
   const end = o.coverageTerm?.endDate?.slice(0, 10) || firstYear?.endDate || created;
   const startYear = Number(start.slice(0, 4)) || new Date().getFullYear();
@@ -210,6 +212,9 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     requiresLoanBalances: o.requiresLoanBalances,
     policyId: o.policyId ?? null,
     renewedFromPolicyId: o.renewedFromPolicyId ?? null,
+    legacyOfferAutoId: o.legacyOfferAutoId ?? null,
+    bankPolicySerial: o.bankPolicySerial ?? null,
+    bankLoanNumber: o.bankLoanNumber ?? null,
     policyHolderId: holder?.partyId ?? "",
     payerId: payer?.partyId ?? "",
     insuredId: insured?.personId ?? "",
@@ -219,6 +224,7 @@ export const mapApiOffer = (o: OffersOfferResponse): Offer => {
     startDate: start,
     endDate: end,
     termYears: Math.max(1, endYear - startYear),
+    termMonths: coverageTermMonths(start, end),
     paymentMode: DEFAULT_PAYMENT,
     loan: loan
       ? {

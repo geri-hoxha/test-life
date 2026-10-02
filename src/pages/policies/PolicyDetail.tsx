@@ -67,12 +67,16 @@ import type {
   RatingTablesRateResponse,
 } from "@/api/types";
 import {
+  BILLED_IN_LEGACY_LABEL,
   formatCoverageTerm,
   formatPolicyDate,
   formatPolicyDateTime,
+  buildPayerHistory,
   formatPolicyMoney,
   installmentStatusClass,
   installmentStatusLabel,
+  isBilledInLegacy,
+  isPolicyCancellable,
   periodStatusClass,
   periodStatusLabel,
   policyNumberLabel,
@@ -80,6 +84,7 @@ import {
   policyStatusLabel,
   shareToPercentage,
   shortPolicyId,
+  totalChargePremium,
 } from "./policy-ui";
 import PolicyCancellationCard from "./PolicyCancellationCard";
 
@@ -227,7 +232,7 @@ const InsuredPersonFields = ({
         label="DOB / Age"
         value={
           person.dateOfBirth
-            ? `${person.dateOfBirth} (${ageFromDob(person.dateOfBirth)} yrs)`
+            ? `${formatPolicyDate(person.dateOfBirth)} (${ageFromDob(person.dateOfBirth)} yrs)`
             : undefined
         }
       />
@@ -394,13 +399,18 @@ const PolicyDetail = () => {
   );
   const coverages = periods.flatMap((p) => p.coverages ?? []);
   const currency = policy?.currency ?? "ALL";
-  const chargePremium = periods.reduce((sum, p) => sum + (p.chargePremium ?? 0), 0);
+  const chargePremium = totalChargePremium(periods);
   const sumInsured =
     coverages.reduce((max, c) => Math.max(max, c.sumInsured ?? 0), 0) || null;
 
   const participants = policy?.participants ?? [];
   const holder = participants.find((p) => p.role === "policyHolder");
-  const payer = participants.find((p) => p.role === "invoiced") ?? holder;
+  const current = policy?.currentInvoiceRecipient;
+  // The payer today: the recorded current invoice recipient, else whoever was named at issue.
+  const payer: PoliciesPolicyParticipantResponse | undefined = current
+    ? { role: "invoiced", ...current }
+    : (participants.find((p) => p.role === "invoiced") ?? holder);
+  const payerHistory = useMemo(() => buildPayerHistory(policy), [policy]);
   const beneficiaries = participants.filter((p) => p.role === "beneficiary");
   const insuredPersons = policy?.insuredPersons ?? [];
   const sales = policy?.salesAttribution;
@@ -579,15 +589,22 @@ const PolicyDetail = () => {
               Renewal offer
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-2 text-destructive border-destructive/40 hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/50"
-            onClick={() => setTab("cancellation")}
-          >
-            <Ban className="h-4 w-4" />
-            {policy.status === "cancelled" ? "View cancellation" : "Cancel policy"}
-          </Button>
+          {isPolicyCancellable(policy.status) ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 text-destructive border-destructive/40 hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/50"
+              onClick={() => setTab("cancellation")}
+            >
+              <Ban className="h-4 w-4" />
+              Cancel policy
+            </Button>
+          ) : policy.status === "cancelled" ? (
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => setTab("cancellation")}>
+              <Ban className="h-4 w-4" />
+              View cancellation
+            </Button>
+          ) : null}
           <Button
             size="sm"
             className="gap-2"
@@ -1004,6 +1021,55 @@ const PolicyDetail = () => {
               </CardContent>
             </Card>
 
+            {payerHistory.length > 0 ? (
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-base">Payer history</CardTitle>
+                  <CardDescription>
+                    Who has been invoiced for this policy, newest first
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>From</TableHead>
+                          <TableHead>Payer</TableHead>
+                          <TableHead>Identifier</TableHead>
+                          <TableHead>Relationship</TableHead>
+                          <TableHead />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payerHistory.map((entry) => (
+                          <TableRow key={entry.key}>
+                            <TableCell className="font-mono text-xs">
+                              {formatPolicyDate(entry.effectiveFrom)}
+                            </TableCell>
+                            <TableCell>
+                              <PartyLink
+                                partyId={entry.payer.partyId}
+                                partyType={entry.payer.partyType}
+                                displayName={entry.payer.displayName}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {entry.payer.uniqueIdentifier}
+                            </TableCell>
+                            <TableCell>{relationshipLabel(entry.payer.relationshipToInsured)}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {entry.isCurrent ? "Current" : entry.isIssuePayer ? "At issue" : null}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Beneficiaries</CardTitle>
@@ -1076,35 +1142,40 @@ const PolicyDetail = () => {
                         .sort(
                           (a, b) => (a.installmentSequence ?? 0) - (b.installmentSequence ?? 0),
                         )
-                        .map((row) => (
-                          <TableRow key={row.id ?? row.installmentSequence}>
-                            <TableCell className="font-mono text-xs">
-                              {row.installmentSequence ?? "—"}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {row.coveragePeriodSequence ?? "—"}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {formatCoverageTerm(row.servicePeriod)}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {formatPolicyDate(row.invoiceOnDate)}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {formatPolicyDate(row.dueDate)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm font-medium">
-                              {formatPolicyMoney(row.amount, row.currency || currency)}
-                            </TableCell>
-                            <TableCell>
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${installmentStatusClass(row.status)}`}
-                              >
-                                {installmentStatusLabel(row.status)}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        .map((row) => {
+                          const billedInLegacy = isBilledInLegacy(row, periods);
+                          return (
+                            <TableRow key={row.id ?? row.installmentSequence}>
+                              <TableCell className="font-mono text-xs">
+                                {row.installmentSequence ?? "—"}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {row.coveragePeriodSequence ?? "—"}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {formatCoverageTerm(row.servicePeriod)}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {formatPolicyDate(row.invoiceOnDate)}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {formatPolicyDate(row.dueDate)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm font-medium">
+                                {formatPolicyMoney(row.amount, row.currency || currency)}
+                              </TableCell>
+                              <TableCell>
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${installmentStatusClass(billedInLegacy ? "invoiced" : row.status)}`}
+                                >
+                                  {billedInLegacy
+                                    ? BILLED_IN_LEGACY_LABEL
+                                    : installmentStatusLabel(row.status)}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                     )}
                   </TableBody>
                 </Table>

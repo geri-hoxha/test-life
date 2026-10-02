@@ -1,6 +1,4 @@
 import {
-  Search,
-  Bell,
   ChevronDown,
   Settings,
   LogOut,
@@ -30,7 +28,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,10 +41,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import QuickActions from "./QuickActions";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
 import { useListCurrencyRates } from "@/api/currency-rates";
 import { clearSession } from "@/api/client";
 import { LOGIN_PATH, readDisplayUsername } from "@/lib/auth";
+import { formatDateTime } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 import { Loader } from "@/components/Loader";
 import { ChangePasswordDialog } from "@/components/auth/ChangePasswordDialog";
@@ -146,15 +143,6 @@ const pickFxRates = (
   return rates;
 };
 
-const formatFetchedAt = (fetchedAtUtc?: string): string | null => {
-  if (!fetchedAtUtc) return null;
-  try {
-    return format(parseISO(fetchedAtUtc), "d MMM HH:mm");
-  } catch {
-    return null;
-  }
-};
-
 const initialsFromUsername = (username: string): string => {
   const parts = username
     .trim()
@@ -188,9 +176,8 @@ const TopBar = () => {
     ...(usdRates.data?.items ?? []),
   ];
   const fxRates = pickFxRates(rateItems);
-  const fetchedLabel = formatFetchedAt(
-    rateItems.find((r) => r.fetchedAtUtc)?.fetchedAtUtc,
-  );
+  const fetchedAtUtc = rateItems.find((r) => r.fetchedAtUtc)?.fetchedAtUtc;
+  const fetchedLabel = fetchedAtUtc ? formatDateTime(fetchedAtUtc) : null;
   const ratesLoading = eurRates.isLoading || usdRates.isLoading;
   const username = readDisplayUsername() ?? "User";
   const usernameInitials = initialsFromUsername(username);
@@ -215,28 +202,8 @@ const TopBar = () => {
           </div>
         </a>
 
-        <div className="relative flex-1 max-w-xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-topbar-muted" />
-          <Input
-            placeholder="Search people, companies, policies, offers…"
-            className="pl-9 h-9 bg-topbar-hover/60 border-topbar-border text-topbar-foreground placeholder:text-topbar-muted focus-visible:ring-accent focus-visible:ring-offset-0"
-          />
-          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex items-center gap-1 rounded border border-topbar-border bg-topbar/80 px-1.5 py-0.5 text-[10px] font-mono text-topbar-muted">
-            ⌘K
-          </kbd>
-        </div>
-
         <div className="flex items-center gap-2 ml-auto">
           <QuickActions />
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-topbar-foreground hover:bg-topbar-hover hover:text-topbar-foreground relative"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-accent ring-2 ring-topbar" />
-          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -382,7 +349,7 @@ const TopBar = () => {
             {fetchedLabel && (
               <span
                 className="text-[10px] tabular-nums text-topbar-muted/45"
-                title="Currency rates fetchedAtUtc"
+                title="Rates fetched at"
               >
                 {fetchedLabel}
               </span>

@@ -141,6 +141,10 @@ export type Offer = {
   requiresLoanBalances?: boolean;
   policyId?: string | null;
   renewedFromPolicyId?: string | null;
+  /** Original LisWeb offer number; null for offers created in this system. */
+  legacyOfferAutoId?: number | null;
+  bankPolicySerial?: string | null;
+  bankLoanNumber?: string | null;
   policyHolderId: string;
   payerId: string;
   insuredId: string;
@@ -150,6 +154,8 @@ export type Offer = {
   startDate: string;
   endDate: string;
   termYears: number;
+  /** Coverage length in whole months, for display; `termYears` stays for the yearly loan schedule. */
+  termMonths: number;
   paymentMode: PaymentMode;
   loan?: {
     amount: number;

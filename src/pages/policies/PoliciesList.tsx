@@ -40,13 +40,13 @@ import { toast } from "sonner";
 import { Eye, Loader2, Printer, ShieldCheck } from "lucide-react";
 import { getCurrencies } from "@/config/currencies";
 import { openPolicyPrint, openPolicyPrintWindow, useListPolicies } from "@/api/policies";
+import { insuredFullName } from "@/lib/customer-name";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
-import type { PoliciesPolicyListItemResponse } from "@/api/types";
 import {
-  formatPolicyLocalDate,
-  formatPolicyLocalDateTime,
+  formatPolicyDate,
+  formatPolicyDateTime,
   formatPolicyMoney,
   policyNumberLabel,
   policyStatusClass,
@@ -54,13 +54,7 @@ import {
   shortPolicyId,
 } from "./policy-ui";
 
-const COL_COUNT = 16;
-
-const insuredFullName = (p: PoliciesPolicyListItemResponse) =>
-  [p.insuredFirstName, p.insuredLastName]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(" ") || p.insuredName?.trim() || "";
+const COL_COUNT = 15;
 
 const Empty = () => <span className="text-muted-foreground">—</span>;
 
@@ -71,6 +65,11 @@ const toDate = (isoDay: string) => {
   } catch {
     return undefined;
   }
+};
+
+const serialFromInput = (value: string): number | undefined => {
+  const serial = Number(value);
+  return /^\d+$/.test(value) && Number.isSafeInteger(serial) ? serial : undefined;
 };
 
 const PoliciesList = () => {
@@ -84,6 +83,7 @@ const PoliciesList = () => {
   const [coverageOn, setCoverageOn] = useState("");
   const [partyId, setPartyId] = useState("");
   const [personId, setPersonId] = useState("");
+  const [serial, setSerial] = useState("");
   const [legacyPolicyNumber, setLegacyPolicyNumber] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -100,6 +100,7 @@ const PoliciesList = () => {
         coverageOn: coverageOn.trim() || undefined,
         partyId: partyId.trim() || undefined,
         personId: personId.trim() || undefined,
+        serial: serialFromInput(serial),
         legacyPolicyNumber: legacyPolicyNumber.trim() || undefined,
       }),
     [
@@ -111,6 +112,7 @@ const PoliciesList = () => {
       coverageOn,
       partyId,
       personId,
+      serial,
       legacyPolicyNumber,
     ],
   );
@@ -138,6 +140,7 @@ const PoliciesList = () => {
     setCoverageOn("");
     setPartyId("");
     setPersonId("");
+    setSerial("");
     setLegacyPolicyNumber("");
   };
 
@@ -173,6 +176,7 @@ const PoliciesList = () => {
     coverageOn ||
     partyId ||
     personId ||
+    serial ||
     legacyPolicyNumber;
 
   return (
@@ -273,6 +277,16 @@ const PoliciesList = () => {
                 />
               </div>
               <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Serial</Label>
+                <Input
+                  className="h-9 font-mono text-xs"
+                  inputMode="numeric"
+                  value={serial}
+                  onChange={(e) => setSerial(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Filter by serial"
+                />
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Legacy policy number</Label>
                 <Input
                   className="h-9 font-mono text-xs"
@@ -317,7 +331,6 @@ const PoliciesList = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Serial</TableHead>
-                  <TableHead>Legacy policy no.</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Policy plan</TableHead>
                   <TableHead>Status</TableHead>
@@ -367,9 +380,6 @@ const PoliciesList = () => {
                           policyNumberLabel(p.serial, p.id)
                         )}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {p.legacyPolicyNumber?.trim() || <Empty />}
-                      </TableCell>
                       <TableCell className="text-sm">
                         {p.productName?.trim() || <Empty />}
                       </TableCell>
@@ -402,13 +412,13 @@ const PoliciesList = () => {
                         {p.currency?.trim() || <Empty />}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {formatPolicyLocalDate(p.coverageTerm?.startDate)}
+                        {formatPolicyDate(p.coverageTerm?.startDate)}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {formatPolicyLocalDate(p.coverageTerm?.endDate)}
+                        {formatPolicyDate(p.coverageTerm?.endDate)}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {formatPolicyLocalDateTime(p.issuedOnUtc)}
+                        {formatPolicyDateTime(p.issuedOnUtc)}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {p.offerId ? (

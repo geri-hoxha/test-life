@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { FileText } from "lucide-react";
 import { useListOffers } from "@/api/offers";
+import { customerName } from "@/lib/customer-name";
+import { RECENT_ROWS } from "./constants";
 import {
   formatOfferDate,
   formatOfferMoney,
@@ -28,16 +30,14 @@ const RecentOffersTable = () => {
   const navigate = useNavigate();
   const { data: offersPage, isLoading } = useListOffers({
     pageNumber: 1,
-    pageSize: 10,
+    pageSize: RECENT_ROWS,
   });
 
   const offers = useMemo(
     () =>
-      [...(offersPage?.items ?? [])]
-        .sort((a, b) =>
-          (b.createdOnUtc ?? "").localeCompare(a.createdOnUtc ?? ""),
-        )
-        .slice(0, 6),
+      [...(offersPage?.items ?? [])].sort((a, b) =>
+        (b.createdOnUtc ?? "").localeCompare(a.createdOnUtc ?? ""),
+      ),
     [offersPage?.items],
   );
 
@@ -118,7 +118,7 @@ const RecentOffersTable = () => {
                     </div>
                   </TableCell>
                   <TableCell className="py-2 px-3 text-sm max-w-[10rem] truncate">
-                    {o.policyHolderName?.trim() || "—"}
+                    {customerName(o) || "—"}
                   </TableCell>
                   <TableCell className="py-2 px-3 text-sm max-w-[10rem] truncate">
                     {o.productName?.trim() || o.productId || "—"}

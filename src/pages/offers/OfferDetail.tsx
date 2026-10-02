@@ -96,6 +96,7 @@ import {
 } from "./VerificationStep";
 import { toast } from "sonner";
 import { toastApiError } from "@/lib/api-error";
+import { todayLocalIsoDate } from "@/lib/date-format";
 import { buildYearlyLoanPeriodDates } from "@/lib/loan-periods";
 import {
   useGetOffer,
@@ -132,6 +133,7 @@ import {
 } from "@/api/documents";
 import { useGetAgent } from "@/api/agents";
 import { useGetBankAccount } from "@/api/bank-accounts";
+import { useGetPolicy } from "@/api/policies";
 import { customerPath, countryDisplayName } from "@/api/adapters/customers";
 import { useGetPerson } from "@/api/people";
 import { useGetCompany } from "@/api/companies";
@@ -146,8 +148,10 @@ import type {
   DomainOffersParticipantRole,
   DomainPoliciesRelationshipToInsured,
 } from "@/api/types";
+import { formatCoverageTermMonths } from "@/data/policy-plan-types";
 import { usePolicyPlanTypeLabel } from "@/hooks/usePolicyPlanTypeOptions";
 import { SAME_AS_INSURED } from "@/hooks/useRelationshipToInsuredOptions";
+import { policyNumberLabel } from "@/pages/policies/policy-ui";
 import { useDocumentPreview } from "@/components/documents/DocumentPreview";
 import { DiscountRequestsTable } from "./DiscountRequestsTable";
 import {
@@ -848,6 +852,12 @@ const OfferDetail = () => {
     enabled: Boolean(salesAgentId) && !apiOffer?.salesAttribution?.agentDisplayName,
   });
 
+  // The offer only carries policy ids; the policy number is the serial on the policy itself.
+  const { data: issuedPolicy, isLoading: issuedPolicyLoading } = useGetPolicy(offer?.policyId ?? "");
+  const { data: renewedFromPolicy, isLoading: renewedFromPolicyLoading } = useGetPolicy(
+    offer?.renewedFromPolicyId ?? "",
+  );
+
   useEffect(() => {
     const first = offer?.offerYears[0];
     const key = first?.id || (first ? String(first.year) : "");
@@ -937,7 +947,11 @@ const OfferDetail = () => {
       setIssuancePending("issue");
       const issued = await issueOfferPolicy.mutateAsync({ offerId: offer.id });
       const policyId = issued.policy?.id;
-      toast.success(policyId ? `Policy ${policyId} issued` : "Policy issued");
+      toast.success(
+        policyId
+          ? `Policy ${policyNumberLabel(issued.policy?.serial, policyId)} issued`
+          : "Policy issued",
+      );
       if (policyId) navigate(`/policies/${policyId}`);
     } catch (err) {
       toastApiError(err, "Failed to issue policy");
@@ -997,7 +1011,7 @@ const OfferDetail = () => {
   };
 
   const openLoanDialog = () => {
-    const start = offer.startDate || new Date().toISOString().slice(0, 10);
+    const start = offer.startDate || todayLocalIsoDate();
     const end = offer.endDate || start;
     const term = Math.max(1, offer.termYears);
     const rows = buildYearlyLoanPeriodDates(start, end, term).map((range) => ({
@@ -1622,7 +1636,7 @@ const OfferDetail = () => {
               to={`/policies/${offer.policyId}`}
               className="font-mono text-primary hover:underline"
             >
-              {offer.policyId}
+              {issuedPolicyLoading ? "…" : policyNumberLabel(issuedPolicy?.serial, offer.policyId)}
             </Link>
             .
           </p>
@@ -1689,7 +1703,9 @@ const OfferDetail = () => {
             <CardDescription>Term</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold">{offer.termYears} years</div>
+            <div className="text-lg font-semibold">
+              {formatCoverageTermMonths(offer.termMonths)}
+            </div>
           </CardContent>
         </Card>
         <Card
@@ -1795,7 +1811,7 @@ const OfferDetail = () => {
                   }
                 />
                 <Field
-                  label="Created on UTC"
+                  label="Created on"
                   value={
                     <span
                       className={`${PERIOD_DATE_CLASS} inline-flex items-center gap-1.5`}
@@ -1806,7 +1822,7 @@ const OfferDetail = () => {
                   }
                 />
                 <Field
-                  label="Quoted on UTC"
+                  label="Quoted on"
                   value={
                     <span
                       className={`${PERIOD_DATE_CLASS} inline-flex items-center gap-1.5`}
@@ -1824,7 +1840,9 @@ const OfferDetail = () => {
                         to={`/policies/${offer.renewedFromPolicyId}`}
                         className="font-mono text-xs text-primary hover:underline"
                       >
-                        {offer.renewedFromPolicyId}
+                        {renewedFromPolicyLoading
+                          ? "…"
+                          : policyNumberLabel(renewedFromPolicy?.serial, offer.renewedFromPolicyId)}
                       </Link>
                     }
                   />
@@ -1897,6 +1915,34 @@ const OfferDetail = () => {
                       : paymentBankAccountId || undefined
                   }
                 />
+                <Field
+                  label="Bank policy serial"
+                  value={
+                    offer.bankPolicySerial ? (
+                      <span className="font-mono break-all">
+                        {offer.bankPolicySerial}
+                      </span>
+                    ) : undefined
+                  }
+                />
+                <Field
+                  label="Bank loan number"
+                  value={
+                    offer.bankLoanNumber ? (
+                      <span className="font-mono break-all">
+                        {offer.bankLoanNumber}
+                      </span>
+                    ) : undefined
+                  }
+                />
+                {offer.legacyOfferAutoId != null ? (
+                  <Field
+                    label="Legacy offer no."
+                    value={
+                      <span className="font-mono">{offer.legacyOfferAutoId}</span>
+                    }
+                  />
+                ) : null}
               </CardContent>
             </Card>
 
@@ -1928,7 +1974,7 @@ const OfferDetail = () => {
                   />
                   <Field
                     label="Term"
-                    value={`${offer.termYears} ${offer.termYears === 1 ? "year" : "years"}`}
+                    value={formatCoverageTermMonths(offer.termMonths)}
                   />
                   <Field
                     label="Periods"
