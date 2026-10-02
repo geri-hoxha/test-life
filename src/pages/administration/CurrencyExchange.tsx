@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { FilterGrid } from "@/components/FilterGrid";
 import { TableLoadingRow } from "@/components/Loader";
@@ -30,19 +29,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useListCurrencyRates } from "@/api/currency-rates";
+import { formatDateTime } from "@/lib/date-format";
 import { compactQuery } from "@/lib/list-query";
 import { getCurrencies } from "@/config/currencies";
 
 const RATE_CURRENCIES = getCurrencies().filter((code) => code !== "ALL");
-
-const formatUtc = (iso?: string) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
-  }
-};
 
 const formatRate = (rate?: number) => {
   if (typeof rate !== "number") return "—";
@@ -188,10 +179,10 @@ const CurrencyExchange = () => {
                         {formatRate(row.rateToAll)}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">
-                        {formatUtc(row.publishedAtUtc)}
+                        {formatDateTime(row.publishedAtUtc)}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">
-                        {formatUtc(row.fetchedAtUtc)}
+                        {formatDateTime(row.fetchedAtUtc)}
                       </TableCell>
                     </TableRow>
                   ))

@@ -70,6 +70,7 @@ import {
   VerificationChecksTable,
 } from "@/pages/offers/VerificationStep";
 import { REASON_MAX_LENGTH } from "@/pages/offers/offer-ui";
+import { policyNumberLabel } from "@/pages/policies/policy-ui";
 import {
   ArrowLeft,
   Calculator,
@@ -84,7 +85,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { StartRenewalBalanceFields } from "./StartRenewalBalanceFields";
-import { startRenewalRequestBody } from "./start-renewal-balances";
+import { startRenewalBody } from "./start-renewal-balances";
 import {
   formatRenewalDate,
   formatRenewalDateTime,
@@ -273,7 +274,7 @@ const RenewalDetail = () => {
   };
 
   const handleStart = () => {
-    const balances = startRenewalRequestBody(openingBalance, closingBalance);
+    const balances = startRenewalBody(renewal.requiresLoanBalances, openingBalance, closingBalance);
     if (!balances.ok) {
       setBalanceError(true);
       return;
@@ -574,7 +575,9 @@ const RenewalDetail = () => {
             value={
               renewal.policyId ? (
                 <span className="inline-flex items-center gap-1 min-w-0">
-                  <span className="font-mono text-xs truncate">{renewal.policyId}</span>
+                  <span className="font-mono text-xs truncate">
+                    {policyNumberLabel(policy?.serial, renewal.policyId)}
+                  </span>
                   <Button
                     type="button"
                     size="icon"
@@ -638,10 +641,10 @@ const RenewalDetail = () => {
               </span>
             }
           />
-          <Field label="Created on UTC" value={<DateTimeValue value={renewal.createdOnUtc} />} />
-          <Field label="Started on UTC" value={<DateTimeValue value={renewal.startedOnUtc} />} />
-          <Field label="Priced on UTC" value={<DateTimeValue value={renewal.pricedOnUtc} />} />
-          <Field label="Applied on UTC" value={<DateTimeValue value={renewal.appliedOnUtc} />} />
+          <Field label="Created on" value={<DateTimeValue value={renewal.createdOnUtc} />} />
+          <Field label="Started on" value={<DateTimeValue value={renewal.startedOnUtc} />} />
+          <Field label="Priced on" value={<DateTimeValue value={renewal.pricedOnUtc} />} />
+          <Field label="Applied on" value={<DateTimeValue value={renewal.appliedOnUtc} />} />
         </CardContent>
       </Card>
 
@@ -854,14 +857,16 @@ const RenewalDetail = () => {
               Start underwriting for the next coverage period.
             </DialogDescription>
           </DialogHeader>
-          <StartRenewalBalanceFields
-            openingBalance={openingBalance}
-            closingBalance={closingBalance}
-            onOpeningBalanceChange={setOpeningBalance}
-            onClosingBalanceChange={setClosingBalance}
-            disabled={startRenewal.isPending}
-            showError={balanceError}
-          />
+          {renewal.requiresLoanBalances ? (
+            <StartRenewalBalanceFields
+              openingBalance={openingBalance}
+              closingBalance={closingBalance}
+              onOpeningBalanceChange={setOpeningBalance}
+              onClosingBalanceChange={setClosingBalance}
+              disabled={startRenewal.isPending}
+              showError={balanceError}
+            />
+          ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={closeStart} disabled={startRenewal.isPending}>
               Cancel

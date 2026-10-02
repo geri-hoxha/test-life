@@ -60,6 +60,7 @@ import {
 } from "@/api/documents";
 import { useDocumentPreview } from "@/components/documents/DocumentPreview";
 import type { DocumentsDocumentResponse } from "@/api/types";
+import { formatDateTime } from "@/lib/date-format";
 import { compactQuery, dateToUtcEnd, dateToUtcStart } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { isApiForbidden, toastApiError } from "@/lib/api-error";
@@ -72,15 +73,6 @@ const toDate = (isoDay: string) => {
     return parseISO(isoDay);
   } catch {
     return undefined;
-  }
-};
-
-const formatCreated = (iso?: string) => {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "yyyy-MM-dd HH:mm");
-  } catch {
-    return iso;
   }
 };
 
@@ -369,7 +361,7 @@ const DocumentsList = () => {
                       <TableCell className="text-sm text-muted-foreground">
                         {row.storageProvider ?? "—"}
                       </TableCell>
-                      <TableCell className="text-sm tabular-nums">{formatCreated(row.createdOn)}</TableCell>
+                      <TableCell className="text-sm tabular-nums">{formatDateTime(row.createdOn)}</TableCell>
                       <TableCell stickyRight className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button

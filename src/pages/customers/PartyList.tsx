@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format, parseISO } from "date-fns";
 import AppShell from "@/components/layout/AppShell";
 import { FilterGrid } from "@/components/FilterGrid";
 import { TableLoadingRow } from "@/components/Loader";
@@ -46,15 +45,13 @@ import {
 import { Plus, Pencil, FileText } from "lucide-react";
 import { fullName, COMPANY_TYPE_OPTIONS, companyTypeLabel } from "@/data/customers";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { formatDate } from "@/lib/date-format";
 import { compactQuery } from "@/lib/list-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { isApiForbidden } from "@/lib/api-error";
 
 const initials = (first: string, last: string) =>
   `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
-
-const fmtMoney = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
 
 const copy = {
   person: {
@@ -203,7 +200,7 @@ export const PartyList = ({ partyType }: PartyListProps) => {
   const hasFilters = isCompany ? hasCompanyFilters : hasPeopleFilters;
   const clearFilters = isCompany ? clearCompanyFilters : clearPeopleFilters;
 
-  const colSpan = isCompany ? 9 : 10;
+  const colSpan = isCompany ? 5 : 6;
 
   return (
     <AppShell>
@@ -410,9 +407,6 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                       <TableHead>Gender</TableHead>
                     </>
                   )}
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="text-right">Total exposure</TableHead>
                   <TableHead stickyRight className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -464,22 +458,11 @@ export const PartyList = ({ partyType }: PartyListProps) => {
                         ) : (
                           <>
                             <TableCell className="text-muted-foreground min-w-28">
-                              {c.dateOfBirth ? format(parseISO(c.dateOfBirth), "MMM dd, yyyy") : "—"}
+                              {formatDate(c.dateOfBirth)}
                             </TableCell>
                             <TableCell className="text-muted-foreground">{c.gender}</TableCell>
                           </>
                         )}
-                        <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground truncate max-w-[200px]">
-                          {c.email ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-medium" onClick={(e) => e.stopPropagation()}>
-                          {c.totalExposure > 0 ? (
-                            <span>{fmtMoney(c.totalExposure)}</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
                         <TableCell stickyRight className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="inline-flex items-center gap-1">
                             <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">

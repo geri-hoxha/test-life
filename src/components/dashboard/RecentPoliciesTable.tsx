@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { ShieldCheck } from "lucide-react";
 import { useListPolicies } from "@/api/policies";
+import { customerName } from "@/lib/customer-name";
+import { RECENT_ROWS } from "./constants";
 import {
   formatPolicyDate,
   formatPolicyMoney,
@@ -28,16 +30,14 @@ const RecentPoliciesTable = () => {
   const navigate = useNavigate();
   const { data: policiesPage, isLoading } = useListPolicies({
     pageNumber: 1,
-    pageSize: 10,
+    pageSize: RECENT_ROWS,
   });
 
   const policies = useMemo(
     () =>
-      [...(policiesPage?.items ?? [])]
-        .sort((a, b) =>
-          (b.issuedOnUtc ?? "").localeCompare(a.issuedOnUtc ?? ""),
-        )
-        .slice(0, 6),
+      [...(policiesPage?.items ?? [])].sort((a, b) =>
+        (b.issuedOnUtc ?? "").localeCompare(a.issuedOnUtc ?? ""),
+      ),
     [policiesPage?.items],
   );
 
@@ -59,7 +59,7 @@ const RecentPoliciesTable = () => {
           <Link to="/policies">View all</Link>
         </Button>
       </div>
-      <div className="min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -118,7 +118,7 @@ const RecentPoliciesTable = () => {
                     </div>
                   </TableCell>
                   <TableCell className="py-2 px-3 text-sm max-w-[10rem] truncate">
-                    {p.policyHolderName?.trim() || "—"}
+                    {customerName(p) || "—"}
                   </TableCell>
                   <TableCell className="py-2 px-3 text-sm max-w-[10rem] truncate">
                     {p.productName?.trim() || p.productId || "—"}

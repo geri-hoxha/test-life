@@ -20,7 +20,7 @@ describe("formatRenewalMoney", () => {
   });
 
   it("does not assume ALL when the currency is unknown", () => {
-    expect(formatRenewalMoney(2198, undefined)).toBe("2,198");
+    expect(formatRenewalMoney(2198, undefined)).toBe("2,198.00");
     expect(formatRenewalMoney(2198, "  ")).not.toContain("ALL");
   });
 });

@@ -4,7 +4,7 @@ A React web front-end for managing an insurance business: offers, policies, rene
 
 ## Features
 
-- Dashboard with KPIs, activity chart, and recent offers/policies
+- Dashboard with KPIs and recent offers/policies
 - Offers, policies, renewals and invoices
 - Customers, people, companies, agents and partners
 - Agent and partner commissions

@@ -47,3 +47,13 @@ export const startRenewalRequestBody = (
   }
   return { ok: true, body: { openingBalance: opening, closingBalance: closing } };
 };
+
+/** Only renewals that take loan balances send them; for the rest the start body is always `{}`. */
+export const startRenewalBody = (
+  requiresLoanBalances: boolean | null | undefined,
+  openingBalance: string,
+  closingBalance: string,
+): StartRenewalBalancesResult =>
+  requiresLoanBalances
+    ? startRenewalRequestBody(openingBalance, closingBalance)
+    : { ok: true, body: {} };

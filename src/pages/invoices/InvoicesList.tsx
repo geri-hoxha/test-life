@@ -44,6 +44,7 @@ import FiscalizationRetryDialog from "./FiscalizationRetryDialog";
 import {
   INVOICE_STATUSES,
   INVOICE_TYPES,
+  canRetryFiscalization,
   formatInvoiceMoney,
   formatServicePeriod,
   invoiceStatusClass,
@@ -311,19 +312,21 @@ const InvoicesList = () => {
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
-                            disabled={!row.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRetryTarget(row);
-                            }}
-                            title="Retry fiscalization"
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                          </Button>
+                          {canRetryFiscalization(row.status) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+                              disabled={!row.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRetryTarget(row);
+                              }}
+                              title="Retry fiscalization"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

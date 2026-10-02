@@ -16,6 +16,7 @@ import type { InvoicesInvoiceLineResponse } from "@/api/types";
 import { ArrowLeft, ExternalLink, RotateCcw, ShieldCheck } from "lucide-react";
 import FiscalizationRetryDialog from "./FiscalizationRetryDialog";
 import {
+  canRetryFiscalization,
   formatInvoiceDate,
   formatInvoiceDateTime,
   formatInvoiceMoney,
@@ -192,14 +193,16 @@ const InvoiceDetail = () => {
               <ShieldCheck className="h-4 w-4" /> Open policy
             </Button>
           )}
-          <Button
-            size="sm"
-            className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700 ml-auto"
-            onClick={() => setRetryOpen(true)}
-            disabled={!invoice.id}
-          >
-            <RotateCcw className="h-4 w-4" /> Retry fiscalization
-          </Button>
+          {canRetryFiscalization(invoice.status) && (
+            <Button
+              size="sm"
+              className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700 ml-auto"
+              onClick={() => setRetryOpen(true)}
+              disabled={!invoice.id}
+            >
+              <RotateCcw className="h-4 w-4" /> Retry fiscalization
+            </Button>
+          )}
         </div>
       </div>
 

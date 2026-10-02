@@ -36,6 +36,7 @@ import {
   buildCreateDocumentFormData,
 } from "@/api/documents";
 import { mapProductDocumentType } from "@/api/adapters/document-types";
+import { formatAmount as formatPlainAmount } from "@/lib/money-format";
 
 type Props = { productId: string };
 
@@ -43,7 +44,7 @@ const VERSION_NA = "N/A";
 
 const formatAmount = (value: number | null | undefined, currency?: string | null) => {
   if (value == null) return "—";
-  const amount = value.toLocaleString();
+  const amount = formatPlainAmount(value);
   return currency ? `${amount} ${currency}` : amount;
 };
 

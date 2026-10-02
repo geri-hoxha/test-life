@@ -1034,6 +1034,12 @@ export type OffersOfferResponse = {
   status?: DomainOffersOfferStatus;
   policyId?: string | null;
   renewedFromPolicyId?: string | null;
+  /** Original LisWeb offer number. Read-only; null on offers created in this system. */
+  legacyOfferAutoId?: number | null;
+  /** Serial the bank assigned to the policy. Digits only. */
+  bankPolicySerial?: string | null;
+  /** The bank's loan number for this offer. */
+  bankLoanNumber?: string | null;
   createdOnUtc?: string;
   quotedOnUtc?: string | null;
   salesAttribution?: OffersSalesAttributionResponse | null;
@@ -1056,6 +1062,12 @@ export type OffersOfferListItemResponse = {
   expiresOnUtc?: string | null;
   policyId?: string | null;
   renewedFromPolicyId?: string | null;
+  /** Original LisWeb offer number. Read-only; null on offers created in this system. */
+  legacyOfferAutoId?: number | null;
+  /** Serial the bank assigned to the policy. Digits only. */
+  bankPolicySerial?: string | null;
+  /** The bank's loan number for this offer. */
+  bankLoanNumber?: string | null;
   coverageTerm?: OffersDateOnlyRangeResponse;
   currency?: string;
   sumInsured?: number | null;
@@ -1086,6 +1098,10 @@ export type OffersCreateOfferRequest = {
   agentId?: string | null;
   /** Always sent (null when not chosen yet); the backend may reject it with a validation error. */
   insuredPersonId: string | null;
+  /** Optional. Digits only, at most 30 characters. */
+  bankPolicySerial?: string | null;
+  /** Optional. At most 50 characters. */
+  bankLoanNumber?: string | null;
 };
 
 export type OffersGetOfferRequest = Record<string, unknown>;
@@ -1112,6 +1128,12 @@ export type OffersListOffersRequest = PaginationPagedRequest & {
   createdToUtc?: string;
   partyId?: string;
   personId?: string;
+  /** Exact match on the LisWeb offer number. Whole number greater than 0, otherwise the API returns 400. */
+  legacyOfferAutoId?: number;
+  /** Exact match on the bank policy serial. Digits only. */
+  bankPolicySerial?: string;
+  /** Exact match on the bank loan number. */
+  bankLoanNumber?: string;
   pageNumber?: number;
   pageSize?: number;
 };

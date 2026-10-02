@@ -67,7 +67,7 @@ import {
   renewalStatusLabel,
   shortRenewalId,
 } from "./renewal-ui";
-import { startRenewalRequestBody } from "./start-renewal-balances";
+import { startRenewalBody } from "./start-renewal-balances";
 
 const COL_COUNT = 12;
 
@@ -187,7 +187,11 @@ const RenewalsList = () => {
 
   const confirmStart = () => {
     if (!startTarget?.policyId || !startTarget.id) return;
-    const balances = startRenewalRequestBody(openingBalance, closingBalance);
+    const balances = startRenewalBody(
+      startTarget.requiresLoanBalances,
+      openingBalance,
+      closingBalance,
+    );
     if (!balances.ok) {
       setBalanceError(true);
       return;
@@ -484,14 +488,16 @@ const RenewalsList = () => {
                 : "Start underwriting for this renewal."}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <StartRenewalBalanceFields
-            openingBalance={openingBalance}
-            closingBalance={closingBalance}
-            onOpeningBalanceChange={setOpeningBalance}
-            onClosingBalanceChange={setClosingBalance}
-            disabled={startRenewal.isPending}
-            showError={balanceError}
-          />
+          {startTarget?.requiresLoanBalances ? (
+            <StartRenewalBalanceFields
+              openingBalance={openingBalance}
+              closingBalance={closingBalance}
+              onOpeningBalanceChange={setOpeningBalance}
+              onClosingBalanceChange={setClosingBalance}
+              disabled={startRenewal.isPending}
+              showError={balanceError}
+            />
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={startRenewal.isPending}>
               Cancel

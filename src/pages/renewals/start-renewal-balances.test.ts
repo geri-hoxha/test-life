@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { startRenewalRequestBody } from "./start-renewal-balances";
+import { startRenewalBody, startRenewalRequestBody } from "./start-renewal-balances";
 
 describe("startRenewalRequestBody", () => {
   it("sends an empty object when both balances are blank", () => {
@@ -31,5 +31,20 @@ describe("startRenewalRequestBody", () => {
 
   it("rejects a non-numeric balance", () => {
     expect(startRenewalRequestBody("abc", "10").ok).toBe(false);
+  });
+});
+
+describe("startRenewalBody", () => {
+  it("sends no balances when the renewal does not take loan balances", () => {
+    expect(startRenewalBody(false, "", "")).toEqual({ ok: true, body: {} });
+    expect(startRenewalBody(undefined, "1200", "800")).toEqual({ ok: true, body: {} });
+  });
+
+  it("validates and sends the balances when the renewal takes them", () => {
+    expect(startRenewalBody(true, "1200", "800")).toEqual({
+      ok: true,
+      body: { openingBalance: 1200, closingBalance: 800 },
+    });
+    expect(startRenewalBody(true, "1200", "").ok).toBe(false);
   });
 });
